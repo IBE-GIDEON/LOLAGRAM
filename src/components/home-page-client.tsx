@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react"
 import { FiSearch } from "react-icons/fi"
 
 import { Card, Input } from "@/components/ui"
-import { ThemeToggle } from "@/components/theme-toggle"
 import { VendorList } from "@/components/vendor-list"
 import { hasSupabase } from "@/lib/env"
 import { loadVendors } from "@/lib/marketplace"
@@ -56,16 +55,13 @@ export function HomePageClient({
               L
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.24em] text-muted">
-                    LOLAGRAM
-                  </p>
-                  <h1 className="mt-1 text-lg font-bold text-ink">
-                    Browse vendors fast
-                  </h1>
-                </div>
-                <ThemeToggle />
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.24em] text-muted">
+                  LOLAGRAM
+                </p>
+                <h1 className="mt-1 text-lg font-bold text-ink">
+                  Browse vendors fast
+                </h1>
               </div>
               <p className="mt-2 text-sm leading-5 text-muted">
                 WhatsApp-style discovery for Nigerian shops, with direct ordering
