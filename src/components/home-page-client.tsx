@@ -83,7 +83,7 @@ export function HomePageClient({
         }
         onScrollPositionChange={setScrollTop}
         stickyHeader={
-          <div className="sticky top-0 z-20 border-b border-black/5 bg-white/38 backdrop-blur-xl dark:border-white/10 dark:bg-black/18">
+          <div className="pointer-events-none sticky top-0 z-20 -mb-12 border-b border-black/5 bg-white/38 backdrop-blur-xl dark:border-white/10 dark:bg-black/18">
             <div className="flex h-12 items-center justify-center">
               <span
                 className={cn(
