@@ -1,9 +1,12 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { FiSearch } from "react-icons/fi"
+import { FiPlus, FiSearch, FiUser } from "react-icons/fi"
 
-import { Card, Input } from "@/components/ui"
+import { useAuth } from "@/components/providers/auth-provider"
+import { ThemeToggle } from "@/components/theme-toggle"
+import { Input } from "@/components/ui"
 import { VendorList } from "@/components/vendor-list"
 import { hasSupabase } from "@/lib/env"
 import { loadVendors } from "@/lib/marketplace"
@@ -17,6 +20,7 @@ export function HomePageClient({
 }: {
   searchOnly?: boolean
 }) {
+  const { sessionUserId, vendorProfile } = useAuth()
   const [activeTab, setActiveTab] = useState<HomeTab>(searchOnly ? "find" : "general")
   const [query, setQuery] = useState("")
   const [vendors, setVendors] = useState<VendorSnapshot[]>([])
@@ -37,105 +41,129 @@ export function HomePageClient({
   }, [activeTab, query])
 
   const isFindTab = searchOnly || activeTab === "find"
-  const displayedVendors = useMemo(() => {
-    if (isFindTab) {
+  const pageTitle = searchOnly ? "Search" : "Lolagram"
+  const sellerHref = vendorProfile
+    ? "/seller/products"
+    : sessionUserId
+      ? "/onboarding/seller"
+      : "/profile"
+  const sellerLabel = vendorProfile
+    ? "Manage your store products"
+    : sessionUserId
+      ? "Open seller onboarding"
+      : "Sign in to start selling"
+  const filteredVendors = useMemo(() => {
+    if (isFindTab || !query.trim()) {
       return vendors
     }
-    return vendors.slice(0, visibleCount)
-  }, [isFindTab, vendors, visibleCount])
 
-  const hasMore = !isFindTab && visibleCount < vendors.length
+    const normalizedQuery = query.trim().toLowerCase()
+
+    return vendors.filter((vendor) =>
+      [vendor.storeName, vendor.category, vendor.city].some((value) =>
+        value.toLowerCase().includes(normalizedQuery)
+      )
+    )
+  }, [isFindTab, query, vendors])
+
+  const displayedVendors = useMemo(() => {
+    const source = isFindTab ? vendors : filteredVendors
+
+    if (isFindTab) {
+      return source
+    }
+    return source.slice(0, visibleCount)
+  }, [filteredVendors, isFindTab, vendors, visibleCount])
+
+  const visibleVendorCount = isFindTab ? vendors.length : filteredVendors.length
+  const hasMore = !isFindTab && visibleCount < filteredVendors.length
 
   return (
     <div className="px-4 pb-6 pt-3">
-      <div className="sticky top-0 z-20 -mx-4 space-y-3 bg-canvas/95 px-4 pb-3 backdrop-blur">
-        <Card className="overflow-hidden">
-          <div className="flex items-start gap-3 px-4 py-4">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-chrome text-lg font-bold text-brand">
-              L
-            </div>
-            <div className="min-w-0 flex-1">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.24em] text-muted">
-                  LOLAGRAM
-                </p>
-                <h1 className="mt-1 text-lg font-bold text-ink">
-                  Browse vendors fast
-                </h1>
-              </div>
-              <p className="mt-2 text-sm leading-5 text-muted">
-                WhatsApp-style discovery for Nigerian shops, with direct ordering
-                in a few taps.
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
-            <span className="rounded-full bg-brand/12 px-3 py-1 text-[11px] font-semibold text-ink">
-              Mobile first
-            </span>
-            <span className="rounded-full bg-canvas px-3 py-1 text-[11px] text-muted">
-              Installable PWA
-            </span>
-            <span className="rounded-full bg-canvas px-3 py-1 text-[11px] text-muted">
-              Smooth vendor scrolling
-            </span>
-          </div>
-        </Card>
-
-        {!hasSupabase ? (
-          <Card className="border border-brand/15 bg-brand/5 px-4 py-3 text-sm text-ink">
-            Demo mode is active. The experience is fully navigable while you connect
-            Supabase, Paystack, and push credentials.
-          </Card>
-        ) : null}
-
-        {!searchOnly ? (
-          <div className="grid grid-cols-2 rounded-full border border-border/70 bg-surface p-1 shadow-soft">
-            {[
-              { key: "find", label: "Find Vendors" },
-              { key: "general", label: "General" }
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                className={cn(
-                  "rounded-full px-4 py-3 text-sm font-semibold transition",
-                  activeTab === tab.key
-                    ? "bg-chrome text-white"
-                    : "text-muted hover:bg-canvas"
-                )}
-                onClick={() => setActiveTab(tab.key as HomeTab)}
+      <div className="sticky top-0 z-20 -mx-4 overflow-hidden rounded-b-[32px] bg-chrome px-4 pb-4 backdrop-blur">
+        <div className="pt-3 text-white shadow-[0_18px_42px_rgba(0,0,0,0.18)]">
+          <div className="flex items-center justify-between gap-3">
+            <Link
+              href="/profile"
+              aria-label="Open your profile"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/90 transition hover:bg-white/15"
+            >
+              <FiUser className="text-[18px]" />
+            </Link>
+            <div className="flex items-center gap-2">
+              <ThemeToggle
+                iconOnly
+                className="border-white/10 bg-white/10 text-white hover:bg-white/15"
+              />
+              <Link
+                href={sellerHref}
+                aria-label={sellerLabel}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-brand text-chrome transition hover:brightness-95"
               >
-                {tab.label}
-              </button>
-            ))}
+                <FiPlus className="text-[20px]" />
+              </Link>
+            </div>
           </div>
-        ) : null}
 
-        <Card className="px-4 py-3">
-          <div className="relative flex-1">
-            <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
+          <div className="mt-5">
+            <h1 className="text-[44px] font-bold leading-none tracking-[-0.05em]">
+              {pageTitle}
+            </h1>
+          </div>
+
+          <div className="relative mt-4 flex-1">
+            <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/55" />
             <Input
-              className="pl-11"
+              className="border-white/10 bg-white/10 pl-11 text-white placeholder:text-white/50 focus:border-brand/50 focus:ring-brand/15"
               placeholder={
                 isFindTab
                   ? "Search store name or category"
-                  : "Search or quick filter vendors"
+                  : "Search vendors or filter by city"
               }
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <p className="text-xs text-muted">
-              {isFindTab
-                ? "Real-time vendor discovery across store name, category, and city."
-                : "All active vendors, sorted by most recent order activity first."}
-            </p>
-            <span className="shrink-0 rounded-full bg-canvas px-2.5 py-1 text-[11px] font-medium text-muted">
-              {vendors.length} vendors
-            </span>
+
+          <div className="mt-4 flex items-center justify-between gap-3">
+            {!searchOnly ? (
+              <div className="flex flex-1 gap-2 overflow-x-auto pb-1">
+                {[
+                  { key: "general", label: "General" },
+                  { key: "find", label: "Find Vendors" }
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    className={cn(
+                      "shrink-0 rounded-full border px-4 py-2.5 text-sm font-semibold transition",
+                      activeTab === tab.key
+                        ? "border-brand/25 bg-brand/20 text-[#E8FFE7]"
+                        : "border-white/10 bg-white/5 text-white/75 hover:bg-white/10"
+                    )}
+                    onClick={() => setActiveTab(tab.key as HomeTab)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/75">
+                Live search
+              </span>
+            )}
+            <div className="flex shrink-0 items-center gap-2">
+              {!hasSupabase ? (
+                <span className="rounded-full border border-brand/20 bg-brand/10 px-3 py-1.5 text-[11px] font-semibold text-brand">
+                  Demo mode
+                </span>
+              ) : null}
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-white/75">
+                {visibleVendorCount} vendors
+              </span>
+            </div>
           </div>
-        </Card>
+        </div>
       </div>
 
       {loading ? (
@@ -154,11 +182,13 @@ export function HomePageClient({
           searchMode={isFindTab}
           hasMore={hasMore}
           onReachEnd={() =>
-            setVisibleCount((current) => Math.min(current + 20, vendors.length))
+            setVisibleCount((current) =>
+              Math.min(current + 20, filteredVendors.length)
+            )
           }
           className={cn(
-            "mt-4",
-            searchOnly ? "h-[calc(100vh-232px)]" : "h-[calc(100vh-308px)]"
+            "mt-3",
+            searchOnly ? "h-[calc(100dvh-288px)]" : "h-[calc(100dvh-332px)]"
           )}
         />
       )}
