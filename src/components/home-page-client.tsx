@@ -1,33 +1,31 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { FiSearch } from "react-icons/fi"
+import { FiCamera, FiMoreHorizontal, FiPlus, FiSearch } from "react-icons/fi"
 
-import { Card, Input } from "@/components/ui"
 import { VendorList } from "@/components/vendor-list"
 import { hasSupabase } from "@/lib/env"
 import { loadVendors } from "@/lib/marketplace"
 import { type VendorSnapshot } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
-type HomeTab = "find" | "general"
+type HomeTab = "all" | "find"
 
 export function HomePageClient({
   searchOnly = false
 }: {
   searchOnly?: boolean
 }) {
-  const [activeTab, setActiveTab] = useState<HomeTab>(searchOnly ? "find" : "general")
+  const [activeTab, setActiveTab] = useState<HomeTab>(searchOnly ? "find" : "all")
   const [query, setQuery] = useState("")
   const [vendors, setVendors] = useState<VendorSnapshot[]>([])
   const [loading, setLoading] = useState(true)
   const [visibleCount, setVisibleCount] = useState(20)
 
   useEffect(() => {
-    const targetTab = searchOnly ? "find" : activeTab
+    const isFindMode = searchOnly || activeTab === "find"
     setLoading(true)
-
-    loadVendors(targetTab === "find" ? query : "")
+    loadVendors(isFindMode ? query : "")
       .then((data) => setVendors(data))
       .finally(() => setLoading(false))
   }, [activeTab, query, searchOnly])
@@ -38,108 +36,87 @@ export function HomePageClient({
 
   const isFindTab = searchOnly || activeTab === "find"
   const displayedVendors = useMemo(() => {
-    if (isFindTab) {
-      return vendors
-    }
+    if (isFindTab) return vendors
     return vendors.slice(0, visibleCount)
   }, [isFindTab, vendors, visibleCount])
 
   const hasMore = !isFindTab && visibleCount < vendors.length
 
-  return (
-    <div className="px-4 pb-6 pt-3">
-      <div className="sticky top-0 z-20 -mx-4 space-y-3 bg-canvas/95 px-4 pb-3 backdrop-blur">
-        <Card className="overflow-hidden">
-          <div className="flex items-start gap-3 px-4 py-4">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-chrome text-lg font-bold text-brand">
-              L
-            </div>
-            <div className="min-w-0 flex-1">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.24em] text-muted">
-                  LOLAGRAM
-                </p>
-                <h1 className="mt-1 text-lg font-bold text-ink">
-                  Browse vendors fast
-                </h1>
-              </div>
-              <p className="mt-2 text-sm leading-5 text-muted">
-                WhatsApp-style discovery for Nigerian shops, with direct ordering
-                in a few taps.
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
-            <span className="rounded-full bg-brand/12 px-3 py-1 text-[11px] font-semibold text-ink">
-              Mobile first
-            </span>
-            <span className="rounded-full bg-canvas px-3 py-1 text-[11px] text-muted">
-              Installable PWA
-            </span>
-            <span className="rounded-full bg-canvas px-3 py-1 text-[11px] text-muted">
-              Smooth vendor scrolling
-            </span>
-          </div>
-        </Card>
+  const pills: { key: HomeTab; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "find", label: "Find Vendors" },
+  ]
 
+  return (
+    <div className="pb-6">
+      {/* WhatsApp-style sticky header */}
+      <div className="sticky top-0 z-20 -mx-4 bg-canvas/95 px-4 pb-3 backdrop-blur">
+
+        {/* Top action bar */}
+        <div className="flex items-center justify-between pt-3 pb-1">
+          <button className="flex h-10 w-10 items-center justify-center rounded-full bg-surface text-ink">
+            <FiMoreHorizontal size={20} />
+          </button>
+          <div className="flex items-center gap-2">
+            <button className="flex h-10 w-10 items-center justify-center rounded-full bg-surface text-ink">
+              <FiCamera size={18} />
+            </button>
+            <button className="flex h-10 w-10 items-center justify-center rounded-full bg-brand text-white">
+              <FiPlus size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Large title */}
+        <h1 className="mb-3 text-[32px] font-bold leading-tight text-ink">
+          Lolagram
+        </h1>
+
+        {/* Demo mode banner */}
         {!hasSupabase ? (
-          <Card className="border border-brand/15 bg-brand/5 px-4 py-3 text-sm text-ink">
-            Demo mode is active. The experience is fully navigable while you connect
-            Supabase, Paystack, and push credentials.
-          </Card>
+          <div className="mb-3 rounded-2xl border border-brand/15 bg-brand/5 px-4 py-2.5 text-xs text-ink">
+            Demo mode active — connect Supabase, Paystack &amp; push credentials to go live.
+          </div>
         ) : null}
 
+        {/* Search bar */}
+        <div className="relative mb-3">
+          <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={16} />
+          <input
+            className="w-full rounded-full bg-surface py-3 pl-11 pr-4 text-sm text-ink placeholder:text-muted focus:outline-none"
+            placeholder={isFindTab ? "Search store name or category" : "Ask Meta AI or Search"}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+
+        {/* Filter pills */}
         {!searchOnly ? (
-          <div className="grid grid-cols-2 rounded-full border border-border/70 bg-surface p-1 shadow-soft">
-            {[
-              { key: "find", label: "Find Vendors" },
-              { key: "general", label: "General" }
-            ].map((tab) => (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {pills.map((pill) => (
               <button
-                key={tab.key}
+                key={pill.key}
+                onClick={() => setActiveTab(pill.key)}
                 className={cn(
-                  "rounded-full px-4 py-3 text-sm font-semibold transition",
-                  activeTab === tab.key
-                    ? "bg-chrome text-white"
-                    : "text-muted hover:bg-canvas"
+                  "shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold transition",
+                  activeTab === pill.key
+                    ? "bg-brand text-white"
+                    : "bg-surface text-muted"
                 )}
-                onClick={() => setActiveTab(tab.key as HomeTab)}
               >
-                {tab.label}
+                {pill.label}
               </button>
             ))}
+            <button className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface text-muted text-sm font-bold">
+              +
+            </button>
           </div>
         ) : null}
-
-        <Card className="px-4 py-3">
-          <div className="relative flex-1">
-            <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
-            <Input
-              className="pl-11"
-              placeholder={
-                isFindTab
-                  ? "Search store name or category"
-                  : "Search or quick filter vendors"
-              }
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </div>
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <p className="text-xs text-muted">
-              {isFindTab
-                ? "Real-time vendor discovery across store name, category, and city."
-                : "All active vendors, sorted by most recent order activity first."}
-            </p>
-            <span className="shrink-0 rounded-full bg-canvas px-2.5 py-1 text-[11px] font-medium text-muted">
-              {vendors.length} vendors
-            </span>
-          </div>
-        </Card>
       </div>
 
+      {/* Vendor list */}
       {loading ? (
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 space-y-3 px-4">
           {Array.from({ length: 5 }).map((_, index) => (
             <div
               key={index}
@@ -157,8 +134,8 @@ export function HomePageClient({
             setVisibleCount((current) => Math.min(current + 20, vendors.length))
           }
           className={cn(
-            "mt-4",
-            searchOnly ? "h-[calc(100vh-232px)]" : "h-[calc(100vh-308px)]"
+            "mt-2 px-4",
+            searchOnly ? "h-[calc(100vh-200px)]" : "h-[calc(100vh-280px)]"
           )}
         />
       )}
