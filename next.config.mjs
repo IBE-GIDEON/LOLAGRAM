@@ -1,8 +1,4 @@
-const distDir = process.env.NEXT_DIST_DIR || ".next"
-
 /** @type {import('next').NextConfig} */
-const nextConfig = {
-  distDir
-}
+const nextConfig = {}
 
 export default nextConfig
