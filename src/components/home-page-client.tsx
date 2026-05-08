@@ -1,14 +1,10 @@
 "use client"
 
-import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { FiPlus, FiSearch, FiUser } from "react-icons/fi"
+import { FiSearch } from "react-icons/fi"
 
-import { useAuth } from "@/components/providers/auth-provider"
-import { ThemeToggle } from "@/components/theme-toggle"
 import { Input } from "@/components/ui"
 import { VendorList } from "@/components/vendor-list"
-import { hasSupabase } from "@/lib/env"
 import { loadVendors } from "@/lib/marketplace"
 import { type VendorSnapshot } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -20,7 +16,6 @@ export function HomePageClient({
 }: {
   searchOnly?: boolean
 }) {
-  const { sessionUserId, vendorProfile } = useAuth()
   const [activeTab, setActiveTab] = useState<HomeTab>(searchOnly ? "find" : "general")
   const [query, setQuery] = useState("")
   const [vendors, setVendors] = useState<VendorSnapshot[]>([])
@@ -42,16 +37,6 @@ export function HomePageClient({
 
   const isFindTab = searchOnly || activeTab === "find"
   const pageTitle = searchOnly ? "Search" : "Lolagram"
-  const sellerHref = vendorProfile
-    ? "/seller/products"
-    : sessionUserId
-      ? "/onboarding/seller"
-      : "/profile"
-  const sellerLabel = vendorProfile
-    ? "Manage your store products"
-    : sessionUserId
-      ? "Open seller onboarding"
-      : "Sign in to start selling"
   const filteredVendors = useMemo(() => {
     if (isFindTab || !query.trim()) {
       return vendors
@@ -80,41 +65,21 @@ export function HomePageClient({
 
   return (
     <div className="px-4 pb-6 pt-3">
-      <div className="sticky top-0 z-20 -mx-4 overflow-hidden rounded-b-[32px] bg-chrome px-4 pb-4 backdrop-blur">
-        <div className="pt-3 text-white shadow-[0_18px_42px_rgba(0,0,0,0.18)]">
+      <div className="sticky top-0 z-20 -mx-4 overflow-hidden rounded-b-[32px] bg-brand px-4 pb-4 text-chrome shadow-[0_16px_36px_rgba(0,0,0,0.12)] backdrop-blur dark:bg-chrome dark:text-white dark:shadow-[0_18px_42px_rgba(0,0,0,0.28)]">
+        <div className="pt-3">
           <div className="flex items-center justify-between gap-3">
-            <Link
-              href="/profile"
-              aria-label="Open your profile"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/90 transition hover:bg-white/15"
-            >
-              <FiUser className="text-[18px]" />
-            </Link>
-            <div className="flex items-center gap-2">
-              <ThemeToggle
-                iconOnly
-                className="border-white/10 bg-white/10 text-white hover:bg-white/15"
-              />
-              <Link
-                href={sellerHref}
-                aria-label={sellerLabel}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-brand text-chrome transition hover:brightness-95"
-              >
-                <FiPlus className="text-[20px]" />
-              </Link>
-            </div>
-          </div>
-
-          <div className="mt-5">
             <h1 className="text-[44px] font-bold leading-none tracking-[-0.05em]">
               {pageTitle}
             </h1>
+            <span className="rounded-full border border-black/10 bg-white/45 px-3 py-1.5 text-[11px] font-semibold text-chrome/80 dark:border-white/10 dark:bg-white/10 dark:text-white/75">
+              {visibleVendorCount} vendors
+            </span>
           </div>
 
           <div className="relative mt-4 flex-1">
-            <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/55" />
+            <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted dark:text-white/55" />
             <Input
-              className="border-white/10 bg-white/10 pl-11 text-white placeholder:text-white/50 focus:border-brand/50 focus:ring-brand/15"
+              className="border-black/5 bg-white/90 pl-11 text-ink placeholder:text-muted focus:border-chrome/10 focus:ring-black/5 dark:border-white/10 dark:bg-white/10 dark:text-white dark:placeholder:text-white/50 dark:focus:border-brand/50 dark:focus:ring-brand/15"
               placeholder={
                 isFindTab
                   ? "Search store name or category"
@@ -127,7 +92,7 @@ export function HomePageClient({
 
           <div className="mt-4 flex items-center justify-between gap-3">
             {!searchOnly ? (
-              <div className="flex flex-1 gap-2 overflow-x-auto pb-1">
+              <div className="grid flex-1 grid-cols-2 gap-2">
                 {[
                   { key: "general", label: "General" },
                   { key: "find", label: "Find Vendors" }
@@ -136,10 +101,10 @@ export function HomePageClient({
                     key={tab.key}
                     type="button"
                     className={cn(
-                      "shrink-0 rounded-full border px-4 py-2.5 text-sm font-semibold transition",
+                      "rounded-full border px-4 py-3 text-center text-sm font-semibold transition",
                       activeTab === tab.key
-                        ? "border-brand/25 bg-brand/20 text-[#E8FFE7]"
-                        : "border-white/10 bg-white/5 text-white/75 hover:bg-white/10"
+                        ? "border-transparent bg-chrome text-white dark:bg-brand dark:text-chrome"
+                        : "border-black/10 bg-white/35 text-chrome/78 hover:bg-white/50 dark:border-white/10 dark:bg-white/5 dark:text-white/75 dark:hover:bg-white/10"
                     )}
                     onClick={() => setActiveTab(tab.key as HomeTab)}
                   >
@@ -148,20 +113,10 @@ export function HomePageClient({
                 ))}
               </div>
             ) : (
-              <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/75">
+              <span className="rounded-full border border-black/10 bg-white/35 px-4 py-2 text-sm font-medium text-chrome/78 dark:border-white/10 dark:bg-white/5 dark:text-white/75">
                 Live search
               </span>
             )}
-            <div className="flex shrink-0 items-center gap-2">
-              {!hasSupabase ? (
-                <span className="rounded-full border border-brand/20 bg-brand/10 px-3 py-1.5 text-[11px] font-semibold text-brand">
-                  Demo mode
-                </span>
-              ) : null}
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-white/75">
-                {visibleVendorCount} vendors
-              </span>
-            </div>
           </div>
         </div>
       </div>
@@ -188,7 +143,7 @@ export function HomePageClient({
           }
           className={cn(
             "mt-3",
-            searchOnly ? "h-[calc(100dvh-288px)]" : "h-[calc(100dvh-332px)]"
+            searchOnly ? "h-[calc(100dvh-236px)]" : "h-[calc(100dvh-284px)]"
           )}
         />
       )}
