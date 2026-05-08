@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo, useRef } from "react"
+import { type ReactNode, useMemo, useRef } from "react"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { FiChevronRight, FiMapPin } from "react-icons/fi"
 
@@ -16,6 +16,10 @@ export function VendorList({
   searchMode = false,
   onReachEnd,
   hasMore = false,
+  loading = false,
+  header,
+  stickyHeader,
+  onScrollPositionChange,
   className
 }: {
   vendors: VendorSnapshot[]
@@ -23,6 +27,10 @@ export function VendorList({
   searchMode?: boolean
   onReachEnd?: () => void
   hasMore?: boolean
+  loading?: boolean
+  header?: ReactNode
+  stickyHeader?: ReactNode
+  onScrollPositionChange?: (scrollTop: number) => void
   className?: string
 }) {
   const parentRef = useRef<HTMLDivElement | null>(null)
@@ -40,11 +48,17 @@ export function VendorList({
   const virtualItems = virtualizer.getVirtualItems()
 
   const handleScroll = () => {
-    if (!parentRef.current || !onReachEnd || !hasMore) {
+    if (!parentRef.current) {
       return
     }
 
     const { scrollTop, scrollHeight, clientHeight } = parentRef.current
+    onScrollPositionChange?.(scrollTop)
+
+    if (!onReachEnd || !hasMore) {
+      return
+    }
+
     if (scrollHeight - scrollTop - clientHeight < 120) {
       onReachEnd()
     }
@@ -93,17 +107,28 @@ export function VendorList({
     <div
       ref={parentRef}
       className={cn(
-        "h-[calc(100vh-252px)] overflow-y-auto rounded-[24px] border border-border/70 bg-surface shadow-soft",
+        "h-[calc(100vh-252px)] overflow-y-auto bg-canvas",
         className
       )}
       onScroll={handleScroll}
     >
+      {stickyHeader ? stickyHeader : null}
+      {header ? <div>{header}</div> : null}
       {shouldVirtualize ? (
         <div
           className="relative w-full"
           style={{ height: `${virtualizer.getTotalSize()}px` }}
         >
           {renderedVendors}
+        </div>
+      ) : loading ? (
+        <div className="pb-4">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div
+              key={index}
+              className="h-[82px] animate-pulse border-b border-border bg-surface/80"
+            />
+          ))}
         </div>
       ) : (
         <div>{renderedVendors}</div>
@@ -129,7 +154,7 @@ function VendorRow({
   return (
     <Link
       href={`/vendor/${vendor.id}`}
-      className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3 transition hover:bg-canvas active:bg-canvas"
+      className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3 transition hover:bg-canvas active:bg-canvas last:border-b-0"
     >
       <Avatar src={vendor.storePhotoUrl} alt={vendor.storeName} />
       <div className="min-w-0 flex-1">
