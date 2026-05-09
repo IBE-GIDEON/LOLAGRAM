@@ -21,7 +21,7 @@ export default function OrderConfirmationPage({
   }, [params.id])
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4 p-4 pb-safe-nav">
       <SectionHeading title="Order confirmation" />
       <Card className="p-6 text-center">
         <p className="text-2xl font-bold text-ink">Your order is in</p>

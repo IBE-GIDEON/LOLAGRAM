@@ -107,7 +107,7 @@ export function ProfilePageClient() {
 
   if (!profile) {
     return (
-      <div className="space-y-4 p-4">
+      <div className="space-y-4 p-4 pb-safe-nav">
         <SectionHeading title="Profile" action={<ThemeToggle />} />
         <Card className="p-5">
           <p className="text-lg font-semibold text-ink">Phone number sign in</p>
@@ -140,10 +140,10 @@ export function ProfilePageClient() {
               {(["buyer", "seller"] as AccountType[]).map((type) => (
                 <button
                   key={type}
-                  className={`rounded-full px-4 py-3 text-sm font-semibold ${
+                  className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 py-3 text-center text-sm font-semibold transition ${
                     authValues.accountType === type
                       ? "bg-chrome text-white"
-                      : "text-muted"
+                      : "text-muted hover:bg-surface"
                   }`}
                   onClick={() =>
                     setAuthValues((current) => ({ ...current, accountType: type }))
@@ -199,7 +199,7 @@ export function ProfilePageClient() {
     (profile.accountType === "seller" || profile.accountType === "both")
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4 p-4 pb-safe-nav">
       <SectionHeading title="Profile" />
 
       <Card className="p-5">
@@ -316,18 +316,19 @@ export function ProfilePageClient() {
       {profile.accountType === "seller" || profile.accountType === "both" ? (
         <div className="space-y-4">
           <Card className="p-5">
-            <div className="flex items-center justify-between">
+            <div className="space-y-4">
               <div>
                 <p className="text-sm font-semibold text-ink">Switch view</p>
                 <p className="mt-1 text-sm text-muted">
                   Use one account for both shopping and selling.
                 </p>
               </div>
-              <div className="grid grid-cols-2 rounded-full bg-canvas p-1">
+
+              <div className="grid w-full grid-cols-2 gap-1 rounded-full bg-canvas p-1">
                 {(["buyer", "seller"] as const).map((mode) => (
                   <button
                     key={mode}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                    className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 py-3 text-center text-sm font-semibold transition ${
                       viewMode === mode ? "bg-chrome text-white" : "text-muted"
                     }`}
                     onClick={() => {

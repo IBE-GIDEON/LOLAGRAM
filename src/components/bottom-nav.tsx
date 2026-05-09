@@ -17,7 +17,7 @@ export function BottomNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="sticky bottom-0 z-40 border-t border-border bg-surface/95 px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-2 backdrop-blur">
+    <nav className="sticky bottom-0 z-40 shrink-0 border-t border-border bg-surface/95 px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-2 backdrop-blur">
       <div className="grid grid-cols-4 gap-1">
         {items.map((item) => {
           const active =

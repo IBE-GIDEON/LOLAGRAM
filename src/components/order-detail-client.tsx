@@ -58,7 +58,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
   const whatsappNumber = vendorData?.vendor.whatsappNumber
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4 p-4 pb-safe-nav">
       <SectionHeading title="Order detail" />
 
       <Card className="p-4">

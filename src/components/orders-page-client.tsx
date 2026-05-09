@@ -40,7 +40,7 @@ export function OrdersPageClient() {
 
   if (!profile) {
     return (
-      <div className="space-y-4 p-4">
+      <div className="space-y-4 p-4 pb-safe-nav">
         <SectionHeading title="Orders" />
         <Card className="p-5">
           <p className="text-lg font-semibold text-ink">Sign in to view your orders</p>
@@ -59,7 +59,7 @@ export function OrdersPageClient() {
   }
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4 p-4 pb-safe-nav">
       <SectionHeading title="Orders" />
 
       {vendorProfile ? (

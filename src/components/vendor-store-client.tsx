@@ -109,7 +109,7 @@ export function VendorStoreClient({
   }
 
   return (
-    <div className="pb-8">
+    <div className="pb-safe-nav">
       <div className="relative">
         <div className="h-44 overflow-hidden bg-gradient-to-br from-chrome via-chrome to-brand/70">
           {data.vendor.storePhotoUrl ? (

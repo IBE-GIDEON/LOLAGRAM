@@ -30,7 +30,7 @@ export function SellerOnboardingClient() {
 
   if (!profile) {
     return (
-      <div className="space-y-4 p-4">
+      <div className="space-y-4 p-4 pb-safe-nav">
         <SectionHeading title="Seller onboarding" />
         <Card className="p-5">
           <p className="text-lg font-semibold text-ink">Sign in first</p>
@@ -50,7 +50,7 @@ export function SellerOnboardingClient() {
   }
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4 p-4 pb-safe-nav">
       <SectionHeading title="Seller onboarding" />
       <Card className="p-4">
         <div className="flex items-center justify-between">

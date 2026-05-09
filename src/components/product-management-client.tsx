@@ -42,7 +42,7 @@ export function ProductManagementClient() {
 
   if (!profile || !vendorProfile) {
     return (
-      <div className="space-y-4 p-4">
+      <div className="space-y-4 p-4 pb-safe-nav">
         <SectionHeading title="Manage products" />
         <Card className="p-5">
           <p className="text-lg font-semibold text-ink">Create your store first</p>
@@ -61,7 +61,7 @@ export function ProductManagementClient() {
   }
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4 p-4 pb-safe-nav">
       <SectionHeading
         title="Manage products"
         action={

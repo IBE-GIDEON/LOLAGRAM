@@ -90,6 +90,10 @@ select {
   background: rgba(var(--color-muted), 0.32);
 }
 
+.pb-safe-nav {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 96px);
+}
+
 html.dark .bg-white {
   background-color: rgb(var(--color-surface)) !important;
 }

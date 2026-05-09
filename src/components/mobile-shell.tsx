@@ -30,7 +30,7 @@ export function MobileShell({ children }: PropsWithChildren) {
         </aside>
         <main className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-canvas lg:overflow-hidden lg:rounded-[36px] lg:border lg:border-border/60 lg:shadow-xl">
           <OfflineBanner />
-          <div className="flex-1 pb-24">{children}</div>
+          <div className="min-h-0 flex-1">{children}</div>
           <BottomNav />
         </main>
       </div>
