@@ -17,6 +17,14 @@ export const metadata: Metadata = {
   description:
     "Mobile-first Nigerian marketplace for buyers and sellers with a WhatsApp-style vendor list.",
   applicationName: "LOLAGRAM",
+  icons: {
+    icon: [
+      { url: "/icons/icon-64.png", sizes: "64x64", type: "image/png" },
+      { url: "/icons/icon-128.png", sizes: "128x128", type: "image/png" }
+    ],
+    apple: [{ url: "/icons/apple-icon-180.png", sizes: "180x180", type: "image/png" }],
+    shortcut: [{ url: "/icons/icon-64.png", sizes: "64x64", type: "image/png" }]
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -28,7 +36,10 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#C0392B"
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#25D366" },
+    { media: "(prefers-color-scheme: dark)", color: "#111B21" }
+  ]
 }
 
 export default function RootLayout({
@@ -41,7 +52,7 @@ export default function RootLayout({
       try {
         var stored = window.localStorage.getItem("${THEME_KEY}");
         var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        var isDark = stored ? stored === "dark" : prefersDark;
+        var isDark = stored ? stored === "dark" : true;
         document.documentElement.classList.toggle("dark", isDark);
       } catch (error) {}
     })();
