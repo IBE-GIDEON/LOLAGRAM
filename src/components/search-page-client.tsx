@@ -35,10 +35,12 @@ export function SearchPageClient() {
   const [mode, setMode] = useState<SearchMode>("all")
   const [results, setResults] = useState<MarketplaceSearchResults>(emptyResults)
   const [loading, setLoading] = useState(true)
+  const [scrollTop, setScrollTop] = useState(0)
   const deferredQuery = useDeferredValue(query)
   const activeQuery = deferredQuery.trim()
   const showProducts = mode === "all" || mode === "products"
   const showVendors = mode === "all" || mode === "stores"
+  const showCompactHeader = scrollTop > 88
 
   useEffect(() => {
     let ignore = false
@@ -62,129 +64,156 @@ export function SearchPageClient() {
   }, [deferredQuery])
 
   return (
-    <div className="pb-8">
-      <div className="sticky top-0 z-20 bg-canvas/96 px-4 pb-3 pt-3 backdrop-blur">
-        <h1 className="text-[32px] font-bold tracking-[-0.04em] text-ink">Search</h1>
-        <p className="mt-1 text-sm text-muted">
-          Search products, stores, categories, or cities in one place.
-        </p>
-
-        <div className="relative mt-4">
-          <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
-          <Input
-            className="pl-11"
-            placeholder="Search bag, watch, wig, lipstick, or store name"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </div>
-
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-          {([
-            ["all", "All"],
-            ["products", "Products"],
-            ["stores", "Stores"]
-          ] as const).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
+    <div className="pb-6 pt-0">
+      <div
+        className="h-[calc(100dvh-116px)] overflow-y-auto bg-canvas"
+        onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+      >
+        <div
+          className={cn(
+            "pointer-events-none sticky top-0 z-20 -mb-12 transition-all duration-200",
+            showCompactHeader
+              ? "border-b border-black/5 bg-white/38 backdrop-blur-xl dark:border-white/10 dark:bg-black/18"
+              : "border-b border-transparent bg-transparent backdrop-blur-0"
+          )}
+        >
+          <div className="flex h-12 items-center justify-center">
+            <span
               className={cn(
-                "shrink-0 rounded-full border px-4 py-2.5 text-sm font-semibold transition",
-                mode === value
-                  ? "border-transparent bg-chrome text-white dark:bg-brand dark:text-chrome"
-                  : "border-border bg-surface text-muted hover:bg-canvas"
+                "text-sm font-semibold tracking-[-0.01em] text-ink transition-all duration-200 dark:text-white",
+                showCompactHeader
+                  ? "translate-y-0 opacity-100"
+                  : "translate-y-1 opacity-0"
               )}
-              onClick={() => setMode(value)}
             >
-              {label}
-            </button>
-          ))}
+              Search
+            </span>
+          </div>
         </div>
 
-        {!activeQuery ? (
+        <div className="bg-canvas px-4 pb-3 pt-3">
+          <h1 className="text-[32px] font-bold tracking-[-0.04em] text-ink">Search</h1>
+          <p className="mt-1 text-sm text-muted">
+            Search products, stores, categories, or cities in one place.
+          </p>
+
+          <div className="relative mt-4">
+            <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
+            <Input
+              className="pl-11"
+              placeholder="Search bag, watch, wig, lipstick, or store name"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
+
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-            {suggestionTerms.map((term) => (
+            {([
+              ["all", "All"],
+              ["products", "Products"],
+              ["stores", "Stores"]
+            ] as const).map(([value, label]) => (
               <button
-                key={term}
+                key={value}
                 type="button"
-                className="shrink-0 rounded-full border border-border bg-surface px-3 py-2 text-xs font-medium text-muted transition hover:bg-canvas"
-                onClick={() => setQuery(term)}
+                className={cn(
+                  "shrink-0 rounded-full border px-4 py-2.5 text-sm font-semibold transition",
+                  mode === value
+                    ? "border-transparent bg-chrome text-white dark:bg-brand dark:text-chrome"
+                    : "border-border bg-surface text-muted hover:bg-canvas"
+                )}
+                onClick={() => setMode(value)}
               >
-                {term}
+                {label}
               </button>
             ))}
           </div>
-        ) : null}
-      </div>
 
-      <div className="space-y-6 px-4 py-4">
-        {showProducts ? (
-          <section>
-            <SectionHeading
-              title={activeQuery ? "Products" : "Trending products"}
-              action={
-                <span className="text-xs font-medium text-muted">
-                  {results.products.length} results
-                </span>
-              }
-            />
-            {loading ? (
-              <div className="grid grid-cols-2 gap-3">
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="aspect-[0.82] animate-pulse rounded-[22px] bg-surface"
-                  />
-                ))}
-              </div>
-            ) : results.products.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3">
-                {results.products.map((product) => (
-                  <ProductSearchCard key={product.id} product={product} />
-                ))}
-              </div>
-            ) : activeQuery ? (
-              <p className="text-sm leading-6 text-muted">
-                No product matched “{activeQuery}” yet. Try another word like
-                watch, wig, bag, lipstick, or dress.
-              </p>
-            ) : null}
-          </section>
-        ) : null}
+          {!activeQuery ? (
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+              {suggestionTerms.map((term) => (
+                <button
+                  key={term}
+                  type="button"
+                  className="shrink-0 rounded-full border border-border bg-surface px-3 py-2 text-xs font-medium text-muted transition hover:bg-canvas"
+                  onClick={() => setQuery(term)}
+                >
+                  {term}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
 
-        {showVendors ? (
-          <section>
-            <SectionHeading
-              title={activeQuery ? "Stores" : "Popular stores"}
-              action={
-                <span className="text-xs font-medium text-muted">
-                  {results.vendors.length} results
-                </span>
-              }
-            />
-            {loading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="h-[82px] animate-pulse border-b border-border bg-surface/80"
-                  />
-                ))}
-              </div>
-            ) : results.vendors.length > 0 ? (
-              <div className="divide-y divide-border overflow-hidden rounded-[24px] bg-surface">
-                {results.vendors.map((vendor) => (
-                  <VendorSearchRow key={vendor.id} vendor={vendor} />
-                ))}
-              </div>
-            ) : activeQuery ? (
-              <p className="text-sm leading-6 text-muted">
-                No store matched “{activeQuery}” directly. Try product words too,
-                not only vendor names.
-              </p>
-            ) : null}
-          </section>
-        ) : null}
+        <div className="space-y-6 px-4 py-4">
+          {showProducts ? (
+            <section>
+              <SectionHeading
+                title={activeQuery ? "Products" : "Trending products"}
+                action={
+                  <span className="text-xs font-medium text-muted">
+                    {results.products.length} results
+                  </span>
+                }
+              />
+              {loading ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div
+                      key={index}
+                      className="aspect-[0.82] animate-pulse rounded-[22px] bg-surface"
+                    />
+                  ))}
+                </div>
+              ) : results.products.length > 0 ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {results.products.map((product) => (
+                    <ProductSearchCard key={product.id} product={product} />
+                  ))}
+                </div>
+              ) : activeQuery ? (
+                <p className="text-sm leading-6 text-muted">
+                  No product matched "{activeQuery}" yet. Try another word like
+                  watch, wig, bag, lipstick, or dress.
+                </p>
+              ) : null}
+            </section>
+          ) : null}
+
+          {showVendors ? (
+            <section>
+              <SectionHeading
+                title={activeQuery ? "Stores" : "Popular stores"}
+                action={
+                  <span className="text-xs font-medium text-muted">
+                    {results.vendors.length} results
+                  </span>
+                }
+              />
+              {loading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div
+                      key={index}
+                      className="h-[82px] animate-pulse border-b border-border bg-surface/80"
+                    />
+                  ))}
+                </div>
+              ) : results.vendors.length > 0 ? (
+                <div className="divide-y divide-border overflow-hidden rounded-[24px] bg-surface">
+                  {results.vendors.map((vendor) => (
+                    <VendorSearchRow key={vendor.id} vendor={vendor} />
+                  ))}
+                </div>
+              ) : activeQuery ? (
+                <p className="text-sm leading-6 text-muted">
+                  No store matched "{activeQuery}" directly. Try product words too,
+                  not only vendor names.
+                </p>
+              ) : null}
+            </section>
+          ) : null}
+        </div>
       </div>
     </div>
   )
