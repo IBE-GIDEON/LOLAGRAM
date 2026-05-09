@@ -3,7 +3,8 @@ import { spawn } from "node:child_process"
 
 const [mode = "dev", ...extraArgs] = process.argv.slice(2)
 
-const distDir = mode === "dev" ? ".next" : ".next-build"
+const isVercel = process.env.VERCEL === "1"
+const distDir = mode === "dev" || isVercel ? ".next" : ".next-build"
 const nextBin = resolve("node_modules", "next", "dist", "bin", "next")
 
 const child = spawn(process.execPath, [nextBin, mode, ...extraArgs], {
