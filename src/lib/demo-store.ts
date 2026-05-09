@@ -6,11 +6,13 @@ import {
 import { createInitialDemoState } from "@/lib/mock-data"
 import {
   type DemoState,
+  type MarketplaceSearchResults,
   type Order,
   type OrderDetail,
   type OrderStatus,
   type Product,
   type ProductInput,
+  type ProductSearchResult,
   type Review,
   type ReviewWithBuyer,
   type SellerProfileInput,
@@ -80,6 +82,40 @@ function buildVendorSnapshot(
   }
 }
 
+function buildMarketplaceProductMatches(state: DemoState, normalized: string) {
+  const activeVendors = state.vendors.filter((vendor) => vendor.isActive)
+  const vendorSnapshotMap = new Map(
+    activeVendors.map((vendor) => [vendor.id, buildVendorSnapshot(vendor, state)])
+  )
+
+  const products: ProductSearchResult[] = state.products
+    .filter((product) => vendorSnapshotMap.has(product.vendorId))
+    .filter((product) => {
+      if (!normalized) return true
+
+      const vendor = vendorSnapshotMap.get(product.vendorId)
+      if (!vendor) return false
+
+      return [
+        product.name,
+        product.description,
+        vendor.storeName,
+        vendor.category,
+        vendor.city
+      ].some((value) => value.toLowerCase().includes(normalized))
+    })
+    .map((product) => ({
+      ...product,
+      vendor: vendorSnapshotMap.get(product.vendorId)!
+    }))
+    .sort((left, right) => +new Date(right.createdAt) - +new Date(left.createdAt))
+
+  return {
+    activeVendors,
+    products
+  }
+}
+
 export function getVendorSnapshots(query?: string): VendorSnapshot[] {
   const state = getDemoState()
   const normalized = query?.trim().toLowerCase()
@@ -100,6 +136,13 @@ export function getVendorSnapshots(query?: string): VendorSnapshot[] {
       const right = b.lastOrderAt ?? b.createdAt
       return +new Date(right) - +new Date(left)
     })
+}
+
+export function getProductFeed(query = ""): ProductSearchResult[] {
+  const state = getDemoState()
+  const normalized = query.trim().toLowerCase()
+
+  return buildMarketplaceProductMatches(state, normalized).products
 }
 
 export function getVendorDetailDemo(vendorId: string): VendorDetail | null {
@@ -132,6 +175,44 @@ export function getVendorDetailDemo(vendorId: string): VendorDetail | null {
     reviews,
     averageRating,
     reviewCount: reviews.length
+  }
+}
+
+export function getMarketplaceSearchResults(query = ""): MarketplaceSearchResults {
+  const state = getDemoState()
+  const normalized = query.trim().toLowerCase()
+  const { activeVendors, products } = buildMarketplaceProductMatches(state, normalized)
+
+  const directVendorMatches = activeVendors
+    .filter((vendor) => {
+      if (!normalized) return true
+      return [vendor.storeName, vendor.category, vendor.city, vendor.bio ?? ""].some(
+        (value) => value.toLowerCase().includes(normalized)
+      )
+    })
+    .map((vendor) => buildVendorSnapshot(vendor, state))
+
+  const vendors = [...directVendorMatches, ...products.map((product) => product.vendor)]
+    .filter(
+      (vendor, index, list) =>
+        list.findIndex((candidate) => candidate.id === vendor.id) === index
+    )
+    .sort((a, b) => {
+      const left = a.lastOrderAt ?? a.createdAt
+      const right = b.lastOrderAt ?? b.createdAt
+      return +new Date(right) - +new Date(left)
+    })
+
+  return {
+    products: products
+      .sort((left, right) => {
+        if (left.inStock !== right.inStock) {
+          return left.inStock ? -1 : 1
+        }
+        return +new Date(right.createdAt) - +new Date(left.createdAt)
+      })
+      .slice(0, normalized ? 18 : 10),
+    vendors: vendors.slice(0, normalized ? 12 : 6)
   }
 }
 

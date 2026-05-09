@@ -193,6 +193,17 @@ export function createInitialDemoState(): DemoState {
         createdAt: daysAgo(7)
       },
       {
+        id: "prod-6b",
+        vendorId: "vendor-ify-threads",
+        name: "Mini Leather Bag",
+        description: "Structured shoulder bag with gold hardware and easy day-to-night styling.",
+        price: 38000,
+        photoUrl:
+          "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800&q=80",
+        inStock: true,
+        createdAt: daysAgo(5)
+      },
+      {
         id: "prod-7",
         vendorId: "vendor-gold-room",
         name: "Layered Gold Chain",

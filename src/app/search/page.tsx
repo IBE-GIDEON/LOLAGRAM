@@ -1,5 +1,5 @@
-import { HomePageClient } from "@/components/home-page-client"
+import { SearchPageClient } from "@/components/search-page-client"
 
 export default function SearchPage() {
-  return <HomePageClient searchOnly />
+  return <SearchPageClient />
 }

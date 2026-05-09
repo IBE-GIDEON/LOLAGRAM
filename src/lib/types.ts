@@ -94,6 +94,15 @@ export interface VendorSnapshot extends VendorProfile {
   lastOrderAt?: string
 }
 
+export interface ProductSearchResult extends Product {
+  vendor: VendorSnapshot
+}
+
+export interface MarketplaceSearchResults {
+  products: ProductSearchResult[]
+  vendors: VendorSnapshot[]
+}
+
 export interface VendorDetail {
   vendor: VendorProfile
   owner?: UserProfile

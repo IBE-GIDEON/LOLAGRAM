@@ -1,0 +1,145 @@
+"use client"
+
+import Link from "next/link"
+import { type ReactNode, useRef } from "react"
+
+import { Badge } from "@/components/ui"
+import { formatCategory, formatCurrency } from "@/lib/format"
+import { type ProductSearchResult } from "@/lib/types"
+import { cn } from "@/lib/utils"
+
+export function ProductFeed({
+  products,
+  onReachEnd,
+  hasMore = false,
+  loading = false,
+  header,
+  stickyHeader,
+  emptyState,
+  onScrollPositionChange,
+  className
+}: {
+  products: ProductSearchResult[]
+  onReachEnd?: () => void
+  hasMore?: boolean
+  loading?: boolean
+  header?: ReactNode
+  stickyHeader?: ReactNode
+  emptyState?: ReactNode
+  onScrollPositionChange?: (scrollTop: number) => void
+  className?: string
+}) {
+  const parentRef = useRef<HTMLDivElement | null>(null)
+
+  const handleScroll = () => {
+    if (!parentRef.current) {
+      return
+    }
+
+    const { scrollTop, scrollHeight, clientHeight } = parentRef.current
+    onScrollPositionChange?.(scrollTop)
+
+    if (!onReachEnd || !hasMore) {
+      return
+    }
+
+    if (scrollHeight - scrollTop - clientHeight < 180) {
+      onReachEnd()
+    }
+  }
+
+  return (
+    <div
+      ref={parentRef}
+      className={cn("h-[calc(100vh-252px)] overflow-y-auto bg-canvas", className)}
+      onScroll={handleScroll}
+    >
+      {stickyHeader ? stickyHeader : null}
+      {header ? <div>{header}</div> : null}
+
+      {loading ? (
+        <div className="grid grid-cols-2 gap-3 px-4 pb-5 pt-4">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div
+              key={index}
+              className="overflow-hidden rounded-[24px] border border-border/70 bg-surface"
+            >
+              <div className="aspect-square animate-pulse bg-canvas" />
+              <div className="space-y-2 p-3">
+                <div className="h-3 w-20 animate-pulse rounded-full bg-canvas" />
+                <div className="h-4 w-4/5 animate-pulse rounded-full bg-canvas" />
+                <div className="h-4 w-2/5 animate-pulse rounded-full bg-canvas" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : products.length > 0 ? (
+        <div className="grid grid-cols-2 gap-3 px-4 pb-5 pt-4">
+          {products.map((product) => (
+            <ProductFeedCard key={product.id} product={product} />
+          ))}
+        </div>
+      ) : (
+        <div className="px-4 pb-8 pt-6 text-sm leading-6 text-muted">{emptyState}</div>
+      )}
+
+      {hasMore ? (
+        <div className="px-4 pb-4 text-center text-xs text-muted">
+          Loading more products...
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function ProductFeedCard({ product }: { product: ProductSearchResult }) {
+  return (
+    <Link
+      href={`/vendor/${product.vendor.id}?product=${product.id}`}
+      className="overflow-hidden rounded-[24px] border border-border/70 bg-surface text-left transition hover:bg-surface/90 active:scale-[0.99]"
+    >
+      <div className="relative aspect-square overflow-hidden bg-canvas">
+        {product.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={product.photoUrl}
+            alt={product.name}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center bg-canvas text-xs font-medium text-muted">
+            No photo
+          </div>
+        )}
+
+        <span
+          className={cn(
+            "absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-sm",
+            product.inStock
+              ? "bg-white/92 text-success dark:bg-black/70"
+              : "bg-black/78 text-white dark:bg-black/82"
+          )}
+        >
+          {product.inStock ? "In stock" : "Out of stock"}
+        </span>
+      </div>
+
+      <div className="space-y-2 p-3">
+        <p className="truncate text-[11px] font-medium uppercase tracking-[0.08em] text-muted">
+          {product.vendor.storeName}
+        </p>
+        <p className="line-clamp-2 text-sm font-semibold leading-5 text-ink">
+          {product.name}
+        </p>
+        <p className="text-base font-bold text-brand">{formatCurrency(product.price)}</p>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge className="bg-canvas text-[11px]">
+            {formatCategory(product.vendor.category)}
+          </Badge>
+          <span className="text-[11px] font-medium text-muted">{product.vendor.city}</span>
+        </div>
+      </div>
+    </Link>
+  )
+}

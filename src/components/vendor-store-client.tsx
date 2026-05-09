@@ -18,7 +18,13 @@ import { loadVendorDetail, startCheckout } from "@/lib/marketplace"
 import { queueOfflineOrder } from "@/lib/offline-orders"
 import { type Product, type VendorDetail } from "@/lib/types"
 
-export function VendorStoreClient({ vendorId }: { vendorId: string }) {
+export function VendorStoreClient({
+  vendorId,
+  initialProductId
+}: {
+  vendorId: string
+  initialProductId?: string
+}) {
   const { profile } = useAuth()
   const {
     vendorId: cartVendorId,
@@ -39,6 +45,18 @@ export function VendorStoreClient({ vendorId }: { vendorId: string }) {
   useEffect(() => {
     loadVendorDetail(vendorId).then(setData)
   }, [vendorId])
+
+  useEffect(() => {
+    if (!data || !initialProductId) return
+
+    const matchingProduct = data.products.find(
+      (product) => product.id === initialProductId
+    )
+
+    if (matchingProduct) {
+      setSelectedProduct(matchingProduct)
+    }
+  }, [data, initialProductId])
 
   const cartItems = cartVendorId === vendorId ? items : []
 

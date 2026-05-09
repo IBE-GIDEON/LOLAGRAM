@@ -7,6 +7,8 @@ import {
   getBuyerOrdersDemo,
   getDemoUserById,
   getDemoUserByPhone,
+  getMarketplaceSearchResults,
+  getProductFeed,
   getOrderByIdDemo,
   getSellerOrdersDemo,
   getSellerProductsDemo,
@@ -25,10 +27,12 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import {
   type AuthFormValues,
   type CheckoutPayload,
+  type MarketplaceSearchResults,
   type OrderDetail,
   type OrderStatus,
   type PaystackInitializeResponse,
   type ProductInput,
+  type ProductSearchResult,
   type SellerProfileInput,
   type StoreAnalytics,
   type UserProfile,
@@ -65,6 +69,19 @@ function mapVendor(row: Record<string, unknown>): VendorProfile {
   }
 }
 
+function mapProduct(row: Record<string, unknown>) {
+  return {
+    id: String(row.id),
+    vendorId: String(row.vendor_id),
+    name: String(row.name),
+    description: String(row.description ?? ""),
+    price: Number(row.price ?? 0),
+    photoUrl: row.photo_url ? String(row.photo_url) : undefined,
+    inStock: Boolean(row.in_stock),
+    createdAt: String(row.created_at ?? new Date().toISOString())
+  }
+}
+
 export async function loadVendors(query = ""): Promise<VendorSnapshot[]> {
   if (!hasSupabase) {
     return getVendorSnapshots(query)
@@ -97,6 +114,211 @@ export async function loadVendors(query = ""): Promise<VendorSnapshot[]> {
   }))
 }
 
+export async function loadMarketplaceSearch(
+  query = ""
+): Promise<MarketplaceSearchResults> {
+  if (!hasSupabase) {
+    return getMarketplaceSearchResults(query)
+  }
+
+  const supabase = getSupabaseBrowserClient()
+  if (!supabase) return getMarketplaceSearchResults(query)
+
+  const normalized = query.trim()
+  const vendorRequest = normalized
+    ? supabase
+        .from("vendor_profiles")
+        .select("*")
+        .eq("is_active", true)
+        .or(
+          `store_name.ilike.%${normalized}%,category.ilike.%${normalized}%,city.ilike.%${normalized}%,bio.ilike.%${normalized}%`
+        )
+        .limit(12)
+    : supabase
+        .from("vendor_profiles")
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(6)
+
+  const productRequest = normalized
+    ? supabase
+        .from("products")
+        .select("*")
+        .or(`name.ilike.%${normalized}%,description.ilike.%${normalized}%`)
+        .order("created_at", { ascending: false })
+        .limit(18)
+    : supabase
+        .from("products")
+        .select("*")
+        .eq("in_stock", true)
+        .order("created_at", { ascending: false })
+        .limit(10)
+
+  const [
+    { data: vendorRows, error: vendorError },
+    { data: productRows, error: productError }
+  ] = await Promise.all([vendorRequest, productRequest])
+
+  if (vendorError || productError || !vendorRows || !productRows) {
+    return getMarketplaceSearchResults(query)
+  }
+
+  const relatedVendorProducts =
+    normalized && vendorRows.length > 0
+      ? await supabase
+          .from("products")
+          .select("*")
+          .in(
+            "vendor_id",
+            vendorRows.map((vendor) => String(vendor.id))
+          )
+          .order("created_at", { ascending: false })
+          .limit(18)
+      : { data: [], error: null }
+
+  if (relatedVendorProducts.error) {
+    return getMarketplaceSearchResults(query)
+  }
+
+  const mergedProductRows = [...productRows, ...(relatedVendorProducts.data ?? [])].filter(
+    (product, index, list) =>
+      list.findIndex((candidate) => String(candidate.id) === String(product.id)) ===
+      index
+  )
+
+  const productVendorIds = [
+    ...new Set(mergedProductRows.map((product) => String(product.vendor_id)))
+  ]
+
+  const missingVendorIds = productVendorIds.filter(
+    (vendorId) => !vendorRows.some((vendor) => String(vendor.id) === vendorId)
+  )
+
+  const extraVendorRows =
+    missingVendorIds.length > 0
+      ? await supabase
+          .from("vendor_profiles")
+          .select("*")
+          .in("id", missingVendorIds)
+          .eq("is_active", true)
+      : { data: [], error: null }
+
+  if (extraVendorRows.error) {
+    return getMarketplaceSearchResults(query)
+  }
+
+  const allVendorRows = [...vendorRows, ...(extraVendorRows.data ?? [])]
+  const vendorSnapshotMap = new Map(
+    allVendorRows.map((row) => {
+      const vendor = mapVendor(row)
+      const snapshot: VendorSnapshot = {
+        ...vendor,
+        reviewCount: 0,
+        productCount: 0
+      }
+
+      return [vendor.id, snapshot]
+    })
+  )
+
+  const products = mergedProductRows
+    .map((row): ProductSearchResult | null => {
+      const vendor = vendorSnapshotMap.get(String(row.vendor_id))
+      if (!vendor) return null
+
+      return {
+        ...mapProduct(row),
+        vendor
+      } satisfies ProductSearchResult
+    })
+    .filter((item): item is ProductSearchResult => Boolean(item))
+    .sort((left, right) => {
+      if (left.inStock !== right.inStock) {
+        return left.inStock ? -1 : 1
+      }
+      return +new Date(right.createdAt) - +new Date(left.createdAt)
+    })
+
+  const vendors = [
+    ...vendorRows.map((row) => vendorSnapshotMap.get(String(row.id))),
+    ...products.map((product) => product.vendor)
+  ]
+    .filter((vendor): vendor is VendorSnapshot => Boolean(vendor))
+    .filter(
+      (vendor, index, list) =>
+        list.findIndex((candidate) => candidate.id === vendor.id) === index
+    )
+
+  return {
+    products,
+    vendors
+  }
+}
+
+export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]> {
+  const normalized = query.trim()
+
+  if (!hasSupabase) {
+    return getProductFeed(query)
+  }
+
+  const supabase = getSupabaseBrowserClient()
+  if (!supabase) return getProductFeed(query)
+
+  if (normalized) {
+    const results = await loadMarketplaceSearch(query)
+    return results.products
+  }
+
+  const { data: productRows, error: productError } = await supabase
+    .from("products")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(100)
+
+  if (productError || !productRows) {
+    return getProductFeed(query)
+  }
+
+  const vendorIds = [...new Set(productRows.map((product) => String(product.vendor_id)))]
+
+  const { data: vendorRows, error: vendorError } = await supabase
+    .from("vendor_profiles")
+    .select("*")
+    .in("id", vendorIds)
+    .eq("is_active", true)
+
+  if (vendorError || !vendorRows) {
+    return getProductFeed(query)
+  }
+
+  const vendorSnapshotMap = new Map(
+    vendorRows.map((row) => {
+      const vendor = mapVendor(row)
+      const snapshot: VendorSnapshot = {
+        ...vendor,
+        reviewCount: 0,
+        productCount: 0
+      }
+
+      return [vendor.id, snapshot]
+    })
+  )
+
+  return productRows
+    .map((row): ProductSearchResult | null => {
+      const vendor = vendorSnapshotMap.get(String(row.vendor_id))
+      if (!vendor) return null
+
+      return {
+        ...mapProduct(row),
+        vendor
+      }
+    })
+    .filter((item): item is ProductSearchResult => Boolean(item))
+}
+
 export async function loadVendorDetail(vendorId: string): Promise<VendorDetail | null> {
   if (!hasSupabase) {
     return getVendorDetailDemo(vendorId)
@@ -124,17 +346,7 @@ export async function loadVendorDetail(vendorId: string): Promise<VendorDetail |
   const mappedVendor = mapVendor(vendor)
   return {
     vendor: mappedVendor,
-    products:
-      products?.map((product) => ({
-        id: String(product.id),
-        vendorId: String(product.vendor_id),
-        name: String(product.name),
-        description: String(product.description ?? ""),
-        price: Number(product.price ?? 0),
-        photoUrl: product.photo_url ? String(product.photo_url) : undefined,
-        inStock: Boolean(product.in_stock),
-        createdAt: String(product.created_at ?? new Date().toISOString())
-      })) ?? [],
+    products: products?.map((product) => mapProduct(product)) ?? [],
     reviews:
       reviews?.map((review) => ({
         id: String(review.id),

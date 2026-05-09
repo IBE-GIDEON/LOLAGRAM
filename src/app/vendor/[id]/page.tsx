@@ -1,9 +1,16 @@
 import { VendorStoreClient } from "@/components/vendor-store-client"
 
 export default function VendorPage({
-  params
+  params,
+  searchParams
 }: {
   params: { id: string }
+  searchParams?: { product?: string }
 }) {
-  return <VendorStoreClient vendorId={params.id} />
+  return (
+    <VendorStoreClient
+      vendorId={params.id}
+      initialProductId={searchParams?.product}
+    />
+  )
 }
