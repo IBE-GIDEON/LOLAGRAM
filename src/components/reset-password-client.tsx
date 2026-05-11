@@ -26,8 +26,8 @@ export function ResetPasswordClient() {
         <div>
           <p className="text-lg font-semibold text-ink">Choose a new password</p>
           <p className="mt-2 text-sm leading-6 text-muted">
-            Open this page from the recovery email we sent you, then set a fresh
-            password for your phone account.
+            Open this page from the password reset email we sent you, then set a
+            fresh password for your LOLAGRAM account.
           </p>
         </div>
 

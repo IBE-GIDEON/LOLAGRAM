@@ -5,8 +5,8 @@ import {
   createOrderDemo,
   deleteProductDemo,
   getBuyerOrdersDemo,
+  getDemoUserByEmail,
   getDemoUserById,
-  getDemoUserByPhone,
   getMarketplaceSearchResults,
   getProductFeed,
   getOrderByIdDemo,
@@ -48,10 +48,10 @@ import {
 function mapUser(row: Record<string, unknown>): UserProfile {
   return {
     id: String(row.id),
+    email: String(row.email ?? row.recovery_email ?? ""),
     phone: String(row.phone ?? ""),
     fullName: String(row.full_name ?? ""),
     profilePhotoUrl: row.profile_photo_url ? String(row.profile_photo_url) : undefined,
-    recoveryEmail: row.recovery_email ? String(row.recovery_email) : undefined,
     accountType: String(row.account_type ?? "buyer") as UserProfile["accountType"],
     createdAt: String(row.created_at ?? new Date().toISOString())
   }
@@ -547,16 +547,16 @@ export async function loadVendorProfile(userId: string) {
 }
 
 export async function findOrCreateDemoUser(values: SignUpFormValues) {
-  const existing = getDemoUserByPhone(values.phone)
+  const existing = getDemoUserByEmail(values.email)
   if (existing) {
     return existing
   }
 
   const user: UserProfile = {
     id: createId("user"),
+    email: values.email,
     phone: values.phone,
     fullName: values.fullName,
-    recoveryEmail: values.recoveryEmail,
     accountType: values.accountType,
     createdAt: new Date().toISOString()
   }
@@ -601,10 +601,10 @@ export async function saveUserProfile(input: UserProfile) {
     .from("users")
     .upsert({
       id: input.id,
+      email: input.email,
       phone: input.phone,
       full_name: input.fullName,
       profile_photo_url: input.profilePhotoUrl,
-      recovery_email: input.recoveryEmail,
       account_type: input.accountType
     })
     .select()

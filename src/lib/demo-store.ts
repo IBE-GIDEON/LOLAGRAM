@@ -233,6 +233,15 @@ export function getDemoUserByPhone(phone: string) {
   return state.users.find((user) => user.phone === phone) ?? null
 }
 
+export function getDemoUserByEmail(email: string) {
+  const state = getDemoState()
+  return (
+    state.users.find(
+      (user) => user.email.toLowerCase() === email.trim().toLowerCase()
+    ) ?? null
+  )
+}
+
 export function getDemoUserById(userId: string) {
   const state = getDemoState()
   return state.users.find((user) => user.id === userId) ?? null

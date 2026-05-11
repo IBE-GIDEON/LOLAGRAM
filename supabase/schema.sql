@@ -6,16 +6,25 @@ create type public.order_status as enum ('pending', 'confirmed', 'dispatched', '
 
 create table if not exists public.users (
   id uuid primary key references auth.users (id) on delete cascade,
+  email text unique not null,
   phone text unique not null,
   full_name text not null,
   profile_photo_url text,
-  recovery_email text,
   account_type public.account_type not null default 'buyer',
   created_at timestamptz not null default now()
 );
 
 alter table public.users
-add column if not exists recovery_email text;
+add column if not exists email text;
+
+update public.users u
+set email = au.email
+from auth.users au
+where au.id = u.id
+  and (u.email is null or btrim(u.email) = '');
+
+create unique index if not exists users_email_key
+on public.users(email);
 
 create table if not exists public.vendor_profiles (
   id uuid primary key default gen_random_uuid(),
@@ -114,10 +123,11 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.users (id, phone, full_name, account_type)
+  insert into public.users (id, email, phone, full_name, account_type)
   values (
     new.id,
-    coalesce(new.phone, ''),
+    coalesce(new.email, ''),
+    coalesce(new.raw_user_meta_data ->> 'phone', new.phone, ''),
     coalesce(new.raw_user_meta_data ->> 'full_name', 'New LOLAGRAM User'),
     coalesce((new.raw_user_meta_data ->> 'account_type')::public.account_type, 'buyer')
   )

@@ -13,6 +13,7 @@ export function createInitialDemoState(): DemoState {
     users: [
       {
         id: "user-amara",
+        email: "amara@lolagram.app",
         phone: "+2348012345678",
         fullName: "Amara Okafor",
         profilePhotoUrl:
@@ -22,6 +23,7 @@ export function createInitialDemoState(): DemoState {
       },
       {
         id: "user-zainab",
+        email: "zainab@lolagram.app",
         phone: "+2348099991122",
         fullName: "Zainab Bello",
         profilePhotoUrl:
@@ -31,6 +33,7 @@ export function createInitialDemoState(): DemoState {
       },
       {
         id: "user-tosin",
+        email: "tosin@lolagram.app",
         phone: "+2348077773344",
         fullName: "Tosin Adeyemi",
         profilePhotoUrl:
@@ -40,6 +43,7 @@ export function createInitialDemoState(): DemoState {
       },
       {
         id: "user-ify",
+        email: "ify@lolagram.app",
         phone: "+2348122227788",
         fullName: "Ify Chukwu",
         profilePhotoUrl:

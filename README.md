@@ -6,7 +6,7 @@ LOLAGRAM is a mobile-first Nigerian marketplace built with Next.js 14, TypeScrip
 
 - WhatsApp-style vendor discovery feed with search and pagination
 - Single app for buyers and sellers with role switching
-- Phone-plus-password auth with recovery email for password reset
+- Email-plus-password auth with required phone number for buyer and seller profiles
 - Vendor store pages with product grid, cart, checkout CTA, and reviews
 - Buyer and seller orders views
 - Seller onboarding and product management
@@ -39,7 +39,7 @@ Apply [supabase/schema.sql](/C:/Users/HOME%20PC/Documents/LOLAGRAM/supabase/sche
 Use [PRODUCTION-LAUNCH.md](/C:/Users/HOME%20PC/Documents/LOLAGRAM/PRODUCTION-LAUNCH.md) before onboarding real users. It covers:
 
 - live environment variables
-- phone auth and OTP setup
+- email/password auth setup with required phone collection
 - Paystack webhook and production payments
 - storage and multi-image product uploads
 - push notifications

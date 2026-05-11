@@ -16,6 +16,7 @@ import {
   type SignUpFormValues,
   type StoreAnalytics
 } from "@/lib/types"
+import { VIEW_MODE_KEY } from "@/lib/constants"
 
 type AuthMode = "signin" | "signup" | "forgot"
 
@@ -24,26 +25,25 @@ export function ProfilePageClient() {
     loading,
     profile,
     vendorProfile,
-    isDemoMode,
     signIn,
     signOut,
     signUp,
     requestPasswordReset,
     updatePassword,
-    saveRecoveryEmail,
+    updateEmailAddress,
     upgradeAccountType,
     refreshProfile
   } = useAuth()
   const [authMode, setAuthMode] = useState<AuthMode>("signin")
   const [signInValues, setSignInValues] = useState<SignInFormValues>({
-    phone: "+234",
+    email: "",
     password: ""
   })
   const [signUpValues, setSignUpValues] = useState<SignUpFormValues>({
+    email: "",
     phone: "+234",
     fullName: "",
     password: "",
-    recoveryEmail: "",
     accountType: "buyer"
   })
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -51,7 +51,8 @@ export function ProfilePageClient() {
   const [savingProfile, setSavingProfile] = useState(false)
   const [editName, setEditName] = useState("")
   const [photoPreview, setPhotoPreview] = useState("")
-  const [recoveryEmail, setRecoveryEmail] = useState("")
+  const [emailAddress, setEmailAddress] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("+234")
   const [newPassword, setNewPassword] = useState("")
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("")
   const [analytics, setAnalytics] = useState<StoreAnalytics | null>(null)
@@ -61,7 +62,8 @@ export function ProfilePageClient() {
     if (!profile) return
     setEditName(profile.fullName)
     setPhotoPreview(profile.profilePhotoUrl ?? "")
-    setRecoveryEmail(profile.recoveryEmail ?? "")
+    setEmailAddress(profile.email)
+    setPhoneNumber(profile.phone)
   }, [profile])
 
   useEffect(() => {
@@ -74,7 +76,7 @@ export function ProfilePageClient() {
   }, [profile, vendorProfile])
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("lolagram-view-mode")
+    const saved = window.localStorage.getItem(VIEW_MODE_KEY)
     if (saved === "buyer" || saved === "seller") {
       setViewMode(saved)
     }
@@ -155,16 +157,17 @@ export function ProfilePageClient() {
               <div>
                 <p className="text-lg font-semibold text-ink">Welcome back</p>
                 <p className="mt-2 text-sm leading-6 text-muted">
-                  Sign in with your phone number and password.
+                  Sign in with your email and password.
                 </p>
               </div>
               <Input
-                placeholder="Phone number"
-                value={signInValues.phone}
+                type="email"
+                placeholder="Email address"
+                value={signInValues.email}
                 onChange={(event) =>
                   setSignInValues((current) => ({
                     ...current,
-                    phone: event.target.value
+                    email: event.target.value
                   }))
                 }
               />
@@ -199,8 +202,8 @@ export function ProfilePageClient() {
               <div>
                 <p className="text-lg font-semibold text-ink">Create your account</p>
                 <p className="mt-2 text-sm leading-6 text-muted">
-                  Use your phone number to log in. Add a recovery email so forgot
-                  password works without SMS.
+                  Use email for login and password reset. Your phone number stays
+                  required for shopping and seller contact.
                 </p>
               </div>
               <Input
@@ -214,23 +217,23 @@ export function ProfilePageClient() {
                 }
               />
               <Input
+                type="email"
+                placeholder="Email address"
+                value={signUpValues.email}
+                onChange={(event) =>
+                  setSignUpValues((current) => ({
+                    ...current,
+                    email: event.target.value
+                  }))
+                }
+              />
+              <Input
                 placeholder="Phone number"
                 value={signUpValues.phone}
                 onChange={(event) =>
                   setSignUpValues((current) => ({
                     ...current,
                     phone: event.target.value
-                  }))
-                }
-              />
-              <Input
-                type="email"
-                placeholder="Recovery email (recommended)"
-                value={signUpValues.recoveryEmail ?? ""}
-                onChange={(event) =>
-                  setSignUpValues((current) => ({
-                    ...current,
-                    recoveryEmail: event.target.value
                   }))
                 }
               />
@@ -300,13 +303,12 @@ export function ProfilePageClient() {
               <div>
                 <p className="text-lg font-semibold text-ink">Forgot password</p>
                 <p className="mt-2 text-sm leading-6 text-muted">
-                  Enter the recovery email linked to your account. Since launch
-                  auth is phone and password, reset links are sent by email.
+                  Enter your email and we’ll send you a password reset link.
                 </p>
               </div>
               <Input
                 type="email"
-                placeholder="Recovery email"
+                placeholder="Email address"
                 value={forgotEmail}
                 onChange={(event) => setForgotEmail(event.target.value)}
               />
@@ -326,24 +328,7 @@ export function ProfilePageClient() {
               >
                 Send reset link
               </Button>
-              <p className="text-xs leading-5 text-muted">
-                No recovery email yet? Create a new account or sign in from a device
-                you already trust, then add one in Profile.
-              </p>
             </div>
-          ) : null}
-        </Card>
-
-        <Card className="p-5">
-          <p className="text-sm font-semibold text-ink">Launch-friendly auth</p>
-          <p className="mt-2 text-sm leading-6 text-muted">
-            Phone number stays your main login. Recovery email is only for password
-            reset, so you can launch without paying for SMS OTP.
-          </p>
-          {isDemoMode ? (
-            <p className="mt-2 text-xs text-muted">
-              Demo mode is still on locally because live auth keys are missing there.
-            </p>
           ) : null}
         </Card>
       </div>
@@ -396,7 +381,10 @@ export function ProfilePageClient() {
                 value={editName}
                 onChange={(event) => setEditName(event.target.value)}
               />
-              <Input value={profile.phone} disabled />
+              <Input
+                value={phoneNumber}
+                onChange={(event) => setPhoneNumber(event.target.value)}
+              />
               <Button
                 variant="secondary"
                 className="w-full"
@@ -407,8 +395,8 @@ export function ProfilePageClient() {
                     await saveUserProfile({
                       ...profile,
                       fullName: editName,
-                      profilePhotoUrl: photoPreview,
-                      recoveryEmail
+                      phone: phoneNumber,
+                      profilePhotoUrl: photoPreview
                     })
                     await refreshProfile(profile.id)
                     toast.success("Profile updated.")
@@ -445,32 +433,32 @@ export function ProfilePageClient() {
         <div className="flex items-start gap-3">
           <FiMail className="mt-1 text-brand" />
           <div>
-            <p className="text-sm font-semibold text-ink">Recovery email</p>
+            <p className="text-sm font-semibold text-ink">Email address</p>
             <p className="mt-1 text-sm leading-6 text-muted">
-              This is what powers forgot password now that SMS OTP is off.
+              This is your sign-in and forgot-password email.
             </p>
           </div>
         </div>
         <Input
           type="email"
-          placeholder="Recovery email"
-          value={recoveryEmail}
-          onChange={(event) => setRecoveryEmail(event.target.value)}
+          placeholder="Email address"
+          value={emailAddress}
+          onChange={(event) => setEmailAddress(event.target.value)}
         />
         <Button
           variant="outline"
           className="w-full"
           onClick={async () => {
             try {
-              await saveRecoveryEmail(recoveryEmail)
+              await updateEmailAddress(emailAddress)
             } catch (error) {
               toast.error(
-                error instanceof Error ? error.message : "Could not save recovery email."
+                error instanceof Error ? error.message : "Could not update email."
               )
             }
           }}
         >
-          Save recovery email
+          Save email
         </Button>
       </Card>
 
@@ -584,7 +572,7 @@ export function ProfilePageClient() {
                     }`}
                     onClick={() => {
                       setViewMode(mode)
-                      window.localStorage.setItem("lolagram-view-mode", mode)
+                      window.localStorage.setItem(VIEW_MODE_KEY, mode)
                     }}
                   >
                     {mode === "buyer" ? "Buyer" : "Seller"}

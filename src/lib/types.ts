@@ -17,10 +17,10 @@ export type OrderStatus =
 
 export interface UserProfile {
   id: string
+  email: string
   phone: string
   fullName: string
   profilePhotoUrl?: string
-  recoveryEmail?: string
   accountType: AccountType
   createdAt: string
 }
@@ -138,15 +138,15 @@ export interface DemoState {
 }
 
 export interface SignUpFormValues {
+  email: string
   phone: string
   fullName: string
   password: string
-  recoveryEmail?: string
   accountType: AccountType
 }
 
 export interface SignInFormValues {
-  phone: string
+  email: string
   password: string
 }
 

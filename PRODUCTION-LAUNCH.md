@@ -33,20 +33,21 @@ Important launch checks:
 - RLS policies are enabled
 - storage upload policy allows authenticated users to upload store assets
 
-## 3. Phone + Password Auth
+## 3. Email + Password Auth
 
 In Supabase Auth:
 
-- enable phone auth
-- turn off phone confirmation if you do not want SMS verification during launch
-- keep phone as the login identifier
-- use recovery email for forgot-password links
+- enable email auth
+- decide whether you want email confirmation on or off for launch day
+- keep phone number required in your app signup flow
+- use the same email for sign in and forgot-password links
 
 Before launch, verify:
 
-- sign up with phone and password works
+- sign up with email and password works
 - returning login works
-- forgot password sends a reset link to the saved recovery email
+- phone number is collected during signup
+- forgot password sends a reset link to the account email
 - reset password opens `/reset-password` and updates the password successfully
 - buyer to seller upgrade works
 - session persists in the installed PWA

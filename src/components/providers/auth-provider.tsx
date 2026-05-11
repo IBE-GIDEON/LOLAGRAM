@@ -29,9 +29,9 @@ import {
 interface AuthContextValue extends AuthSessionState {
   signIn: (values: SignInFormValues) => Promise<void>
   signUp: (values: SignUpFormValues) => Promise<void>
-  requestPasswordReset: (recoveryEmail: string) => Promise<void>
+  requestPasswordReset: (email: string) => Promise<void>
   updatePassword: (nextPassword: string) => Promise<void>
-  saveRecoveryEmail: (recoveryEmail: string) => Promise<void>
+  updateEmailAddress: (email: string) => Promise<void>
   signOut: () => Promise<void>
   upgradeAccountType: (nextType: AccountType) => Promise<void>
   refreshProfile: (userId?: string | null) => Promise<void>
@@ -69,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let ignore = false
+    let unsubscribe: (() => void) | undefined
 
     async function bootstrap() {
       if (isDemoMode) {
@@ -102,77 +103,77 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await refreshProfile(nextUserId)
       }
 
-      const {
-        data: { subscription }
-      } = supabase.auth.onAuthStateChange(async (_, nextSession) => {
+      const { data } = supabase.auth.onAuthStateChange(async (_, nextSession) => {
         const nextId = nextSession?.user?.id ?? null
         if (ignore) return
         setSessionUserId(nextId)
         await refreshProfile(nextId)
       })
 
+      unsubscribe = () => data.subscription.unsubscribe()
+
       if (!ignore) {
         setLoading(false)
       }
-
-      return () => subscription.unsubscribe()
     }
 
-    let cleanup: (() => void) | undefined
-    bootstrap().then((unsubscribe) => {
-      cleanup = unsubscribe
-    })
+    bootstrap()
 
     return () => {
       ignore = true
-      cleanup?.()
+      unsubscribe?.()
     }
   }, [isDemoMode, refreshProfile])
 
-  const signIn = useCallback(async (values: SignInFormValues) => {
-    if (isDemoMode) {
-      const user = await findOrCreateDemoUser({
-        phone: values.phone,
-        fullName: "Demo User",
-        password: values.password,
-        recoveryEmail: "",
-        accountType: "buyer"
+  const signIn = useCallback(
+    async (values: SignInFormValues) => {
+      const normalizedEmail = values.email.trim().toLowerCase()
+
+      if (isDemoMode) {
+        const user = await findOrCreateDemoUser({
+          email: normalizedEmail,
+          phone: "+234",
+          fullName: "Demo User",
+          password: values.password,
+          accountType: "buyer"
+        })
+
+        window.localStorage.setItem(DEMO_USER_KEY, user.id)
+        setSessionUserId(user.id)
+        await refreshProfile(user.id)
+        toast.success("Signed in successfully.")
+        return
+      }
+
+      const supabase = getSupabaseBrowserClient()
+      if (!supabase) {
+        throw new Error("Supabase is not configured")
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: values.password
       })
 
-      window.localStorage.setItem(DEMO_USER_KEY, user.id)
-      setSessionUserId(user.id)
-      await refreshProfile(user.id)
-      toast.success("Signed in successfully.")
-      return
-    }
+      if (error || !data.user) {
+        throw error ?? new Error("Unable to sign in")
+      }
 
-    const supabase = getSupabaseBrowserClient()
-    if (!supabase) {
-      throw new Error("Supabase is not configured")
-    }
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      phone: values.phone,
-      password: values.password
-    })
-
-    if (error || !data.user) {
-      throw error ?? new Error("Unable to sign in")
-    }
-
-    setSessionUserId(data.user.id)
-    await refreshProfile(data.user.id)
-    toast.success("Welcome back.")
-  }, [isDemoMode, refreshProfile])
+      setSessionUserId(data.user.id)
+      await refreshProfile(data.user.id)
+      toast.success("Welcome back.")
+    },
+    [isDemoMode, refreshProfile]
+  )
 
   const signUp = useCallback(
     async (values: SignUpFormValues) => {
-      const normalizedRecoveryEmail = values.recoveryEmail?.trim().toLowerCase()
+      const normalizedEmail = values.email.trim().toLowerCase()
 
       if (isDemoMode) {
         const user = await findOrCreateDemoUser({
           ...values,
-          recoveryEmail: normalizedRecoveryEmail
+          email: normalizedEmail
         })
         window.localStorage.setItem(DEMO_USER_KEY, user.id)
         setSessionUserId(user.id)
@@ -187,12 +188,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const { data, error } = await supabase.auth.signUp({
-        phone: values.phone,
+        email: normalizedEmail,
         password: values.password,
         options: {
+          emailRedirectTo: `${env.appUrl}/profile`,
           data: {
             full_name: values.fullName,
-            account_type: values.accountType
+            account_type: values.accountType,
+            phone: values.phone
           }
         }
       })
@@ -201,32 +204,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error ?? new Error("Unable to create account")
       }
 
-      if (!data.session) {
-        throw new Error(
-          "Phone confirmation is still enabled in Supabase. Turn it off to use phone and password without SMS."
-        )
-      }
-
       await supabase.from("users").upsert({
         id: data.user.id,
+        email: normalizedEmail,
         phone: values.phone,
         full_name: values.fullName,
-        recovery_email: normalizedRecoveryEmail,
         account_type: values.accountType
       })
 
-      if (normalizedRecoveryEmail) {
-        const { error: recoveryError } = await supabase.auth.updateUser({
-          email: normalizedRecoveryEmail
-        })
-
-        if (recoveryError) {
-          toast.error(
-            "Account created, but recovery email needs to be added again from Profile."
-          )
-        } else {
-          toast.success("Check your email to confirm password recovery access.")
-        }
+      if (!data.session) {
+        toast.success("Account created. Check your email to confirm it, then sign in.")
+        return
       }
 
       setSessionUserId(data.user.id)
@@ -237,10 +225,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   const requestPasswordReset = useCallback(
-    async (recoveryEmail: string) => {
-      const normalizedEmail = recoveryEmail.trim().toLowerCase()
+    async (email: string) => {
+      const normalizedEmail = email.trim().toLowerCase()
       if (!normalizedEmail) {
-        throw new Error("Add your recovery email first.")
+        throw new Error("Enter your email address first.")
       }
 
       if (isDemoMode) {
@@ -291,29 +279,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [isDemoMode]
   )
 
-  const saveRecoveryEmail = useCallback(
-    async (recoveryEmail: string) => {
+  const updateEmailAddress = useCallback(
+    async (email: string) => {
       if (!profile) return
 
-      const normalizedEmail = recoveryEmail.trim().toLowerCase()
+      const normalizedEmail = email.trim().toLowerCase()
+      if (!normalizedEmail) {
+        throw new Error("Enter your email address first.")
+      }
 
       if (isDemoMode) {
         const nextProfile = {
           ...profile,
-          recoveryEmail: normalizedEmail || undefined
+          email: normalizedEmail
         }
         await saveUserProfile(nextProfile)
         setProfile(nextProfile)
+        toast.success("Email updated in demo mode.")
         return
       }
 
       const supabase = getSupabaseBrowserClient()
       if (!supabase) {
         throw new Error("Supabase is not configured")
-      }
-
-      if (!normalizedEmail) {
-        throw new Error("Add a recovery email before saving.")
       }
 
       const { error } = await supabase.auth.updateUser({
@@ -326,10 +314,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       await saveUserProfile({
         ...profile,
-        recoveryEmail: normalizedEmail
+        email: normalizedEmail
       })
       await refreshProfile(profile.id)
-      toast.success("Recovery email saved. Check your inbox to confirm it.")
+      toast.success("Email updated. Check your inbox to confirm it.")
     },
     [isDemoMode, profile, refreshProfile]
   )
@@ -360,7 +348,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           : null
 
         if (nextProfile) {
-          window.localStorage.setItem(DEMO_USER_KEY, nextProfile.id)
+          await saveUserProfile(nextProfile)
           setProfile(nextProfile)
         }
         return
@@ -394,7 +382,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signUp,
       requestPasswordReset,
       updatePassword,
-      saveRecoveryEmail,
+      updateEmailAddress,
       signOut,
       upgradeAccountType,
       refreshProfile
@@ -409,7 +397,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signUp,
       requestPasswordReset,
       updatePassword,
-      saveRecoveryEmail,
+      updateEmailAddress,
       signOut,
       upgradeAccountType,
       refreshProfile
