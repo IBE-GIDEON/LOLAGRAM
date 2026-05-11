@@ -20,6 +20,7 @@ export interface UserProfile {
   phone: string
   fullName: string
   profilePhotoUrl?: string
+  recoveryEmail?: string
   accountType: AccountType
   createdAt: string
 }
@@ -136,10 +137,17 @@ export interface DemoState {
   reviews: Review[]
 }
 
-export interface AuthFormValues {
+export interface SignUpFormValues {
   phone: string
   fullName: string
+  password: string
+  recoveryEmail?: string
   accountType: AccountType
+}
+
+export interface SignInFormValues {
+  phone: string
+  password: string
 }
 
 export interface SellerProfileInput {

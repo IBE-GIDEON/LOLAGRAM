@@ -3,39 +3,57 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import toast from "react-hot-toast"
-import { FiBell, FiEdit3, FiLogOut, FiShoppingBag, FiUser } from "react-icons/fi"
+import { FiBell, FiEdit3, FiKey, FiLogOut, FiMail, FiShoppingBag, FiUser } from "react-icons/fi"
 
 import { useAuth } from "@/components/providers/auth-provider"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Avatar, Badge, Button, Card, Input, SectionHeading } from "@/components/ui"
-import { DEMO_OTP, VIEW_MODE_KEY } from "@/lib/constants"
 import { uploadImage } from "@/lib/image"
 import { loadStoreAnalytics, saveUserProfile } from "@/lib/marketplace"
-import { type AccountType, type AuthFormValues, type StoreAnalytics } from "@/lib/types"
+import {
+  type AccountType,
+  type SignInFormValues,
+  type SignUpFormValues,
+  type StoreAnalytics
+} from "@/lib/types"
+
+type AuthMode = "signin" | "signup" | "forgot"
 
 export function ProfilePageClient() {
   const {
     loading,
     profile,
     vendorProfile,
-    pendingPhone,
     isDemoMode,
-    requestOtp,
-    verifyOtp,
+    signIn,
     signOut,
+    signUp,
+    requestPasswordReset,
+    updatePassword,
+    saveRecoveryEmail,
     upgradeAccountType,
     refreshProfile
   } = useAuth()
-  const [authValues, setAuthValues] = useState<AuthFormValues>({
+  const [authMode, setAuthMode] = useState<AuthMode>("signin")
+  const [signInValues, setSignInValues] = useState<SignInFormValues>({
+    phone: "+234",
+    password: ""
+  })
+  const [signUpValues, setSignUpValues] = useState<SignUpFormValues>({
     phone: "+234",
     fullName: "",
+    password: "",
+    recoveryEmail: "",
     accountType: "buyer"
   })
-  const [otp, setOtp] = useState("")
-  const [otpRequested, setOtpRequested] = useState(false)
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [forgotEmail, setForgotEmail] = useState("")
   const [savingProfile, setSavingProfile] = useState(false)
   const [editName, setEditName] = useState("")
   const [photoPreview, setPhotoPreview] = useState("")
+  const [recoveryEmail, setRecoveryEmail] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("")
   const [analytics, setAnalytics] = useState<StoreAnalytics | null>(null)
   const [viewMode, setViewMode] = useState<"buyer" | "seller">("buyer")
 
@@ -43,6 +61,7 @@ export function ProfilePageClient() {
     if (!profile) return
     setEditName(profile.fullName)
     setPhotoPreview(profile.profilePhotoUrl ?? "")
+    setRecoveryEmail(profile.recoveryEmail ?? "")
   }, [profile])
 
   useEffect(() => {
@@ -55,7 +74,7 @@ export function ProfilePageClient() {
   }, [profile, vendorProfile])
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(VIEW_MODE_KEY)
+    const saved = window.localStorage.getItem("lolagram-view-mode")
     if (saved === "buyer" || saved === "seller") {
       setViewMode(saved)
     }
@@ -109,86 +128,223 @@ export function ProfilePageClient() {
     return (
       <div className="space-y-4 p-4 pb-safe-nav">
         <SectionHeading title="Profile" action={<ThemeToggle />} />
+
         <Card className="p-5">
-          <p className="text-lg font-semibold text-ink">Phone number sign in</p>
-          <p className="mt-2 text-sm leading-6 text-muted">
-            Sign in with OTP to shop, sell, receive order updates, and keep your
-            session available inside the PWA.
-          </p>
-          <div className="mt-5 space-y-3">
-            <Input
-              placeholder="Full name"
-              value={authValues.fullName}
-              onChange={(event) =>
-                setAuthValues((current) => ({
-                  ...current,
-                  fullName: event.target.value
-                }))
-              }
-            />
-            <Input
-              placeholder="Phone number"
-              value={authValues.phone}
-              onChange={(event) =>
-                setAuthValues((current) => ({
-                  ...current,
-                  phone: event.target.value
-                }))
-              }
-            />
-            <div className="grid grid-cols-2 gap-3 rounded-full bg-canvas p-1">
-              {(["buyer", "seller"] as AccountType[]).map((type) => (
-                <button
-                  key={type}
-                  className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 py-3 text-center text-sm font-semibold transition ${
-                    authValues.accountType === type
-                      ? "bg-chrome text-white"
-                      : "text-muted hover:bg-surface"
-                  }`}
-                  onClick={() =>
-                    setAuthValues((current) => ({ ...current, accountType: type }))
-                  }
-                >
-                  {type === "buyer" ? "Buyer" : "Seller"}
-                </button>
-              ))}
-            </div>
-            {otpRequested ? (
-              <>
-                <Input
-                  placeholder="Enter OTP"
-                  value={otp}
-                  onChange={(event) => setOtp(event.target.value)}
-                />
-                <Button
-                  className="w-full"
-                  onClick={async () => {
-                    await verifyOtp(otp, authValues)
-                  }}
-                >
-                  Verify OTP
-                </Button>
-                {isDemoMode ? (
-                  <p className="text-xs text-muted">
-                    Demo mode OTP:{" "}
-                    <span className="font-semibold">{DEMO_OTP}</span>
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted">Sent to {pendingPhone}</p>
-                )}
-              </>
-            ) : (
+          <div className="flex items-center gap-2 rounded-full bg-canvas p-1">
+            {([
+              ["signin", "Sign in"],
+              ["signup", "Create account"],
+              ["forgot", "Forgot password"]
+            ] as const).map(([mode, label]) => (
+              <button
+                key={mode}
+                className={`flex-1 rounded-full px-3 py-2.5 text-sm font-semibold transition ${
+                  authMode === mode
+                    ? "bg-chrome text-white"
+                    : "text-muted hover:bg-surface"
+                }`}
+                onClick={() => setAuthMode(mode)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {authMode === "signin" ? (
+            <div className="mt-5 space-y-3">
+              <div>
+                <p className="text-lg font-semibold text-ink">Welcome back</p>
+                <p className="mt-2 text-sm leading-6 text-muted">
+                  Sign in with your phone number and password.
+                </p>
+              </div>
+              <Input
+                placeholder="Phone number"
+                value={signInValues.phone}
+                onChange={(event) =>
+                  setSignInValues((current) => ({
+                    ...current,
+                    phone: event.target.value
+                  }))
+                }
+              />
+              <Input
+                type="password"
+                placeholder="Password"
+                value={signInValues.password}
+                onChange={(event) =>
+                  setSignInValues((current) => ({
+                    ...current,
+                    password: event.target.value
+                  }))
+                }
+              />
               <Button
                 className="w-full"
                 onClick={async () => {
-                  await requestOtp(authValues)
-                  setOtpRequested(true)
+                  try {
+                    await signIn(signInValues)
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : "Could not sign in.")
+                  }
                 }}
               >
-                Send OTP
+                Sign in
               </Button>
-            )}
-          </div>
+            </div>
+          ) : null}
+
+          {authMode === "signup" ? (
+            <div className="mt-5 space-y-3">
+              <div>
+                <p className="text-lg font-semibold text-ink">Create your account</p>
+                <p className="mt-2 text-sm leading-6 text-muted">
+                  Use your phone number to log in. Add a recovery email so forgot
+                  password works without SMS.
+                </p>
+              </div>
+              <Input
+                placeholder="Full name"
+                value={signUpValues.fullName}
+                onChange={(event) =>
+                  setSignUpValues((current) => ({
+                    ...current,
+                    fullName: event.target.value
+                  }))
+                }
+              />
+              <Input
+                placeholder="Phone number"
+                value={signUpValues.phone}
+                onChange={(event) =>
+                  setSignUpValues((current) => ({
+                    ...current,
+                    phone: event.target.value
+                  }))
+                }
+              />
+              <Input
+                type="email"
+                placeholder="Recovery email (recommended)"
+                value={signUpValues.recoveryEmail ?? ""}
+                onChange={(event) =>
+                  setSignUpValues((current) => ({
+                    ...current,
+                    recoveryEmail: event.target.value
+                  }))
+                }
+              />
+              <Input
+                type="password"
+                placeholder="Password"
+                value={signUpValues.password}
+                onChange={(event) =>
+                  setSignUpValues((current) => ({
+                    ...current,
+                    password: event.target.value
+                  }))
+                }
+              />
+              <Input
+                type="password"
+                placeholder="Confirm password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+              />
+              <div className="grid grid-cols-2 gap-3 rounded-full bg-canvas p-1">
+                {(["buyer", "seller"] as AccountType[]).map((type) => (
+                  <button
+                    key={type}
+                    className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 py-3 text-center text-sm font-semibold transition ${
+                      signUpValues.accountType === type
+                        ? "bg-chrome text-white"
+                        : "text-muted hover:bg-surface"
+                    }`}
+                    onClick={() =>
+                      setSignUpValues((current) => ({ ...current, accountType: type }))
+                    }
+                  >
+                    {type === "buyer" ? "Buyer" : "Seller"}
+                  </button>
+                ))}
+              </div>
+              <Button
+                className="w-full"
+                onClick={async () => {
+                  if (signUpValues.password.length < 6) {
+                    toast.error("Use at least 6 characters for your password.")
+                    return
+                  }
+
+                  if (signUpValues.password !== confirmPassword) {
+                    toast.error("Passwords do not match.")
+                    return
+                  }
+
+                  try {
+                    await signUp(signUpValues)
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error ? error.message : "Could not create account."
+                    )
+                  }
+                }}
+              >
+                Create account
+              </Button>
+            </div>
+          ) : null}
+
+          {authMode === "forgot" ? (
+            <div className="mt-5 space-y-3">
+              <div>
+                <p className="text-lg font-semibold text-ink">Forgot password</p>
+                <p className="mt-2 text-sm leading-6 text-muted">
+                  Enter the recovery email linked to your account. Since launch
+                  auth is phone and password, reset links are sent by email.
+                </p>
+              </div>
+              <Input
+                type="email"
+                placeholder="Recovery email"
+                value={forgotEmail}
+                onChange={(event) => setForgotEmail(event.target.value)}
+              />
+              <Button
+                className="w-full"
+                onClick={async () => {
+                  try {
+                    await requestPasswordReset(forgotEmail)
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error
+                        ? error.message
+                        : "Could not send reset link."
+                    )
+                  }
+                }}
+              >
+                Send reset link
+              </Button>
+              <p className="text-xs leading-5 text-muted">
+                No recovery email yet? Create a new account or sign in from a device
+                you already trust, then add one in Profile.
+              </p>
+            </div>
+          ) : null}
+        </Card>
+
+        <Card className="p-5">
+          <p className="text-sm font-semibold text-ink">Launch-friendly auth</p>
+          <p className="mt-2 text-sm leading-6 text-muted">
+            Phone number stays your main login. Recovery email is only for password
+            reset, so you can launch without paying for SMS OTP.
+          </p>
+          {isDemoMode ? (
+            <p className="mt-2 text-xs text-muted">
+              Demo mode is still on locally because live auth keys are missing there.
+            </p>
+          ) : null}
         </Card>
       </div>
     )
@@ -217,8 +373,14 @@ export function ProfilePageClient() {
               onChange={async (event) => {
                 const file = event.target.files?.[0]
                 if (!file) return
-                const url = await uploadImage(file, "profile-photos")
-                setPhotoPreview(url)
+                try {
+                  const url = await uploadImage(file, "profile-photos")
+                  setPhotoPreview(url)
+                } catch (error) {
+                  toast.error(
+                    error instanceof Error ? error.message : "Could not upload photo."
+                  )
+                }
               }}
             />
           </label>
@@ -245,10 +407,15 @@ export function ProfilePageClient() {
                     await saveUserProfile({
                       ...profile,
                       fullName: editName,
-                      profilePhotoUrl: photoPreview
+                      profilePhotoUrl: photoPreview,
+                      recoveryEmail
                     })
                     await refreshProfile(profile.id)
                     toast.success("Profile updated.")
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error ? error.message : "Could not update profile."
+                    )
                   } finally {
                     setSavingProfile(false)
                   }
@@ -272,6 +439,90 @@ export function ProfilePageClient() {
           </div>
           <ThemeToggle />
         </div>
+      </Card>
+
+      <Card className="space-y-4 p-5">
+        <div className="flex items-start gap-3">
+          <FiMail className="mt-1 text-brand" />
+          <div>
+            <p className="text-sm font-semibold text-ink">Recovery email</p>
+            <p className="mt-1 text-sm leading-6 text-muted">
+              This is what powers forgot password now that SMS OTP is off.
+            </p>
+          </div>
+        </div>
+        <Input
+          type="email"
+          placeholder="Recovery email"
+          value={recoveryEmail}
+          onChange={(event) => setRecoveryEmail(event.target.value)}
+        />
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={async () => {
+            try {
+              await saveRecoveryEmail(recoveryEmail)
+            } catch (error) {
+              toast.error(
+                error instanceof Error ? error.message : "Could not save recovery email."
+              )
+            }
+          }}
+        >
+          Save recovery email
+        </Button>
+      </Card>
+
+      <Card className="space-y-4 p-5">
+        <div className="flex items-start gap-3">
+          <FiKey className="mt-1 text-brand" />
+          <div>
+            <p className="text-sm font-semibold text-ink">Password</p>
+            <p className="mt-1 text-sm leading-6 text-muted">
+              Change your password anytime from inside the app.
+            </p>
+          </div>
+        </div>
+        <Input
+          type="password"
+          placeholder="New password"
+          value={newPassword}
+          onChange={(event) => setNewPassword(event.target.value)}
+        />
+        <Input
+          type="password"
+          placeholder="Confirm new password"
+          value={newPasswordConfirm}
+          onChange={(event) => setNewPasswordConfirm(event.target.value)}
+        />
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={async () => {
+            if (newPassword.length < 6) {
+              toast.error("Use at least 6 characters for your password.")
+              return
+            }
+
+            if (newPassword !== newPasswordConfirm) {
+              toast.error("Passwords do not match.")
+              return
+            }
+
+            try {
+              await updatePassword(newPassword)
+              setNewPassword("")
+              setNewPasswordConfirm("")
+            } catch (error) {
+              toast.error(
+                error instanceof Error ? error.message : "Could not update password."
+              )
+            }
+          }}
+        >
+          Update password
+        </Button>
       </Card>
 
       <Card className="p-5">
@@ -333,7 +584,7 @@ export function ProfilePageClient() {
                     }`}
                     onClick={() => {
                       setViewMode(mode)
-                      window.localStorage.setItem(VIEW_MODE_KEY, mode)
+                      window.localStorage.setItem("lolagram-view-mode", mode)
                     }}
                   >
                     {mode === "buyer" ? "Buyer" : "Seller"}

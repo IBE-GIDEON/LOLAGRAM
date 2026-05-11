@@ -29,15 +29,15 @@ import {
 } from "@/lib/product-images"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import {
-  type AuthFormValues,
   type CheckoutPayload,
   type MarketplaceSearchResults,
   type OrderDetail,
   type OrderStatus,
   type PaystackInitializeResponse,
   type ProductInput,
-  type ProductSearchResult,
+   type ProductSearchResult,
   type SellerProfileInput,
+  type SignUpFormValues,
   type StoreAnalytics,
   type UserProfile,
   type VendorDetail,
@@ -51,6 +51,7 @@ function mapUser(row: Record<string, unknown>): UserProfile {
     phone: String(row.phone ?? ""),
     fullName: String(row.full_name ?? ""),
     profilePhotoUrl: row.profile_photo_url ? String(row.profile_photo_url) : undefined,
+    recoveryEmail: row.recovery_email ? String(row.recovery_email) : undefined,
     accountType: String(row.account_type ?? "buyer") as UserProfile["accountType"],
     createdAt: String(row.created_at ?? new Date().toISOString())
   }
@@ -545,7 +546,7 @@ export async function loadVendorProfile(userId: string) {
   return mapVendor(data)
 }
 
-export async function findOrCreateDemoUser(values: AuthFormValues) {
+export async function findOrCreateDemoUser(values: SignUpFormValues) {
   const existing = getDemoUserByPhone(values.phone)
   if (existing) {
     return existing
@@ -555,6 +556,7 @@ export async function findOrCreateDemoUser(values: AuthFormValues) {
     id: createId("user"),
     phone: values.phone,
     fullName: values.fullName,
+    recoveryEmail: values.recoveryEmail,
     accountType: values.accountType,
     createdAt: new Date().toISOString()
   }
@@ -602,6 +604,7 @@ export async function saveUserProfile(input: UserProfile) {
       phone: input.phone,
       full_name: input.fullName,
       profile_photo_url: input.profilePhotoUrl,
+      recovery_email: input.recoveryEmail,
       account_type: input.accountType
     })
     .select()

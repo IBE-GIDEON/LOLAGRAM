@@ -10,20 +10,28 @@ import {
 } from "react"
 import toast from "react-hot-toast"
 
-import { DEMO_OTP, DEMO_USER_KEY } from "@/lib/constants"
-import { canUseDemoMode } from "@/lib/env"
+import { DEMO_USER_KEY } from "@/lib/constants"
+import { canUseDemoMode, env } from "@/lib/env"
 import {
   findOrCreateDemoUser,
   loadUserProfile,
-  loadVendorProfile
+  loadVendorProfile,
+  saveUserProfile
 } from "@/lib/marketplace"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
-import { type AccountType, type AuthFormValues, type AuthSessionState } from "@/lib/types"
+import {
+  type AccountType,
+  type AuthSessionState,
+  type SignInFormValues,
+  type SignUpFormValues
+} from "@/lib/types"
 
 interface AuthContextValue extends AuthSessionState {
-  pendingPhone: string
-  requestOtp: (values: AuthFormValues) => Promise<void>
-  verifyOtp: (token: string, values: AuthFormValues) => Promise<void>
+  signIn: (values: SignInFormValues) => Promise<void>
+  signUp: (values: SignUpFormValues) => Promise<void>
+  requestPasswordReset: (recoveryEmail: string) => Promise<void>
+  updatePassword: (nextPassword: string) => Promise<void>
+  saveRecoveryEmail: (recoveryEmail: string) => Promise<void>
   signOut: () => Promise<void>
   upgradeAccountType: (nextType: AccountType) => Promise<void>
   refreshProfile: (userId?: string | null) => Promise<void>
@@ -37,25 +45,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [vendorProfile, setVendorProfile] =
     useState<AuthSessionState["vendorProfile"]>(null)
   const [loading, setLoading] = useState(true)
-  const [pendingPhone, setPendingPhone] = useState("")
   const isDemoMode = canUseDemoMode
 
-  const refreshProfile = useCallback(async (userId?: string | null) => {
-    const targetUserId = userId ?? sessionUserId
-    if (!targetUserId) {
-      setProfile(null)
-      setVendorProfile(null)
-      return
-    }
+  const refreshProfile = useCallback(
+    async (userId?: string | null) => {
+      const targetUserId = userId ?? sessionUserId
+      if (!targetUserId) {
+        setProfile(null)
+        setVendorProfile(null)
+        return
+      }
 
-    const [nextProfile, nextVendor] = await Promise.all([
-      loadUserProfile(targetUserId),
-      loadVendorProfile(targetUserId)
-    ])
+      const [nextProfile, nextVendor] = await Promise.all([
+        loadUserProfile(targetUserId),
+        loadVendorProfile(targetUserId)
+      ])
 
-    setProfile(nextProfile)
-    setVendorProfile(nextVendor)
-  }, [sessionUserId])
+      setProfile(nextProfile)
+      setVendorProfile(nextVendor)
+    },
+    [sessionUserId]
+  )
 
   useEffect(() => {
     let ignore = false
@@ -92,7 +102,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await refreshProfile(nextUserId)
       }
 
-      supabase.auth.onAuthStateChange(async (_, nextSession) => {
+      const {
+        data: { subscription }
+      } = supabase.auth.onAuthStateChange(async (_, nextSession) => {
         const nextId = nextSession?.user?.id ?? null
         if (ignore) return
         setSessionUserId(nextId)
@@ -102,21 +114,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!ignore) {
         setLoading(false)
       }
+
+      return () => subscription.unsubscribe()
     }
 
-    bootstrap()
+    let cleanup: (() => void) | undefined
+    bootstrap().then((unsubscribe) => {
+      cleanup = unsubscribe
+    })
 
     return () => {
       ignore = true
+      cleanup?.()
     }
   }, [isDemoMode, refreshProfile])
 
-  const requestOtp = useCallback(
-    async (values: AuthFormValues) => {
-      setPendingPhone(values.phone)
+  const signIn = useCallback(async (values: SignInFormValues) => {
+    if (isDemoMode) {
+      const user = await findOrCreateDemoUser({
+        phone: values.phone,
+        fullName: "Demo User",
+        password: values.password,
+        recoveryEmail: "",
+        accountType: "buyer"
+      })
+
+      window.localStorage.setItem(DEMO_USER_KEY, user.id)
+      setSessionUserId(user.id)
+      await refreshProfile(user.id)
+      toast.success("Signed in successfully.")
+      return
+    }
+
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) {
+      throw new Error("Supabase is not configured")
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      phone: values.phone,
+      password: values.password
+    })
+
+    if (error || !data.user) {
+      throw error ?? new Error("Unable to sign in")
+    }
+
+    setSessionUserId(data.user.id)
+    await refreshProfile(data.user.id)
+    toast.success("Welcome back.")
+  }, [isDemoMode, refreshProfile])
+
+  const signUp = useCallback(
+    async (values: SignUpFormValues) => {
+      const normalizedRecoveryEmail = values.recoveryEmail?.trim().toLowerCase()
 
       if (isDemoMode) {
-        toast.success(`Demo OTP sent. Use ${DEMO_OTP}.`)
+        const user = await findOrCreateDemoUser({
+          ...values,
+          recoveryEmail: normalizedRecoveryEmail
+        })
+        window.localStorage.setItem(DEMO_USER_KEY, user.id)
+        setSessionUserId(user.id)
+        await refreshProfile(user.id)
+        toast.success("Account created.")
         return
       }
 
@@ -125,8 +186,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error("Supabase is not configured")
       }
 
-      const { error } = await supabase.auth.signInWithOtp({
+      const { data, error } = await supabase.auth.signUp({
         phone: values.phone,
+        password: values.password,
         options: {
           data: {
             full_name: values.fullName,
@@ -135,27 +197,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       })
 
-      if (error) {
-        throw error
+      if (error || !data.user) {
+        throw error ?? new Error("Unable to create account")
       }
 
-      toast.success("OTP sent to your phone number.")
+      if (!data.session) {
+        throw new Error(
+          "Phone confirmation is still enabled in Supabase. Turn it off to use phone and password without SMS."
+        )
+      }
+
+      await supabase.from("users").upsert({
+        id: data.user.id,
+        phone: values.phone,
+        full_name: values.fullName,
+        recovery_email: normalizedRecoveryEmail,
+        account_type: values.accountType
+      })
+
+      if (normalizedRecoveryEmail) {
+        const { error: recoveryError } = await supabase.auth.updateUser({
+          email: normalizedRecoveryEmail
+        })
+
+        if (recoveryError) {
+          toast.error(
+            "Account created, but recovery email needs to be added again from Profile."
+          )
+        } else {
+          toast.success("Check your email to confirm password recovery access.")
+        }
+      }
+
+      setSessionUserId(data.user.id)
+      await refreshProfile(data.user.id)
+      toast.success("Account created.")
     },
-    [isDemoMode]
+    [isDemoMode, refreshProfile]
   )
 
-  const verifyOtp = useCallback(
-    async (token: string, values: AuthFormValues) => {
-      if (isDemoMode) {
-        if (token !== DEMO_OTP) {
-          throw new Error("Use 123456 in demo mode.")
-        }
+  const requestPasswordReset = useCallback(
+    async (recoveryEmail: string) => {
+      const normalizedEmail = recoveryEmail.trim().toLowerCase()
+      if (!normalizedEmail) {
+        throw new Error("Add your recovery email first.")
+      }
 
-        const user = await findOrCreateDemoUser(values)
-        window.localStorage.setItem(DEMO_USER_KEY, user.id)
-        setSessionUserId(user.id)
-        await refreshProfile(user.id)
-        toast.success("Welcome to LOLAGRAM.")
+      if (isDemoMode) {
+        toast.success("Reset email sent in demo mode.")
         return
       }
 
@@ -164,32 +253,85 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error("Supabase is not configured")
       }
 
-      const { data, error } = await supabase.auth.verifyOtp({
-        phone: values.phone,
-        token,
-        type: "sms"
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        redirectTo: `${env.appUrl}/reset-password`
       })
 
-      if (error || !data.user) {
-        throw error ?? new Error("Unable to verify OTP")
+      if (error) {
+        throw error
       }
 
-      const { error: profileError } = await supabase.from("users").upsert({
-        id: data.user.id,
-        phone: values.phone,
-        full_name: values.fullName,
-        account_type: values.accountType
-      })
-
-      if (profileError) {
-        throw profileError
-      }
-
-      setSessionUserId(data.user.id)
-      await refreshProfile(data.user.id)
-      toast.success("Signed in successfully.")
+      toast.success("Password reset link sent. Check your email.")
     },
-    [isDemoMode, refreshProfile]
+    [isDemoMode]
+  )
+
+  const updatePassword = useCallback(
+    async (nextPassword: string) => {
+      if (isDemoMode) {
+        toast.success("Password updated in demo mode.")
+        return
+      }
+
+      const supabase = getSupabaseBrowserClient()
+      if (!supabase) {
+        throw new Error("Supabase is not configured")
+      }
+
+      const { error } = await supabase.auth.updateUser({
+        password: nextPassword
+      })
+
+      if (error) {
+        throw error
+      }
+
+      toast.success("Password updated.")
+    },
+    [isDemoMode]
+  )
+
+  const saveRecoveryEmail = useCallback(
+    async (recoveryEmail: string) => {
+      if (!profile) return
+
+      const normalizedEmail = recoveryEmail.trim().toLowerCase()
+
+      if (isDemoMode) {
+        const nextProfile = {
+          ...profile,
+          recoveryEmail: normalizedEmail || undefined
+        }
+        await saveUserProfile(nextProfile)
+        setProfile(nextProfile)
+        return
+      }
+
+      const supabase = getSupabaseBrowserClient()
+      if (!supabase) {
+        throw new Error("Supabase is not configured")
+      }
+
+      if (!normalizedEmail) {
+        throw new Error("Add a recovery email before saving.")
+      }
+
+      const { error } = await supabase.auth.updateUser({
+        email: normalizedEmail
+      })
+
+      if (error) {
+        throw error
+      }
+
+      await saveUserProfile({
+        ...profile,
+        recoveryEmail: normalizedEmail
+      })
+      await refreshProfile(profile.id)
+      toast.success("Recovery email saved. Check your inbox to confirm it.")
+    },
+    [isDemoMode, profile, refreshProfile]
   )
 
   const signOut = useCallback(async () => {
@@ -247,26 +389,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profile,
       vendorProfile,
       loading,
-      pendingPhone,
       isDemoMode,
-      requestOtp,
-      verifyOtp,
+      signIn,
+      signUp,
+      requestPasswordReset,
+      updatePassword,
+      saveRecoveryEmail,
       signOut,
       upgradeAccountType,
       refreshProfile
     }),
     [
-      isDemoMode,
-      loading,
-      pendingPhone,
-      profile,
-      refreshProfile,
-      requestOtp,
       sessionUserId,
+      profile,
+      vendorProfile,
+      loading,
+      isDemoMode,
+      signIn,
+      signUp,
+      requestPasswordReset,
+      updatePassword,
+      saveRecoveryEmail,
       signOut,
       upgradeAccountType,
-      vendorProfile,
-      verifyOtp
+      refreshProfile
     ]
   )
 

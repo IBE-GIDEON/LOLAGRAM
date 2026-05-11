@@ -33,19 +33,21 @@ Important launch checks:
 - RLS policies are enabled
 - storage upload policy allows authenticated users to upload store assets
 
-## 3. Phone OTP Auth
+## 3. Phone + Password Auth
 
 In Supabase Auth:
 
 - enable phone auth
-- connect your SMS provider for Nigerian numbers
-- verify OTP templates and delivery
-- test one real Nigerian number end to end
+- turn off phone confirmation if you do not want SMS verification during launch
+- keep phone as the login identifier
+- use recovery email for forgot-password links
 
 Before launch, verify:
 
-- sign up works
+- sign up with phone and password works
 - returning login works
+- forgot password sends a reset link to the saved recovery email
+- reset password opens `/reset-password` and updates the password successfully
 - buyer to seller upgrade works
 - session persists in the installed PWA
 

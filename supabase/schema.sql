@@ -9,9 +9,13 @@ create table if not exists public.users (
   phone text unique not null,
   full_name text not null,
   profile_photo_url text,
+  recovery_email text,
   account_type public.account_type not null default 'buyer',
   created_at timestamptz not null default now()
 );
+
+alter table public.users
+add column if not exists recovery_email text;
 
 create table if not exists public.vendor_profiles (
   id uuid primary key default gen_random_uuid(),
@@ -26,15 +30,14 @@ create table if not exists public.vendor_profiles (
   total_sales integer not null default 0,
   rating double precision not null default 0,
   created_at timestamptz not null default now(),
-  search_text tsvector generated always as (
-    setweight(to_tsvector('simple', coalesce(store_name, '')), 'A') ||
-    setweight(to_tsvector('simple', coalesce(category::text, '')), 'B') ||
-    setweight(to_tsvector('simple', coalesce(city, '')), 'C')
-  ) stored
+  search_text tsvector not null default ''::tsvector
 );
 
+alter table public.vendor_profiles drop column if exists search_text;
+alter table public.vendor_profiles
+add column if not exists search_text tsvector not null default ''::tsvector;
+
 create unique index if not exists vendor_profiles_user_id_key on public.vendor_profiles(user_id);
-create index if not exists vendor_profiles_search_idx on public.vendor_profiles using gin (search_text);
 create index if not exists vendor_profiles_recent_idx on public.vendor_profiles (created_at desc);
 
 create table if not exists public.products (
@@ -127,6 +130,35 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
 after insert on auth.users
 for each row execute procedure public.handle_new_user();
+
+create or replace function public.update_vendor_search_text()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  new.search_text :=
+    setweight(to_tsvector('simple', coalesce(new.store_name, '')), 'A') ||
+    setweight(to_tsvector('simple', coalesce(new.category::text, '')), 'B') ||
+    setweight(to_tsvector('simple', coalesce(new.city, '')), 'C');
+  return new;
+end;
+$$;
+
+drop trigger if exists vendor_profiles_search_text_before_write on public.vendor_profiles;
+create trigger vendor_profiles_search_text_before_write
+before insert or update of store_name, category, city
+on public.vendor_profiles
+for each row execute procedure public.update_vendor_search_text();
+
+update public.vendor_profiles
+set search_text =
+  setweight(to_tsvector('simple', coalesce(store_name, '')), 'A') ||
+  setweight(to_tsvector('simple', coalesce(category::text, '')), 'B') ||
+  setweight(to_tsvector('simple', coalesce(city, '')), 'C');
+
+create index if not exists vendor_profiles_search_idx on public.vendor_profiles using gin (search_text);
 
 create or replace function public.update_vendor_rating()
 returns trigger
