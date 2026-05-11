@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 
+import { hasSupabaseAdmin } from "@/lib/env"
 import { type CheckoutPayload } from "@/lib/types"
 import { getSupabaseAdminClient } from "@/lib/supabase/server"
 
@@ -7,8 +8,11 @@ export async function POST(request: Request) {
   const payload = (await request.json()) as CheckoutPayload
   const supabase = getSupabaseAdminClient()
 
-  if (!supabase) {
-    return NextResponse.json({ ok: true, mode: "demo" })
+  if (!hasSupabaseAdmin || !supabase) {
+    return NextResponse.json(
+      { error: "Supabase admin configuration is missing for offline order sync." },
+      { status: 503 }
+    )
   }
 
   const { error } = await supabase.from("orders").insert({

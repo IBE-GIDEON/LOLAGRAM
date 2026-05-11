@@ -3,20 +3,26 @@
 import Link from "next/link"
 import { useState } from "react"
 import toast from "react-hot-toast"
+import { FiTrash2 } from "react-icons/fi"
 
 import { useAuth } from "@/components/providers/auth-provider"
 import { Button, Card, Input, SectionHeading, Textarea } from "@/components/ui"
 import { CATEGORY_OPTIONS } from "@/lib/constants"
-import { uploadImage } from "@/lib/image"
+import { uploadImage, uploadImages } from "@/lib/image"
 import { saveProduct, saveSellerProfile } from "@/lib/marketplace"
 import { type VendorCategory } from "@/lib/types"
+
+const MAX_PRODUCT_IMAGES = 6
 
 export function SellerOnboardingClient() {
   const { profile, vendorProfile, refreshProfile, upgradeAccountType } = useAuth()
   const [step, setStep] = useState(1)
   const [busy, setBusy] = useState(false)
+  const [uploadingProductImages, setUploadingProductImages] = useState(false)
   const [storeName, setStoreName] = useState(vendorProfile?.storeName ?? "")
-  const [category, setCategory] = useState<VendorCategory>(vendorProfile?.category ?? "fashion")
+  const [category, setCategory] = useState<VendorCategory>(
+    vendorProfile?.category ?? "fashion"
+  )
   const [storePhotoUrl, setStorePhotoUrl] = useState(vendorProfile?.storePhotoUrl ?? "")
   const [bio, setBio] = useState(vendorProfile?.bio ?? "")
   const [city, setCity] = useState(vendorProfile?.city ?? "")
@@ -26,7 +32,33 @@ export function SellerOnboardingClient() {
   const [productName, setProductName] = useState("")
   const [productPrice, setProductPrice] = useState("")
   const [productDescription, setProductDescription] = useState("")
-  const [productPhotoUrl, setProductPhotoUrl] = useState("")
+  const [productPhotoUrls, setProductPhotoUrls] = useState<string[]>([])
+
+  const handleProductImageUpload = async (fileList: FileList | null) => {
+    if (!fileList?.length) return
+
+    const remainingSlots = MAX_PRODUCT_IMAGES - productPhotoUrls.length
+    if (remainingSlots <= 0) {
+      toast.error(`You can upload up to ${MAX_PRODUCT_IMAGES} product photos.`)
+      return
+    }
+
+    const selectedFiles = Array.from(fileList).slice(0, remainingSlots)
+    setUploadingProductImages(true)
+
+    try {
+      const nextUrls = await uploadImages(selectedFiles, "product-photos")
+      setProductPhotoUrls((current) => [...current, ...nextUrls])
+
+      if (fileList.length > remainingSlots) {
+        toast.error(`Only the first ${remainingSlots} photo(s) were added.`)
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not upload product photos.")
+    } finally {
+      setUploadingProductImages(false)
+    }
+  }
 
   if (!profile) {
     return (
@@ -99,7 +131,14 @@ export function SellerOnboardingClient() {
               onChange={async (event) => {
                 const file = event.target.files?.[0]
                 if (!file) return
-                setStorePhotoUrl(await uploadImage(file, "store-photos"))
+                try {
+                  setStorePhotoUrl(await uploadImage(file, "store-photos"))
+                } catch (error) {
+                  toast.error(
+                    error instanceof Error ? error.message : "Could not upload store photo."
+                  )
+                }
+                event.target.value = ""
               }}
             />
             <p className="text-sm font-semibold text-ink">
@@ -107,7 +146,11 @@ export function SellerOnboardingClient() {
             </p>
             <p className="mt-1 text-xs text-muted">Camera or gallery</p>
           </label>
-          <Textarea placeholder="Tell buyers what you sell" value={bio} onChange={(event) => setBio(event.target.value)} />
+          <Textarea
+            placeholder="Tell buyers what you sell"
+            value={bio}
+            onChange={(event) => setBio(event.target.value)}
+          />
           <Input placeholder="City" value={city} onChange={(event) => setCity(event.target.value)} />
           <Input
             placeholder="WhatsApp number"
@@ -130,16 +173,58 @@ export function SellerOnboardingClient() {
               className="hidden"
               type="file"
               accept="image/*"
+              multiple
               onChange={async (event) => {
-                const file = event.target.files?.[0]
-                if (!file) return
-                setProductPhotoUrl(await uploadImage(file, "product-photos"))
+                await handleProductImageUpload(event.target.files)
+                event.target.value = ""
               }}
             />
             <p className="text-sm font-semibold text-ink">
-              {productPhotoUrl ? "Product photo uploaded" : "Upload first product photo"}
+              {uploadingProductImages
+                ? "Uploading product photos..."
+                : productPhotoUrls.length > 0
+                  ? `Add more photos (${productPhotoUrls.length}/${MAX_PRODUCT_IMAGES})`
+                  : "Upload first product photos"}
+            </p>
+            <p className="mt-1 text-xs text-muted">
+              Add up to {MAX_PRODUCT_IMAGES} images for your first listing.
             </p>
           </label>
+
+          {productPhotoUrls.length > 0 ? (
+            <div className="grid grid-cols-3 gap-3">
+              {productPhotoUrls.map((photoUrl, index) => (
+                <div
+                  key={`${photoUrl}-${index}`}
+                  className="relative overflow-hidden rounded-[20px] bg-canvas"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photoUrl}
+                    alt={`Product photo ${index + 1}`}
+                    className="aspect-square h-full w-full object-cover"
+                  />
+                  {index === 0 ? (
+                    <span className="absolute left-2 top-2 rounded-full bg-brand px-2 py-1 text-[10px] font-semibold text-white">
+                      Cover
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="absolute right-2 top-2 rounded-full bg-black/70 p-2 text-white"
+                    onClick={() =>
+                      setProductPhotoUrls((current) =>
+                        current.filter((_, itemIndex) => itemIndex !== index)
+                      )
+                    }
+                  >
+                    <FiTrash2 size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
           <Input
             placeholder="Product name"
             value={productName}
@@ -162,23 +247,44 @@ export function SellerOnboardingClient() {
             <Button
               disabled={busy}
               onClick={async () => {
+                if (!storeName.trim()) {
+                  toast.error("Add your store name first.")
+                  return
+                }
+
+                if (!productName.trim()) {
+                  toast.error("Add your first product name.")
+                  return
+                }
+
+                if (!Number(productPrice)) {
+                  toast.error("Enter a valid first product price.")
+                  return
+                }
+
+                if (productPhotoUrls.length === 0) {
+                  toast.error("Upload at least one product photo.")
+                  return
+                }
+
                 setBusy(true)
                 try {
                   const vendor = await saveSellerProfile(profile.id, {
-                    storeName,
+                    storeName: storeName.trim(),
                     category,
                     storePhotoUrl,
-                    bio,
-                    city,
-                    whatsappNumber
+                    bio: bio.trim(),
+                    city: city.trim(),
+                    whatsappNumber: whatsappNumber.trim()
                   })
 
                   await saveProduct({
                     vendorId: vendor.id,
-                    name: productName,
-                    description: productDescription,
+                    name: productName.trim(),
+                    description: productDescription.trim(),
                     price: Number(productPrice || 0),
-                    photoUrl: productPhotoUrl,
+                    photoUrl: productPhotoUrls[0],
+                    photoUrls: productPhotoUrls,
                     inStock: true
                   })
 
@@ -189,7 +295,9 @@ export function SellerOnboardingClient() {
                   await refreshProfile(profile.id)
                   setStep(4)
                 } catch (error) {
-                  toast.error(error instanceof Error ? error.message : "Could not launch store.")
+                  toast.error(
+                    error instanceof Error ? error.message : "Could not launch store."
+                  )
                 } finally {
                   setBusy(false)
                 }

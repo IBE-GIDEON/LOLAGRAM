@@ -7,6 +7,7 @@ import { FiChevronRight, FiMapPin, FiSearch } from "react-icons/fi"
 import { Avatar, Badge, Input, SectionHeading, StarRating } from "@/components/ui"
 import { formatCategory, formatCurrency } from "@/lib/format"
 import { loadMarketplaceSearch } from "@/lib/marketplace"
+import { getPrimaryProductImage } from "@/lib/product-images"
 import {
   type MarketplaceSearchResults,
   type ProductSearchResult,
@@ -220,19 +221,26 @@ export function SearchPageClient() {
 }
 
 function ProductSearchCard({ product }: { product: ProductSearchResult }) {
+  const primaryImage = getPrimaryProductImage(product)
+
   return (
     <Link
       href={`/vendor/${product.vendor.id}?product=${product.id}`}
       className="overflow-hidden rounded-[22px] border border-border/70 bg-surface text-left transition hover:bg-canvas"
     >
-      <div className="aspect-square overflow-hidden bg-canvas">
-        {product.photoUrl ? (
+      <div className="relative aspect-square overflow-hidden bg-canvas">
+        {primaryImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={product.photoUrl}
+            src={primaryImage}
             alt={product.name}
             className="h-full w-full object-cover"
           />
+        ) : null}
+        {product.photoUrls.length > 1 ? (
+          <span className="absolute bottom-3 right-3 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-semibold text-white">
+            +{product.photoUrls.length - 1}
+          </span>
         ) : null}
       </div>
       <div className="space-y-2 p-3">

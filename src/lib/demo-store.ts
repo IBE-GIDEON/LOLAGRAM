@@ -292,7 +292,8 @@ export function saveProductDemo(input: ProductInput) {
       existing.name = input.name
       existing.description = input.description
       existing.price = input.price
-      existing.photoUrl = input.photoUrl
+      existing.photoUrl = input.photoUrls[0] ?? input.photoUrl
+      existing.photoUrls = input.photoUrls
       existing.inStock = input.inStock
       return existing
     }
@@ -303,7 +304,8 @@ export function saveProductDemo(input: ProductInput) {
       name: input.name,
       description: input.description,
       price: input.price,
-      photoUrl: input.photoUrl,
+      photoUrl: input.photoUrls[0] ?? input.photoUrl,
+      photoUrls: input.photoUrls,
       inStock: input.inStock,
       createdAt: new Date().toISOString()
     }

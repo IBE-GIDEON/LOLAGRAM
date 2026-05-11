@@ -134,6 +134,11 @@ export function createInitialDemoState(): DemoState {
         price: 32000,
         photoUrl:
           "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=800&q=80",
+        photoUrls: [
+          "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=800&q=80",
+          "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=800&q=80",
+          "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=800&q=80"
+        ],
         inStock: true,
         createdAt: daysAgo(18)
       },
@@ -145,6 +150,10 @@ export function createInitialDemoState(): DemoState {
         price: 14000,
         photoUrl:
           "https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=800&q=80",
+        photoUrls: [
+          "https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=800&q=80",
+          "https://images.unsplash.com/photo-1619451334792-150fd785ee74?w=800&q=80"
+        ],
         inStock: true,
         createdAt: daysAgo(12)
       },
@@ -156,6 +165,10 @@ export function createInitialDemoState(): DemoState {
         price: 68000,
         photoUrl:
           "https://images.unsplash.com/photo-1547996160-81dfa63595aa?w=800&q=80",
+        photoUrls: [
+          "https://images.unsplash.com/photo-1547996160-81dfa63595aa?w=800&q=80",
+          "https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=800&q=80"
+        ],
         inStock: true,
         createdAt: daysAgo(16)
       },
@@ -167,6 +180,9 @@ export function createInitialDemoState(): DemoState {
         price: 92000,
         photoUrl:
           "https://images.unsplash.com/photo-1522312346375-d1a52e2b99b3?w=800&q=80",
+        photoUrls: [
+          "https://images.unsplash.com/photo-1522312346375-d1a52e2b99b3?w=800&q=80"
+        ],
         inStock: false,
         createdAt: daysAgo(9)
       },
@@ -178,6 +194,10 @@ export function createInitialDemoState(): DemoState {
         price: 45000,
         photoUrl:
           "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=800&q=80",
+        photoUrls: [
+          "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=800&q=80",
+          "https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=800&q=80"
+        ],
         inStock: true,
         createdAt: daysAgo(13)
       },
@@ -189,6 +209,11 @@ export function createInitialDemoState(): DemoState {
         price: 72000,
         photoUrl:
           "https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=800&q=80",
+        photoUrls: [
+          "https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=800&q=80",
+          "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&q=80",
+          "https://images.unsplash.com/photo-1492707892479-7bc8d5a4ee93?w=800&q=80"
+        ],
         inStock: true,
         createdAt: daysAgo(7)
       },
@@ -200,6 +225,11 @@ export function createInitialDemoState(): DemoState {
         price: 38000,
         photoUrl:
           "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800&q=80",
+        photoUrls: [
+          "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800&q=80",
+          "https://images.unsplash.com/photo-1591561954557-26941169b49e?w=800&q=80",
+          "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800&q=80"
+        ],
         inStock: true,
         createdAt: daysAgo(5)
       },
@@ -211,6 +241,10 @@ export function createInitialDemoState(): DemoState {
         price: 18000,
         photoUrl:
           "https://images.unsplash.com/photo-1611652022419-a9419f74343d?w=800&q=80",
+        photoUrls: [
+          "https://images.unsplash.com/photo-1611652022419-a9419f74343d?w=800&q=80",
+          "https://images.unsplash.com/photo-1617038220319-276d3cfab638?w=800&q=80"
+        ],
         inStock: true,
         createdAt: daysAgo(11)
       },
@@ -222,6 +256,10 @@ export function createInitialDemoState(): DemoState {
         price: 155000,
         photoUrl:
           "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=800&q=80",
+        photoUrls: [
+          "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=800&q=80",
+          "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&q=80"
+        ],
         inStock: true,
         createdAt: daysAgo(6)
       },
@@ -233,6 +271,10 @@ export function createInitialDemoState(): DemoState {
         price: 132000,
         photoUrl:
           "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&q=80",
+        photoUrls: [
+          "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&q=80",
+          "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=800&q=80"
+        ],
         inStock: true,
         createdAt: daysAgo(4)
       }

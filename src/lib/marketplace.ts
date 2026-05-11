@@ -22,7 +22,11 @@ import {
   updateOrderStatusDemo,
   upsertDemoUser
 } from "@/lib/demo-store"
-import { env, hasSupabase } from "@/lib/env"
+import { canUseDemoMode, env, hasSupabase } from "@/lib/env"
+import {
+  normalizeProductPhotoUrls,
+  serializeLegacyPhotoUrl
+} from "@/lib/product-images"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import {
   type AuthFormValues,
@@ -70,25 +74,41 @@ function mapVendor(row: Record<string, unknown>): VendorProfile {
 }
 
 function mapProduct(row: Record<string, unknown>) {
+  const photoUrls = normalizeProductPhotoUrls(
+    Array.isArray(row.photo_urls)
+      ? row.photo_urls.map((value) => String(value))
+      : undefined,
+    row.photo_url ? String(row.photo_url) : undefined
+  )
+
   return {
     id: String(row.id),
     vendorId: String(row.vendor_id),
     name: String(row.name),
     description: String(row.description ?? ""),
     price: Number(row.price ?? 0),
-    photoUrl: row.photo_url ? String(row.photo_url) : undefined,
+    photoUrl: photoUrls[0],
+    photoUrls,
     inStock: Boolean(row.in_stock),
     createdAt: String(row.created_at ?? new Date().toISOString())
   }
 }
 
+function getLaunchConfigError(feature: string) {
+  return `${feature} needs live Supabase configuration before launch.`
+}
+
+function getPaymentsConfigError() {
+  return "Checkout needs live Paystack and Supabase configuration before launch."
+}
+
 export async function loadVendors(query = ""): Promise<VendorSnapshot[]> {
   if (!hasSupabase) {
-    return getVendorSnapshots(query)
+    return canUseDemoMode ? getVendorSnapshots(query) : []
   }
 
   const supabase = getSupabaseBrowserClient()
-  if (!supabase) return getVendorSnapshots(query)
+  if (!supabase) return canUseDemoMode ? getVendorSnapshots(query) : []
 
   let request = supabase
     .from("vendor_profiles")
@@ -104,7 +124,7 @@ export async function loadVendors(query = ""): Promise<VendorSnapshot[]> {
 
   const { data, error } = await request.limit(100)
   if (error || !data) {
-    return getVendorSnapshots(query)
+    return canUseDemoMode ? getVendorSnapshots(query) : []
   }
 
   return data.map((row) => ({
@@ -118,11 +138,17 @@ export async function loadMarketplaceSearch(
   query = ""
 ): Promise<MarketplaceSearchResults> {
   if (!hasSupabase) {
-    return getMarketplaceSearchResults(query)
+    return canUseDemoMode
+      ? getMarketplaceSearchResults(query)
+      : { products: [], vendors: [] }
   }
 
   const supabase = getSupabaseBrowserClient()
-  if (!supabase) return getMarketplaceSearchResults(query)
+  if (!supabase) {
+    return canUseDemoMode
+      ? getMarketplaceSearchResults(query)
+      : { products: [], vendors: [] }
+  }
 
   const normalized = query.trim()
   const vendorRequest = normalized
@@ -161,7 +187,9 @@ export async function loadMarketplaceSearch(
   ] = await Promise.all([vendorRequest, productRequest])
 
   if (vendorError || productError || !vendorRows || !productRows) {
-    return getMarketplaceSearchResults(query)
+    return canUseDemoMode
+      ? getMarketplaceSearchResults(query)
+      : { products: [], vendors: [] }
   }
 
   const relatedVendorProducts =
@@ -178,7 +206,9 @@ export async function loadMarketplaceSearch(
       : { data: [], error: null }
 
   if (relatedVendorProducts.error) {
-    return getMarketplaceSearchResults(query)
+    return canUseDemoMode
+      ? getMarketplaceSearchResults(query)
+      : { products: [], vendors: [] }
   }
 
   const mergedProductRows = [...productRows, ...(relatedVendorProducts.data ?? [])].filter(
@@ -205,7 +235,9 @@ export async function loadMarketplaceSearch(
       : { data: [], error: null }
 
   if (extraVendorRows.error) {
-    return getMarketplaceSearchResults(query)
+    return canUseDemoMode
+      ? getMarketplaceSearchResults(query)
+      : { products: [], vendors: [] }
   }
 
   const allVendorRows = [...vendorRows, ...(extraVendorRows.data ?? [])]
@@ -260,11 +292,11 @@ export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]
   const normalized = query.trim()
 
   if (!hasSupabase) {
-    return getProductFeed(query)
+    return canUseDemoMode ? getProductFeed(query) : []
   }
 
   const supabase = getSupabaseBrowserClient()
-  if (!supabase) return getProductFeed(query)
+  if (!supabase) return canUseDemoMode ? getProductFeed(query) : []
 
   if (normalized) {
     const results = await loadMarketplaceSearch(query)
@@ -278,7 +310,7 @@ export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]
     .limit(100)
 
   if (productError || !productRows) {
-    return getProductFeed(query)
+    return canUseDemoMode ? getProductFeed(query) : []
   }
 
   const vendorIds = [...new Set(productRows.map((product) => String(product.vendor_id)))]
@@ -290,7 +322,7 @@ export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]
     .eq("is_active", true)
 
   if (vendorError || !vendorRows) {
-    return getProductFeed(query)
+    return canUseDemoMode ? getProductFeed(query) : []
   }
 
   const vendorSnapshotMap = new Map(
@@ -321,11 +353,11 @@ export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]
 
 export async function loadVendorDetail(vendorId: string): Promise<VendorDetail | null> {
   if (!hasSupabase) {
-    return getVendorDetailDemo(vendorId)
+    return canUseDemoMode ? getVendorDetailDemo(vendorId) : null
   }
 
   const supabase = getSupabaseBrowserClient()
-  if (!supabase) return getVendorDetailDemo(vendorId)
+  if (!supabase) return canUseDemoMode ? getVendorDetailDemo(vendorId) : null
 
   const [{ data: vendor }, { data: products }, { data: reviews }] = await Promise.all([
     supabase.from("vendor_profiles").select("*").eq("id", vendorId).maybeSingle(),
@@ -365,18 +397,18 @@ export async function loadVendorDetail(vendorId: string): Promise<VendorDetail |
 
 export async function loadBuyerOrders(userId: string): Promise<OrderDetail[]> {
   if (!hasSupabase) {
-    return getBuyerOrdersDemo(userId)
+    return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
   }
 
   const supabase = getSupabaseBrowserClient()
-  if (!supabase) return getBuyerOrdersDemo(userId)
+  if (!supabase) return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
   const { data, error } = await supabase
     .from("orders")
     .select("*, vendor_profiles(*)")
     .eq("buyer_id", userId)
     .order("created_at", { ascending: false })
 
-  if (error || !data) return getBuyerOrdersDemo(userId)
+  if (error || !data) return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
 
   return data.map((order) => ({
     id: String(order.id),
@@ -396,14 +428,14 @@ export async function loadBuyerOrders(userId: string): Promise<OrderDetail[]> {
 
 export async function loadSellerOrders(userId: string): Promise<OrderDetail[]> {
   if (!hasSupabase) {
-    return getSellerOrdersDemo(userId)
+    return canUseDemoMode ? getSellerOrdersDemo(userId) : []
   }
 
   const vendor = await loadVendorProfile(userId)
   if (!vendor) return []
 
   const supabase = getSupabaseBrowserClient()
-  if (!supabase) return getSellerOrdersDemo(userId)
+  if (!supabase) return canUseDemoMode ? getSellerOrdersDemo(userId) : []
 
   const { data, error } = await supabase
     .from("orders")
@@ -411,7 +443,7 @@ export async function loadSellerOrders(userId: string): Promise<OrderDetail[]> {
     .eq("vendor_id", vendor.id)
     .order("created_at", { ascending: false })
 
-  if (error || !data) return getSellerOrdersDemo(userId)
+  if (error || !data) return canUseDemoMode ? getSellerOrdersDemo(userId) : []
 
   return data.map((order) => ({
     id: String(order.id),
@@ -431,11 +463,11 @@ export async function loadSellerOrders(userId: string): Promise<OrderDetail[]> {
 
 export async function loadOrderDetail(orderId: string) {
   if (!hasSupabase) {
-    return getOrderByIdDemo(orderId)
+    return canUseDemoMode ? getOrderByIdDemo(orderId) : null
   }
 
   const supabase = getSupabaseBrowserClient()
-  if (!supabase) return getOrderByIdDemo(orderId)
+  if (!supabase) return canUseDemoMode ? getOrderByIdDemo(orderId) : null
 
   const { data, error } = await supabase
     .from("orders")
@@ -443,7 +475,7 @@ export async function loadOrderDetail(orderId: string) {
     .eq("id", orderId)
     .maybeSingle()
 
-  if (error || !data) return getOrderByIdDemo(orderId)
+  if (error || !data) return canUseDemoMode ? getOrderByIdDemo(orderId) : null
 
   return {
     id: String(data.id),
@@ -462,37 +494,30 @@ export async function loadOrderDetail(orderId: string) {
 
 export async function loadSellerProducts(userId: string) {
   if (!hasSupabase) {
-    return getSellerProductsDemo(userId)
+    return canUseDemoMode ? getSellerProductsDemo(userId) : []
   }
 
   const vendor = await loadVendorProfile(userId)
   if (!vendor) return []
 
   const supabase = getSupabaseBrowserClient()
-  if (!supabase) return getSellerProductsDemo(userId)
+  if (!supabase) return canUseDemoMode ? getSellerProductsDemo(userId) : []
   const { data, error } = await supabase
     .from("products")
     .select("*")
     .eq("vendor_id", vendor.id)
     .order("created_at", { ascending: false })
 
-  if (error || !data) return getSellerProductsDemo(userId)
+  if (error || !data) return canUseDemoMode ? getSellerProductsDemo(userId) : []
 
-  return data.map((product) => ({
-    id: String(product.id),
-    vendorId: String(product.vendor_id),
-    name: String(product.name),
-    description: String(product.description ?? ""),
-    price: Number(product.price ?? 0),
-    photoUrl: product.photo_url ? String(product.photo_url) : undefined,
-    inStock: Boolean(product.in_stock),
-    createdAt: String(product.created_at ?? new Date().toISOString())
-  }))
+  return data.map((product) => mapProduct(product))
 }
 
 export async function loadStoreAnalytics(userId: string): Promise<StoreAnalytics> {
   if (!hasSupabase) {
-    return getStoreAnalyticsDemo(userId)
+    return canUseDemoMode
+      ? getStoreAnalyticsDemo(userId)
+      : { totalOrders: 0, totalRevenue: 0, averageRating: 0 }
   }
 
   const orders = await loadSellerOrders(userId)
@@ -505,18 +530,18 @@ export async function loadStoreAnalytics(userId: string): Promise<StoreAnalytics
 
 export async function loadVendorProfile(userId: string) {
   if (!hasSupabase) {
-    return getVendorByUserId(userId)
+    return canUseDemoMode ? getVendorByUserId(userId) : null
   }
 
   const supabase = getSupabaseBrowserClient()
-  if (!supabase) return getVendorByUserId(userId)
+  if (!supabase) return canUseDemoMode ? getVendorByUserId(userId) : null
   const { data, error } = await supabase
     .from("vendor_profiles")
     .select("*")
     .eq("user_id", userId)
     .maybeSingle()
 
-  if (error || !data) return getVendorByUserId(userId)
+  if (error || !data) return canUseDemoMode ? getVendorByUserId(userId) : null
   return mapVendor(data)
 }
 
@@ -539,28 +564,36 @@ export async function findOrCreateDemoUser(values: AuthFormValues) {
 
 export async function loadUserProfile(userId: string) {
   if (!hasSupabase) {
-    return getDemoUserById(userId)
+    return canUseDemoMode ? getDemoUserById(userId) : null
   }
 
   const supabase = getSupabaseBrowserClient()
-  if (!supabase) return getDemoUserById(userId)
+  if (!supabase) return canUseDemoMode ? getDemoUserById(userId) : null
   const { data, error } = await supabase
     .from("users")
     .select("*")
     .eq("id", userId)
     .maybeSingle()
 
-  if (error || !data) return getDemoUserById(userId)
+  if (error || !data) return canUseDemoMode ? getDemoUserById(userId) : null
   return mapUser(data)
 }
 
 export async function saveUserProfile(input: UserProfile) {
   if (!hasSupabase) {
-    return upsertDemoUser(input)
+    if (canUseDemoMode) {
+      return upsertDemoUser(input)
+    }
+    throw new Error(getLaunchConfigError("Profile updates"))
   }
 
   const supabase = getSupabaseBrowserClient()
-  if (!supabase) return upsertDemoUser(input)
+  if (!supabase) {
+    if (canUseDemoMode) {
+      return upsertDemoUser(input)
+    }
+    throw new Error(getLaunchConfigError("Profile updates"))
+  }
 
   const { data, error } = await supabase
     .from("users")
@@ -586,11 +619,19 @@ export async function saveSellerProfile(
   input: SellerProfileInput
 ): Promise<VendorProfile> {
   if (!hasSupabase) {
-    return saveSellerProfileDemo(userId, input)
+    if (canUseDemoMode) {
+      return saveSellerProfileDemo(userId, input)
+    }
+    throw new Error(getLaunchConfigError("Seller onboarding"))
   }
 
   const supabase = getSupabaseBrowserClient()
-  if (!supabase) return saveSellerProfileDemo(userId, input)
+  if (!supabase) {
+    if (canUseDemoMode) {
+      return saveSellerProfileDemo(userId, input)
+    }
+    throw new Error(getLaunchConfigError("Seller onboarding"))
+  }
 
   const { data, error } = await supabase
     .from("vendor_profiles")
@@ -616,48 +657,79 @@ export async function saveSellerProfile(
 
 export async function saveProduct(input: ProductInput) {
   if (!hasSupabase) {
-    return saveProductDemo(input)
+    if (canUseDemoMode) {
+      return saveProductDemo(input)
+    }
+    throw new Error(getLaunchConfigError("Product uploads"))
   }
 
   const supabase = getSupabaseBrowserClient()
-  if (!supabase) return saveProductDemo(input)
+  if (!supabase) {
+    if (canUseDemoMode) {
+      return saveProductDemo(input)
+    }
+    throw new Error(getLaunchConfigError("Product uploads"))
+  }
 
   const payload = {
     vendor_id: input.vendorId,
     name: input.name,
     description: input.description,
     price: input.price,
-    photo_url: input.photoUrl,
+    photo_url: input.photoUrls[0] ?? input.photoUrl ?? null,
+    photo_urls: input.photoUrls,
     in_stock: input.inStock
   }
 
-  const response = input.id
+  let response = input.id
     ? await supabase.from("products").update(payload).eq("id", input.id).select().single()
     : await supabase.from("products").insert(payload).select().single()
+
+  if (
+    response.error?.code === "PGRST204" ||
+    response.error?.message?.toLowerCase().includes("photo_urls")
+  ) {
+    const legacyPayload = {
+      vendor_id: input.vendorId,
+      name: input.name,
+      description: input.description,
+      price: input.price,
+      photo_url: serializeLegacyPhotoUrl(input.photoUrls) ?? input.photoUrl ?? null,
+      in_stock: input.inStock
+    }
+
+    response = input.id
+      ? await supabase
+          .from("products")
+          .update(legacyPayload)
+          .eq("id", input.id)
+          .select()
+          .single()
+      : await supabase.from("products").insert(legacyPayload).select().single()
+  }
 
   if (response.error || !response.data) {
     throw new Error(response.error?.message ?? "Unable to save product")
   }
 
-  return {
-    id: String(response.data.id),
-    vendorId: String(response.data.vendor_id),
-    name: String(response.data.name),
-    description: String(response.data.description ?? ""),
-    price: Number(response.data.price ?? 0),
-    photoUrl: response.data.photo_url ? String(response.data.photo_url) : undefined,
-    inStock: Boolean(response.data.in_stock),
-    createdAt: String(response.data.created_at ?? new Date().toISOString())
-  }
+  return mapProduct(response.data)
 }
 
 export async function deleteProduct(productId: string) {
   if (!hasSupabase) {
-    return deleteProductDemo(productId)
+    if (canUseDemoMode) {
+      return deleteProductDemo(productId)
+    }
+    throw new Error(getLaunchConfigError("Product deletion"))
   }
 
   const supabase = getSupabaseBrowserClient()
-  if (!supabase) return deleteProductDemo(productId)
+  if (!supabase) {
+    if (canUseDemoMode) {
+      return deleteProductDemo(productId)
+    }
+    throw new Error(getLaunchConfigError("Product deletion"))
+  }
   const { error } = await supabase.from("products").delete().eq("id", productId)
   if (error) {
     throw new Error(error.message)
@@ -669,21 +741,25 @@ export async function startCheckout(
   payload: CheckoutPayload
 ): Promise<PaystackInitializeResponse> {
   if (!hasSupabase) {
-    const order = createOrderDemo({
-      buyerId: payload.buyerId,
-      vendorId: payload.vendorId,
-      items: payload.items,
-      totalAmount: payload.totalAmount,
-      status: "pending",
-      paystackReference: createId("paystack"),
-      deliveryAddress: payload.deliveryAddress
-    })
+    if (canUseDemoMode) {
+      const order = createOrderDemo({
+        buyerId: payload.buyerId,
+        vendorId: payload.vendorId,
+        items: payload.items,
+        totalAmount: payload.totalAmount,
+        status: "pending",
+        paystackReference: createId("paystack"),
+        deliveryAddress: payload.deliveryAddress
+      })
 
-    return {
-      checkoutUrl: `${env.appUrl}/order-confirmation/${order.id}`,
-      orderId: order.id,
-      reference: order.paystackReference ?? createId("ref")
+      return {
+        checkoutUrl: `${env.appUrl}/order-confirmation/${order.id}`,
+        orderId: order.id,
+        reference: order.paystackReference ?? createId("ref")
+      }
     }
+
+    throw new Error(getPaymentsConfigError())
   }
 
   const response = await fetch("/api/paystack/initialize", {
@@ -693,7 +769,10 @@ export async function startCheckout(
   })
 
   if (!response.ok) {
-    throw new Error("Unable to start checkout")
+    const data = (await response.json().catch(() => null)) as
+      | { error?: string }
+      | null
+    throw new Error(data?.error ?? "Unable to start checkout")
   }
 
   return (await response.json()) as PaystackInitializeResponse
@@ -701,7 +780,10 @@ export async function startCheckout(
 
 export async function updateOrderStatus(orderId: string, status: OrderStatus) {
   if (!hasSupabase) {
-    return updateOrderStatusDemo(orderId, status)
+    if (canUseDemoMode) {
+      return updateOrderStatusDemo(orderId, status)
+    }
+    throw new Error(getLaunchConfigError("Order status updates"))
   }
 
   const response = await fetch(`/api/orders/${orderId}/status`, {
@@ -725,11 +807,19 @@ export async function saveReview(input: {
   comment: string
 }) {
   if (!hasSupabase) {
-    return saveReviewDemo(input)
+    if (canUseDemoMode) {
+      return saveReviewDemo(input)
+    }
+    throw new Error(getLaunchConfigError("Reviews"))
   }
 
   const supabase = getSupabaseBrowserClient()
-  if (!supabase) return saveReviewDemo(input)
+  if (!supabase) {
+    if (canUseDemoMode) {
+      return saveReviewDemo(input)
+    }
+    throw new Error(getLaunchConfigError("Reviews"))
+  }
   const { data, error } = await supabase
     .from("reviews")
     .insert({

@@ -11,7 +11,7 @@ import {
 import toast from "react-hot-toast"
 
 import { DEMO_OTP, DEMO_USER_KEY } from "@/lib/constants"
-import { env, hasSupabase } from "@/lib/env"
+import { canUseDemoMode } from "@/lib/env"
 import {
   findOrCreateDemoUser,
   loadUserProfile,
@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useState<AuthSessionState["vendorProfile"]>(null)
   const [loading, setLoading] = useState(true)
   const [pendingPhone, setPendingPhone] = useState("")
-  const isDemoMode = !hasSupabase
+  const isDemoMode = canUseDemoMode
 
   const refreshProfile = useCallback(async (userId?: string | null) => {
     const targetUserId = userId ?? sessionUserId

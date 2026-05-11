@@ -6,7 +6,8 @@ export const env = {
   paystackSecretKey: process.env.PAYSTACK_SECRET_KEY ?? "",
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? "",
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? "",
-  appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+  appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+  enableDemoMode: process.env.NEXT_PUBLIC_ENABLE_DEMO_MODE === "true"
 }
 
 export const hasSupabase =
@@ -20,3 +21,8 @@ export const hasPaystack =
 
 export const hasWebPush =
   Boolean(env.vapidPublicKey) && Boolean(env.vapidPrivateKey)
+
+export const isProductionRuntime = process.env.NODE_ENV === "production"
+
+export const canUseDemoMode =
+  env.enableDemoMode || (!isProductionRuntime && !hasSupabase)

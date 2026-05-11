@@ -44,11 +44,25 @@ create table if not exists public.products (
   description text,
   price numeric(12, 2) not null,
   photo_url text,
+  photo_urls jsonb not null default '[]'::jsonb,
   in_stock boolean not null default true,
   created_at timestamptz not null default now()
 );
 
+alter table public.products
+add column if not exists photo_urls jsonb not null default '[]'::jsonb;
+
+update public.products
+set photo_urls = case
+  when jsonb_array_length(photo_urls) > 0 then photo_urls
+  when photo_url is null or btrim(photo_url) = '' then '[]'::jsonb
+  when left(btrim(photo_url), 1) = '[' then photo_url::jsonb
+  else jsonb_build_array(photo_url)
+end
+where coalesce(jsonb_array_length(photo_urls), 0) = 0;
+
 create index if not exists products_vendor_id_idx on public.products(vendor_id);
+create index if not exists products_recent_idx on public.products(created_at desc);
 
 create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),

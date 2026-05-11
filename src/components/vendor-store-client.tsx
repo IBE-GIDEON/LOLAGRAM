@@ -1,11 +1,9 @@
 "use client"
 
-import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import toast from "react-hot-toast"
-import { FiMessageCircle, FiShoppingBag, FiStar } from "react-icons/fi"
+import { FiMessageCircle, FiStar } from "react-icons/fi"
 
-import { useAuth } from "@/components/providers/auth-provider"
 import { useCart } from "@/components/providers/cart-provider"
 import { BottomSheet, Button, Card, SectionHeading, StarRating } from "@/components/ui"
 import {
@@ -14,8 +12,8 @@ import {
   formatCurrency,
   formatDate
 } from "@/lib/format"
-import { loadVendorDetail, startCheckout } from "@/lib/marketplace"
-import { queueOfflineOrder } from "@/lib/offline-orders"
+import { getPrimaryProductImage } from "@/lib/product-images"
+import { loadVendorDetail } from "@/lib/marketplace"
 import { type Product, type VendorDetail } from "@/lib/types"
 
 export function VendorStoreClient({
@@ -25,21 +23,10 @@ export function VendorStoreClient({
   vendorId: string
   initialProductId?: string
 }) {
-  const { profile } = useAuth()
-  const {
-    vendorId: cartVendorId,
-    items,
-    addItem,
-    updateQuantity,
-    clearCart,
-    itemCount,
-    subtotal
-  } = useCart()
+  const { addItem } = useCart()
   const [data, setData] = useState<VendorDetail | null>(null)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
-  const [cartOpen, setCartOpen] = useState(false)
-  const [deliveryAddress, setDeliveryAddress] = useState("")
-  const [submitting, setSubmitting] = useState(false)
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const productRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -58,51 +45,18 @@ export function VendorStoreClient({
     }
   }, [data, initialProductId])
 
-  const cartItems = cartVendorId === vendorId ? items : []
-
-  const handleCheckout = async () => {
-    if (!profile || !data) {
-      toast.error("Sign in from Profile before placing an order.")
-      return
-    }
-
-    if (!deliveryAddress.trim()) {
-      toast.error("Add a delivery address to continue.")
-      return
-    }
-
-    const payload = {
-      buyerId: profile.id,
-      vendorId: data.vendor.id,
-      items: cartItems,
-      totalAmount: subtotal,
-      deliveryAddress
-    }
-
-    if (!navigator.onLine) {
-      await queueOfflineOrder(payload)
-      clearCart()
-      setCartOpen(false)
-      toast.success("Order queued. We'll sync it once you're back online.")
-      return
-    }
-
-    setSubmitting(true)
-    try {
-      const response = await startCheckout(payload)
-      clearCart()
-      window.location.assign(response.checkoutUrl)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Checkout failed.")
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
   const reviewPreview = useMemo(
     () => data?.reviews.slice(0, 5) ?? [],
     [data?.reviews]
   )
+  const selectedProductImages = useMemo(
+    () => selectedProduct?.photoUrls ?? [],
+    [selectedProduct]
+  )
+
+  useEffect(() => {
+    setSelectedImageIndex(0)
+  }, [selectedProduct?.id])
 
   if (!data) {
     return <div className="p-4 text-sm text-muted">Loading store...</div>
@@ -193,10 +147,10 @@ export function VendorStoreClient({
                 onClick={() => setSelectedProduct(product)}
               >
                 <div className="aspect-square overflow-hidden bg-canvas">
-                  {product.photoUrl ? (
+                  {getPrimaryProductImage(product) ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={product.photoUrl}
+                      src={getPrimaryProductImage(product)}
                       alt={product.name}
                       className="h-full w-full object-cover"
                     />
@@ -218,6 +172,11 @@ export function VendorStoreClient({
                   >
                     {product.inStock ? "In Stock" : "Out of Stock"}
                   </span>
+                  {product.photoUrls.length > 1 ? (
+                    <p className="text-[11px] font-medium text-muted">
+                      {product.photoUrls.length} photos
+                    </p>
+                  ) : null}
                 </div>
               </button>
             ))}
@@ -267,16 +226,6 @@ export function VendorStoreClient({
         </div>
       </div>
 
-      {cartItems.length > 0 ? (
-        <button
-          className="fixed bottom-24 right-4 z-40 inline-flex items-center gap-2 rounded-full bg-chrome px-5 py-3 text-sm font-semibold text-brand shadow-lg"
-          onClick={() => setCartOpen(true)}
-        >
-          <FiShoppingBag />
-          Cart ({itemCount})
-        </button>
-      ) : null}
-
       <BottomSheet
         open={Boolean(selectedProduct)}
         onClose={() => setSelectedProduct(null)}
@@ -285,15 +234,38 @@ export function VendorStoreClient({
         {selectedProduct ? (
           <div className="space-y-4">
             <div className="overflow-hidden rounded-[24px] bg-canvas">
-              {selectedProduct.photoUrl ? (
+              {selectedProductImages[selectedImageIndex] ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={selectedProduct.photoUrl}
+                  src={selectedProductImages[selectedImageIndex]}
                   alt={selectedProduct.name}
                   className="aspect-square w-full object-cover"
                 />
               ) : null}
             </div>
+            {selectedProductImages.length > 1 ? (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {selectedProductImages.map((image, index) => (
+                  <button
+                    key={`${selectedProduct.id}-${index}`}
+                    type="button"
+                    className={`h-16 w-16 shrink-0 overflow-hidden rounded-2xl border ${
+                      selectedImageIndex === index
+                        ? "border-brand"
+                        : "border-border"
+                    }`}
+                    onClick={() => setSelectedImageIndex(index)}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={image}
+                      alt={`${selectedProduct.name} ${index + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <div>
               <p className="text-xl font-bold text-ink">{selectedProduct.name}</p>
               <p className="mt-2 text-lg font-bold text-brand">
@@ -316,74 +288,6 @@ export function VendorStoreClient({
             </Button>
           </div>
         ) : null}
-      </BottomSheet>
-
-      <BottomSheet open={cartOpen} onClose={() => setCartOpen(false)} title="Cart">
-        <div className="space-y-4">
-          {cartItems.map((item) => (
-            <Card key={item.productId} className="p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="font-semibold text-ink">{item.name}</p>
-                  <p className="mt-1 text-sm text-muted">
-                    {formatCurrency(item.price)} each
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 rounded-full bg-canvas px-2 py-1">
-                  <button
-                    className="h-8 w-8 rounded-full bg-surface text-base text-ink"
-                    onClick={() =>
-                      updateQuantity(item.productId, Math.max(0, item.quantity - 1))
-                    }
-                  >
-                    -
-                  </button>
-                  <span className="min-w-[24px] text-center text-sm font-semibold">
-                    {item.quantity}
-                  </span>
-                  <button
-                    className="h-8 w-8 rounded-full bg-surface text-base text-ink"
-                    onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            </Card>
-          ))}
-
-          <Card className="p-4">
-            <p className="text-sm font-semibold text-ink">Delivery address</p>
-            <textarea
-              className="mt-3 min-h-[96px] w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-ink outline-none focus:border-brand/40"
-              placeholder="Enter your delivery address"
-              value={deliveryAddress}
-              onChange={(event) => setDeliveryAddress(event.target.value)}
-            />
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-sm text-muted">Subtotal</p>
-              <p className="text-lg font-bold text-brand">
-                {formatCurrency(subtotal)}
-              </p>
-            </div>
-            <Button
-              className="mt-4 w-full"
-              onClick={handleCheckout}
-              disabled={submitting}
-            >
-              {submitting ? "Starting checkout..." : "Pay with Paystack"}
-            </Button>
-            {!profile ? (
-              <p className="mt-3 text-xs text-muted">
-                Sign in from{" "}
-                <Link href="/profile" className="font-semibold text-brand">
-                  Profile
-                </Link>{" "}
-                before checkout.
-              </p>
-            ) : null}
-          </Card>
-        </div>
       </BottomSheet>
     </div>
   )

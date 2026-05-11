@@ -46,6 +46,7 @@ export interface Product {
   description: string
   price: number
   photoUrl?: string
+  photoUrls: string[]
   inStock: boolean
   createdAt: string
 }
@@ -157,6 +158,7 @@ export interface ProductInput {
   description: string
   price: number
   photoUrl?: string
+  photoUrls: string[]
   inStock: boolean
 }
 

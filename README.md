@@ -33,3 +33,14 @@ npm run dev
 ## Supabase
 
 Apply [supabase/schema.sql](/C:/Users/HOME%20PC/Documents/LOLAGRAM/supabase/schema.sql) in your Supabase SQL editor. The schema includes enums, tables, indexes, triggers, storage buckets, and RLS policies for buyers, sellers, and push subscriptions.
+
+## Launch
+
+Use [PRODUCTION-LAUNCH.md](/C:/Users/HOME%20PC/Documents/LOLAGRAM/PRODUCTION-LAUNCH.md) before onboarding real users. It covers:
+
+- live environment variables
+- phone auth and OTP setup
+- Paystack webhook and production payments
+- storage and multi-image product uploads
+- push notifications
+- launch checks for the first 500 users

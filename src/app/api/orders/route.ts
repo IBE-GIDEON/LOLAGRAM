@@ -1,18 +1,19 @@
 import { NextResponse } from "next/server"
 
+import { hasSupabaseAdmin } from "@/lib/env"
 import { type CheckoutPayload } from "@/lib/types"
-import { createPaystackReference } from "@/lib/utils"
 import { getSupabaseAdminClient } from "@/lib/supabase/server"
+import { createPaystackReference } from "@/lib/utils"
 
 export async function POST(request: Request) {
   const payload = (await request.json()) as CheckoutPayload
   const supabase = getSupabaseAdminClient()
 
-  if (!supabase) {
-    return NextResponse.json({
-      ok: true,
-      orderId: createPaystackReference()
-    })
+  if (!hasSupabaseAdmin || !supabase) {
+    return NextResponse.json(
+      { error: "Supabase admin configuration is missing for order creation." },
+      { status: 503 }
+    )
   }
 
   const reference = createPaystackReference()

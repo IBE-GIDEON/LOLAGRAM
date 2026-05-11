@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-import { env, hasPaystack } from "@/lib/env"
+import { env, hasPaystack, hasSupabaseAdmin } from "@/lib/env"
 import { initializePaystackTransaction } from "@/lib/paystack"
 import { getSupabaseAdminClient } from "@/lib/supabase/server"
 import { type CheckoutPayload } from "@/lib/types"
@@ -11,12 +11,18 @@ export async function POST(request: Request) {
   const supabase = getSupabaseAdminClient()
   const reference = createPaystackReference()
 
-  if (!supabase || !hasPaystack) {
-    return NextResponse.json({
-      checkoutUrl: `${env.appUrl}/order-confirmation/demo-${reference}`,
-      orderId: `demo-${reference}`,
-      reference
-    })
+  if (!hasSupabaseAdmin || !supabase) {
+    return NextResponse.json(
+      { error: "Supabase admin configuration is missing for checkout." },
+      { status: 503 }
+    )
+  }
+
+  if (!hasPaystack) {
+    return NextResponse.json(
+      { error: "Paystack live configuration is missing for checkout." },
+      { status: 503 }
+    )
   }
 
   const { data: order, error } = await supabase

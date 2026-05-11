@@ -1,6 +1,7 @@
 import type { PropsWithChildren } from "react"
 
 import { BottomNav } from "@/components/bottom-nav"
+import { GlobalCart } from "@/components/global-cart"
 import { OfflineBanner } from "@/components/offline-banner"
 
 export function MobileShell({ children }: PropsWithChildren) {
@@ -30,6 +31,7 @@ export function MobileShell({ children }: PropsWithChildren) {
         </aside>
         <main className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-canvas lg:overflow-hidden lg:rounded-[36px] lg:border lg:border-border/60 lg:shadow-xl">
           <OfflineBanner />
+          <GlobalCart />
           <div className="min-h-0 flex-1">{children}</div>
           <BottomNav />
         </main>

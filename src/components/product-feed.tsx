@@ -5,6 +5,7 @@ import { type ReactNode, useRef } from "react"
 
 import { Badge } from "@/components/ui"
 import { formatCategory, formatCurrency } from "@/lib/format"
+import { getPrimaryProductImage } from "@/lib/product-images"
 import { type ProductSearchResult } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -93,16 +94,18 @@ export function ProductFeed({
 }
 
 function ProductFeedCard({ product }: { product: ProductSearchResult }) {
+  const primaryImage = getPrimaryProductImage(product)
+
   return (
     <Link
       href={`/vendor/${product.vendor.id}?product=${product.id}`}
       className="overflow-hidden rounded-[24px] border border-border/70 bg-surface text-left transition hover:bg-surface/90 active:scale-[0.99]"
     >
       <div className="relative aspect-square overflow-hidden bg-canvas">
-        {product.photoUrl ? (
+        {primaryImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={product.photoUrl}
+            src={primaryImage}
             alt={product.name}
             className="h-full w-full object-cover"
           />
@@ -122,6 +125,11 @@ function ProductFeedCard({ product }: { product: ProductSearchResult }) {
         >
           {product.inStock ? "In stock" : "Out of stock"}
         </span>
+        {product.photoUrls.length > 1 ? (
+          <span className="absolute bottom-3 right-3 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-semibold text-white">
+            +{product.photoUrls.length - 1}
+          </span>
+        ) : null}
       </div>
 
       <div className="space-y-2 p-3">

@@ -2,7 +2,7 @@
 
 import imageCompression from "browser-image-compression"
 
-import { hasSupabase } from "@/lib/env"
+import { canUseDemoMode, hasSupabase } from "@/lib/env"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 
 export async function compressImage(file: File) {
@@ -26,11 +26,17 @@ export async function uploadImage(file: File, folder: string) {
   const compressed = await compressImage(file)
 
   if (!hasSupabase) {
+    if (!canUseDemoMode) {
+      throw new Error("Image uploads need Supabase storage before launch.")
+    }
     return fileToDataUrl(compressed as File)
   }
 
   const supabase = getSupabaseBrowserClient()
   if (!supabase) {
+    if (!canUseDemoMode) {
+      throw new Error("Image uploads need Supabase storage before launch.")
+    }
     return fileToDataUrl(compressed as File)
   }
 
@@ -50,4 +56,11 @@ export async function uploadImage(file: File, folder: string) {
 
   const { data } = supabase.storage.from("store-assets").getPublicUrl(path)
   return data.publicUrl
+}
+
+export async function uploadImages(
+  files: Iterable<File>,
+  folder: string
+) {
+  return Promise.all(Array.from(files, (file) => uploadImage(file, folder)))
 }
