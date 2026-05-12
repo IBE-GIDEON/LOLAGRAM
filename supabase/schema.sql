@@ -103,10 +103,14 @@ create table if not exists public.reviews (
   order_id uuid not null references public.orders (id) on delete cascade,
   buyer_id uuid not null references public.users (id) on delete cascade,
   vendor_id uuid not null references public.vendor_profiles (id) on delete cascade,
+  buyer_name text,
   rating integer not null check (rating between 1 and 5),
   comment text,
   created_at timestamptz not null default now()
 );
+
+alter table public.reviews
+add column if not exists buyer_name text;
 
 create unique index if not exists reviews_order_id_key on public.reviews(order_id);
 create index if not exists reviews_vendor_idx on public.reviews (vendor_id, created_at desc);

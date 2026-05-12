@@ -249,7 +249,8 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
                   buyerId: profile.id,
                   vendorId: order.vendorId,
                   rating: reviewRating,
-                  comment: reviewComment
+                  comment: reviewComment,
+                  buyerName: profile.fullName
                 })
 
                 const nextReview = {
@@ -260,7 +261,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
                   rating: reviewRating,
                   comment: reviewComment,
                   createdAt: new Date().toISOString(),
-                  buyerName: profile.fullName
+                  buyerName: profile.fullName.split(/\s+/)[0] ?? profile.fullName
                 }
 
                 setVendorData((current) => {

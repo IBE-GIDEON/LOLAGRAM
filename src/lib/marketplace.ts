@@ -96,6 +96,16 @@ function mapProduct(row: Record<string, unknown>) {
   }
 }
 
+function getReviewerDisplayName(rawName?: string | null) {
+  const normalized = rawName?.trim()
+  if (!normalized) {
+    return "Buyer"
+  }
+
+  const firstName = normalized.split(/\s+/)[0] ?? normalized
+  return firstName.length > 18 ? `${firstName.slice(0, 18)}…` : firstName
+}
+
 function getLaunchConfigError(feature: string) {
   return `${feature} needs live Supabase configuration before launch.`
 }
@@ -956,7 +966,9 @@ export async function loadVendorDetail(vendorId: string): Promise<VendorDetail |
           rating: Number(review.rating),
           comment: String(review.comment ?? ""),
           createdAt: String(review.created_at ?? new Date().toISOString()),
-          buyerName: "Buyer"
+          buyerName: getReviewerDisplayName(
+            review.buyer_name ? String(review.buyer_name) : undefined
+          )
         })) ?? [],
       averageRating: mappedVendor.rating,
       reviewCount: reviewCount ?? reviews?.length ?? 0
@@ -1551,6 +1563,7 @@ export async function saveReview(input: {
   vendorId: string
   rating: number
   comment: string
+  buyerName: string
 }) {
   if (!hasSupabase) {
     if (canUseDemoMode) {
@@ -1566,20 +1579,38 @@ export async function saveReview(input: {
     }
     throw new Error(getLaunchConfigError("Reviews"))
   }
-  const { data, error } = await supabase
+  let response = await supabase
     .from("reviews")
     .insert({
       order_id: input.orderId,
       buyer_id: input.buyerId,
       vendor_id: input.vendorId,
       rating: input.rating,
-      comment: input.comment
+      comment: input.comment,
+      buyer_name: input.buyerName
     })
     .select()
     .single()
 
-  if (error || !data) {
-    throw new Error(error?.message ?? "Unable to save review")
+  if (
+    response.error?.code === "PGRST204" ||
+    response.error?.message?.toLowerCase().includes("buyer_name")
+  ) {
+    response = await supabase
+      .from("reviews")
+      .insert({
+        order_id: input.orderId,
+        buyer_id: input.buyerId,
+        vendor_id: input.vendorId,
+        rating: input.rating,
+        comment: input.comment
+      })
+      .select()
+      .single()
+  }
+
+  if (response.error || !response.data) {
+    throw new Error(response.error?.message ?? "Unable to save review")
   }
 
   vendorDetailCache.delete(input.vendorId)
@@ -1587,5 +1618,5 @@ export async function saveReview(input: {
   deletePersistedCache(persistedCacheKeys.vendorDetail(input.vendorId))
   clearPersistedCacheByPrefix("store-analytics:")
 
-  return data
+  return response.data
 }

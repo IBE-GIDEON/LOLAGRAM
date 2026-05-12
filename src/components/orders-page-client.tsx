@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import toast from "react-hot-toast"
 
 import { useAuth } from "@/components/providers/auth-provider"
-import { Badge, Card, SectionHeading } from "@/components/ui"
+import { Badge, Button, Card, SectionHeading } from "@/components/ui"
 import { ORDER_STATUS_META } from "@/lib/constants"
 import { formatCurrency, formatDate } from "@/lib/format"
 import {
+  archiveCompletedOrder,
   loadBuyerOrders,
   loadSellerOrders,
   peekCachedBuyerOrders,
@@ -27,6 +29,7 @@ export function OrdersPageClient() {
   const [fetching, setFetching] = useState(
     () => loading || (profile ? peekCachedBuyerOrders(profile.id).length === 0 : true)
   )
+  const [archivingOrderId, setArchivingOrderId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!profile) {
@@ -146,8 +149,8 @@ export function OrdersPageClient() {
       ) : (
         <div className="space-y-3">
           {orders.map((order) => (
-            <Link key={order.id} href={`/orders/${order.id}`}>
-              <Card className="p-4 transition hover:bg-canvas">
+            <Card key={order.id} className="p-4 transition hover:bg-canvas">
+              <Link href={`/orders/${order.id}`} className="block">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold text-ink">
@@ -164,8 +167,64 @@ export function OrdersPageClient() {
                     {ORDER_STATUS_META[order.status].label}
                   </Badge>
                 </div>
-              </Card>
-            </Link>
+              </Link>
+
+              <div className="mt-4 flex gap-2">
+                <Link
+                  href={`/orders/${order.id}`}
+                  className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-surface px-4 py-3 text-sm font-semibold text-ink transition hover:bg-canvas"
+                >
+                  Open order
+                </Link>
+
+                {(order.status === "delivered" || order.status === "cancelled") && profile ? (
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    disabled={archivingOrderId === order.id}
+                    onClick={async () => {
+                      const actor = mode === "store" ? "seller" : "buyer"
+                      const confirmed = window.confirm(
+                        mode === "store"
+                          ? "Remove this order from your store history only?"
+                          : "Remove this order from your purchase history only?"
+                      )
+
+                      if (!confirmed) return
+
+                      setArchivingOrderId(order.id)
+                      try {
+                        const result = await archiveCompletedOrder(
+                          order.id,
+                          actor,
+                          profile.id
+                        )
+                        setOrders((current) =>
+                          current.filter((currentOrder) => currentOrder.id !== order.id)
+                        )
+                        toast.success(
+                          result.localOnly
+                            ? "Removed from this device only for now."
+                            : mode === "store"
+                              ? "Removed from your store history."
+                              : "Removed from your purchase history."
+                        )
+                      } catch (error) {
+                        toast.error(
+                          error instanceof Error
+                            ? error.message
+                            : "Could not remove this order from history."
+                        )
+                      } finally {
+                        setArchivingOrderId(null)
+                      }
+                    }}
+                  >
+                    {mode === "store" ? "Remove store copy" : "Remove purchase copy"}
+                  </Button>
+                ) : null}
+              </div>
+            </Card>
           ))}
         </div>
       )}

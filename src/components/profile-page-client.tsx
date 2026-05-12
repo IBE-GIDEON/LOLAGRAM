@@ -358,13 +358,24 @@ export function ProfilePageClient() {
               onChange={async (event) => {
                 const file = event.target.files?.[0]
                 if (!file) return
+                if (!profile) return
+
+                setSavingProfile(true)
                 try {
                   const url = await uploadImage(file, "profile-photos")
                   setPhotoPreview(url)
+                  await saveUserProfile({
+                    ...profile,
+                    profilePhotoUrl: url
+                  })
+                  await refreshProfile(profile.id)
+                  toast.success("Profile photo updated.")
                 } catch (error) {
                   toast.error(
                     error instanceof Error ? error.message : "Could not upload photo."
                   )
+                } finally {
+                  setSavingProfile(false)
                 }
               }}
             />
