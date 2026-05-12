@@ -25,6 +25,7 @@ import {
   type SignInFormValues,
   type SignUpFormValues
 } from "@/lib/types"
+import type { User } from "@supabase/supabase-js"
 
 interface AuthContextValue extends AuthSessionState {
   signIn: (values: SignInFormValues) => Promise<void>
@@ -67,53 +68,112 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [sessionUserId]
   )
 
+  const ensureProfileForSessionUser = useCallback(
+    async (user: User) => {
+      const [existingProfile, nextVendor] = await Promise.all([
+        loadUserProfile(user.id),
+        loadVendorProfile(user.id)
+      ])
+
+      if (existingProfile) {
+        setProfile(existingProfile)
+        setVendorProfile(nextVendor)
+        return existingProfile
+      }
+
+      const nextProfile = await saveUserProfile({
+        id: user.id,
+        email: user.email ?? "",
+        phone: String(user.user_metadata?.phone ?? ""),
+        fullName: String(
+          user.user_metadata?.full_name ??
+            user.email?.split("@")[0] ??
+            "LOLAGRAM User"
+        ),
+        profilePhotoUrl:
+          typeof user.user_metadata?.profile_photo_url === "string"
+            ? user.user_metadata.profile_photo_url
+            : undefined,
+        accountType:
+          (String(user.user_metadata?.account_type ?? "buyer") as AccountType) ??
+          "buyer",
+        createdAt: user.created_at ?? new Date().toISOString()
+      })
+
+      setProfile(nextProfile)
+      setVendorProfile(nextVendor)
+      return nextProfile
+    },
+    []
+  )
+
   useEffect(() => {
     let ignore = false
     let unsubscribe: (() => void) | undefined
 
     async function bootstrap() {
-      if (isDemoMode) {
-        const storedUserId = window.localStorage.getItem(DEMO_USER_KEY)
-        if (storedUserId && !ignore) {
-          setSessionUserId(storedUserId)
-          await refreshProfile(storedUserId)
+      try {
+        if (isDemoMode) {
+          const storedUserId = window.localStorage.getItem(DEMO_USER_KEY)
+          if (storedUserId && !ignore) {
+            setSessionUserId(storedUserId)
+            await refreshProfile(storedUserId)
+          }
+          return
         }
+
+        const supabase = getSupabaseBrowserClient()
+        if (!supabase) {
+          return
+        }
+
+        const {
+          data: { session }
+        } = await supabase.auth.getSession()
+
+        const nextUserId = session?.user?.id ?? null
+        if (!ignore) {
+          setSessionUserId(nextUserId)
+        }
+
+        if (session?.user) {
+          await ensureProfileForSessionUser(session.user)
+        } else if (nextUserId) {
+          await refreshProfile(nextUserId)
+        } else if (!ignore) {
+          setProfile(null)
+          setVendorProfile(null)
+        }
+
+        const { data } = supabase.auth.onAuthStateChange(async (_, nextSession) => {
+          const nextId = nextSession?.user?.id ?? null
+          if (ignore) return
+          setSessionUserId(nextId)
+
+          try {
+            if (nextSession?.user) {
+              await ensureProfileForSessionUser(nextSession.user)
+            } else {
+              await refreshProfile(nextId)
+            }
+          } catch (error) {
+            console.error("Failed to refresh auth session", error)
+            setProfile(null)
+            setVendorProfile(null)
+          }
+        })
+
+        unsubscribe = () => data.subscription.unsubscribe()
+      } catch (error) {
+        console.error("Failed to bootstrap auth", error)
+        if (!ignore) {
+          setProfile(null)
+          setVendorProfile(null)
+        }
+      } finally {
         if (!ignore) {
           setLoading(false)
         }
-        return
-      }
-
-      const supabase = getSupabaseBrowserClient()
-      if (!supabase) {
-        setLoading(false)
-        return
-      }
-
-      const {
-        data: { session }
-      } = await supabase.auth.getSession()
-
-      const nextUserId = session?.user?.id ?? null
-      if (!ignore) {
-        setSessionUserId(nextUserId)
-      }
-
-      if (nextUserId) {
-        await refreshProfile(nextUserId)
-      }
-
-      const { data } = supabase.auth.onAuthStateChange(async (_, nextSession) => {
-        const nextId = nextSession?.user?.id ?? null
-        if (ignore) return
-        setSessionUserId(nextId)
-        await refreshProfile(nextId)
-      })
-
-      unsubscribe = () => data.subscription.unsubscribe()
-
-      if (!ignore) {
-        setLoading(false)
       }
     }
 
@@ -123,7 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ignore = true
       unsubscribe?.()
     }
-  }, [isDemoMode, refreshProfile])
+  }, [ensureProfileForSessionUser, isDemoMode, refreshProfile])
 
   const signIn = useCallback(
     async (values: SignInFormValues) => {
@@ -160,10 +220,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setSessionUserId(data.user.id)
-      await refreshProfile(data.user.id)
+      await ensureProfileForSessionUser(data.user)
       toast.success("Welcome back.")
     },
-    [isDemoMode, refreshProfile]
+    [ensureProfileForSessionUser, isDemoMode, refreshProfile]
   )
 
   const signUp = useCallback(
@@ -218,10 +278,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setSessionUserId(data.user.id)
-      await refreshProfile(data.user.id)
+      await ensureProfileForSessionUser(data.user)
       toast.success("Account created.")
     },
-    [isDemoMode, refreshProfile]
+    [ensureProfileForSessionUser, isDemoMode, refreshProfile]
   )
 
   const requestPasswordReset = useCallback(
