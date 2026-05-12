@@ -6,7 +6,10 @@ import { FiChevronRight, FiMapPin, FiSearch } from "react-icons/fi"
 
 import { Avatar, Badge, Input, SectionHeading, StarRating } from "@/components/ui"
 import { formatCategory, formatCurrency } from "@/lib/format"
-import { loadMarketplaceSearch } from "@/lib/marketplace"
+import {
+  loadMarketplaceSearch,
+  peekCachedMarketplaceSearch
+} from "@/lib/marketplace"
 import { getPrimaryProductImage } from "@/lib/product-images"
 import {
   type MarketplaceSearchResults,
@@ -32,10 +35,17 @@ const emptyResults: MarketplaceSearchResults = {
 }
 
 export function SearchPageClient() {
+  const initialResults = peekCachedMarketplaceSearch("")
   const [query, setQuery] = useState("")
   const [mode, setMode] = useState<SearchMode>("all")
-  const [results, setResults] = useState<MarketplaceSearchResults>(emptyResults)
-  const [loading, setLoading] = useState(true)
+  const [results, setResults] = useState<MarketplaceSearchResults>(
+    initialResults.products.length || initialResults.vendors.length
+      ? initialResults
+      : emptyResults
+  )
+  const [loading, setLoading] = useState(
+    initialResults.products.length === 0 && initialResults.vendors.length === 0
+  )
   const [scrollTop, setScrollTop] = useState(0)
   const deferredQuery = useDeferredValue(query)
   const activeQuery = deferredQuery.trim()
@@ -45,7 +55,7 @@ export function SearchPageClient() {
 
   useEffect(() => {
     let ignore = false
-    setLoading(true)
+    setLoading(results.products.length === 0 && results.vendors.length === 0)
 
     loadMarketplaceSearch(deferredQuery)
       .then((data) => {

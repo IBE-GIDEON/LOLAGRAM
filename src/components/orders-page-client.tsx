@@ -7,7 +7,12 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { Badge, Card, SectionHeading } from "@/components/ui"
 import { ORDER_STATUS_META } from "@/lib/constants"
 import { formatCurrency, formatDate } from "@/lib/format"
-import { loadBuyerOrders, loadSellerOrders } from "@/lib/marketplace"
+import {
+  loadBuyerOrders,
+  loadSellerOrders,
+  peekCachedBuyerOrders,
+  peekCachedSellerOrders
+} from "@/lib/marketplace"
 import { type OrderDetail } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -16,8 +21,28 @@ type OrdersMode = "purchases" | "store"
 export function OrdersPageClient() {
   const { loading, profile, vendorProfile } = useAuth()
   const [mode, setMode] = useState<OrdersMode>("purchases")
-  const [orders, setOrders] = useState<OrderDetail[]>([])
-  const [fetching, setFetching] = useState(true)
+  const [orders, setOrders] = useState<OrderDetail[]>(() =>
+    profile ? peekCachedBuyerOrders(profile.id) : []
+  )
+  const [fetching, setFetching] = useState(
+    () => loading || (profile ? peekCachedBuyerOrders(profile.id).length === 0 : true)
+  )
+
+  useEffect(() => {
+    if (!profile) {
+      return
+    }
+
+    const cachedOrders =
+      mode === "store" && vendorProfile
+        ? peekCachedSellerOrders(profile.id)
+        : peekCachedBuyerOrders(profile.id)
+
+    if (cachedOrders.length > 0) {
+      setOrders(cachedOrders)
+      setFetching(false)
+    }
+  }, [mode, profile, vendorProfile])
 
   useEffect(() => {
     if (!profile) {

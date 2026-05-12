@@ -13,7 +13,7 @@ import {
   formatDate
 } from "@/lib/format"
 import { getPrimaryProductImage } from "@/lib/product-images"
-import { loadVendorDetail } from "@/lib/marketplace"
+import { loadVendorDetail, peekCachedVendorDetail } from "@/lib/marketplace"
 import { type Product, type VendorDetail } from "@/lib/types"
 
 export function VendorStoreClient({
@@ -24,7 +24,9 @@ export function VendorStoreClient({
   initialProductId?: string
 }) {
   const { addItem } = useCart()
-  const [data, setData] = useState<VendorDetail | null>(null)
+  const [data, setData] = useState<VendorDetail | null>(() =>
+    peekCachedVendorDetail(vendorId)
+  )
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const productRef = useRef<HTMLDivElement | null>(null)

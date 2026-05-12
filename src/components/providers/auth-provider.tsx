@@ -10,7 +10,7 @@ import {
 } from "react"
 import toast from "react-hot-toast"
 
-import { DEMO_USER_KEY } from "@/lib/constants"
+import { AUTH_SNAPSHOT_KEY, DEMO_USER_KEY } from "@/lib/constants"
 import { canUseDemoMode, env } from "@/lib/env"
 import {
   findOrCreateDemoUser,
@@ -40,12 +40,75 @@ interface AuthContextValue extends AuthSessionState {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+type AuthSnapshot = Pick<
+  AuthSessionState,
+  "sessionUserId" | "profile" | "vendorProfile"
+>
+
+function readAuthSnapshot(): AuthSnapshot {
+  if (typeof window === "undefined") {
+    return {
+      sessionUserId: null,
+      profile: null,
+      vendorProfile: null
+    }
+  }
+
+  const raw = window.localStorage.getItem(AUTH_SNAPSHOT_KEY)
+  if (!raw) {
+    return {
+      sessionUserId: null,
+      profile: null,
+      vendorProfile: null
+    }
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<AuthSnapshot>
+    return {
+      sessionUserId:
+        typeof parsed.sessionUserId === "string" ? parsed.sessionUserId : null,
+      profile: parsed.profile ?? null,
+      vendorProfile: parsed.vendorProfile ?? null
+    }
+  } catch {
+    return {
+      sessionUserId: null,
+      profile: null,
+      vendorProfile: null
+    }
+  }
+}
+
+function clearAuthSnapshot() {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  window.localStorage.removeItem(AUTH_SNAPSHOT_KEY)
+}
+
+function saveAuthSnapshot(snapshot: AuthSnapshot) {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  window.localStorage.setItem(AUTH_SNAPSHOT_KEY, JSON.stringify(snapshot))
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [sessionUserId, setSessionUserId] = useState<string | null>(null)
-  const [profile, setProfile] = useState<AuthSessionState["profile"]>(null)
+  const [bootSnapshot] = useState(readAuthSnapshot)
+  const [sessionUserId, setSessionUserId] = useState<string | null>(
+    bootSnapshot.sessionUserId
+  )
+  const [profile, setProfile] = useState<AuthSessionState["profile"]>(
+    bootSnapshot.profile
+  )
   const [vendorProfile, setVendorProfile] =
-    useState<AuthSessionState["vendorProfile"]>(null)
-  const [loading, setLoading] = useState(true)
+    useState<AuthSessionState["vendorProfile"]>(bootSnapshot.vendorProfile)
+  const [loading, setLoading] = useState(
+    !(bootSnapshot.sessionUserId || bootSnapshot.profile || bootSnapshot.vendorProfile)
+  )
   const isDemoMode = canUseDemoMode
 
   const refreshProfile = useCallback(
@@ -106,6 +169,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     []
   )
+
+  useEffect(() => {
+    if (!sessionUserId && !profile && !vendorProfile) {
+      clearAuthSnapshot()
+      return
+    }
+
+    saveAuthSnapshot({
+      sessionUserId,
+      profile,
+      vendorProfile
+    })
+  }, [profile, sessionUserId, vendorProfile])
 
   useEffect(() => {
     let ignore = false
@@ -385,6 +461,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     if (isDemoMode) {
       window.localStorage.removeItem(DEMO_USER_KEY)
+      clearAuthSnapshot()
       setSessionUserId(null)
       setProfile(null)
       setVendorProfile(null)
@@ -392,6 +469,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const supabase = getSupabaseBrowserClient()
+    clearAuthSnapshot()
     setSessionUserId(null)
     setProfile(null)
     setVendorProfile(null)

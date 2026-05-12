@@ -123,6 +123,29 @@ const storeAnalyticsCache = new Map<string, CacheEntry<StoreAnalytics>>()
 const vendorProfileCache = new Map<string, CacheEntry<VendorProfile | null>>()
 const userProfileCache = new Map<string, CacheEntry<UserProfile | null>>()
 const HIDDEN_ORDERS_KEY = "lolagram-hidden-orders"
+const PERSISTED_CACHE_KEY = "lolagram-persisted-cache-v1"
+const PERSISTED_CACHE_TTL_MS = 10 * 60 * 1000
+
+type PersistedCacheEntry = {
+  value: unknown
+  expiresAt: number
+}
+
+type PersistedCacheStore = Record<string, PersistedCacheEntry>
+
+const persistedCacheKeys = {
+  vendors: (query: string) => `vendors:${query}`,
+  marketplaceSearch: (query: string) => `marketplace-search:${query}`,
+  productFeed: (query: string) => `product-feed:${query}`,
+  vendorDetail: (vendorId: string) => `vendor-detail:${vendorId}`,
+  buyerOrders: (userId: string) => `buyer-orders:${userId}`,
+  sellerOrders: (userId: string) => `seller-orders:${userId}`,
+  orderDetail: (orderId: string) => `order-detail:${orderId}`,
+  sellerProducts: (userId: string) => `seller-products:${userId}`,
+  storeAnalytics: (userId: string) => `store-analytics:${userId}`,
+  vendorProfile: (userId: string) => `vendor-profile:${userId}`,
+  userProfile: (userId: string) => `user-profile:${userId}`
+} as const
 
 function readCache<T>(cache: Map<string, CacheEntry<T>>, key: string): T | null {
   const entry = cache.get(key)
@@ -142,6 +165,134 @@ function writeCache<T>(cache: Map<string, CacheEntry<T>>, key: string, value: T)
     expiresAt: Date.now() + CACHE_TTL_MS
   })
   return value
+}
+
+function getPersistedCacheStore(): PersistedCacheStore {
+  if (typeof window === "undefined") {
+    return {}
+  }
+
+  const raw = window.localStorage.getItem(PERSISTED_CACHE_KEY)
+  if (!raw) {
+    return {}
+  }
+
+  try {
+    return JSON.parse(raw) as PersistedCacheStore
+  } catch {
+    return {}
+  }
+}
+
+function savePersistedCacheStore(store: PersistedCacheStore) {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  window.localStorage.setItem(PERSISTED_CACHE_KEY, JSON.stringify(store))
+}
+
+function readPersistedCache<T>(key: string): T | null {
+  if (typeof window === "undefined") {
+    return null
+  }
+
+  const store = getPersistedCacheStore()
+  const entry = store[key]
+  if (!entry) {
+    return null
+  }
+
+  if (entry.expiresAt <= Date.now()) {
+    delete store[key]
+    savePersistedCacheStore(store)
+    return null
+  }
+
+  return entry.value as T
+}
+
+function writePersistedCache<T>(
+  key: string,
+  value: T,
+  ttlMs = PERSISTED_CACHE_TTL_MS
+): T {
+  if (typeof window === "undefined") {
+    return value
+  }
+
+  const store = getPersistedCacheStore()
+  store[key] = {
+    value,
+    expiresAt: Date.now() + ttlMs
+  }
+  savePersistedCacheStore(store)
+  return value
+}
+
+function deletePersistedCache(key: string) {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  const store = getPersistedCacheStore()
+  if (!(key in store)) {
+    return
+  }
+
+  delete store[key]
+  savePersistedCacheStore(store)
+}
+
+function clearPersistedCacheByPrefix(prefix: string) {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  const store = getPersistedCacheStore()
+  let changed = false
+
+  for (const key of Object.keys(store)) {
+    if (!key.startsWith(prefix)) {
+      continue
+    }
+
+    delete store[key]
+    changed = true
+  }
+
+  if (changed) {
+    savePersistedCacheStore(store)
+  }
+}
+
+function readHybridCache<T>(
+  cache: Map<string, CacheEntry<T>>,
+  key: string,
+  persistedKey: string
+): T | null {
+  const memoryValue = readCache(cache, key)
+  if (memoryValue !== null) {
+    return memoryValue
+  }
+
+  const persistedValue = readPersistedCache<T>(persistedKey)
+  if (persistedValue === null) {
+    return null
+  }
+
+  return writeCache(cache, key, persistedValue)
+}
+
+function writeHybridCache<T>(
+  cache: Map<string, CacheEntry<T>>,
+  key: string,
+  persistedKey: string,
+  value: T,
+  ttlMs = PERSISTED_CACHE_TTL_MS
+): T {
+  writeCache(cache, key, value)
+  return writePersistedCache(persistedKey, value, ttlMs)
 }
 
 type HiddenOrdersStore = {
@@ -194,6 +345,9 @@ function clearMarketplaceDiscoveryCaches() {
   vendorListCache.clear()
   marketplaceSearchCache.clear()
   productFeedCache.clear()
+  clearPersistedCacheByPrefix("vendors:")
+  clearPersistedCacheByPrefix("marketplace-search:")
+  clearPersistedCacheByPrefix("product-feed:")
 }
 
 function mapOrder(row: Record<string, unknown>, vendor?: VendorProfile): OrderDetail {
@@ -224,10 +378,15 @@ function mapOrder(row: Record<string, unknown>, vendor?: VendorProfile): OrderDe
 function refreshVendorReferences(vendor: VendorProfile) {
   const cachedDetail = readCache(vendorDetailCache, vendor.id)
   if (cachedDetail) {
-    writeCache(vendorDetailCache, vendor.id, {
+    writeHybridCache(
+      vendorDetailCache,
+      vendor.id,
+      persistedCacheKeys.vendorDetail(vendor.id),
+      {
       ...cachedDetail,
       vendor
-    })
+      }
+    )
   }
 
   for (const [key, entry] of buyerOrdersCache) {
@@ -240,9 +399,10 @@ function refreshVendorReferences(vendor: VendorProfile) {
       continue
     }
 
-    writeCache(
+    writeHybridCache(
       buyerOrdersCache,
       key,
+      persistedCacheKeys.buyerOrders(key),
       entry.value.map((order) =>
         order.vendorId === vendor.id ? { ...order, vendor } : order
       )
@@ -259,9 +419,10 @@ function refreshVendorReferences(vendor: VendorProfile) {
       continue
     }
 
-    writeCache(
+    writeHybridCache(
       sellerOrdersCache,
       key,
+      persistedCacheKeys.sellerOrders(key),
       entry.value.map((order) =>
         order.vendorId === vendor.id ? { ...order, vendor } : order
       )
@@ -278,7 +439,7 @@ function refreshVendorReferences(vendor: VendorProfile) {
       continue
     }
 
-    writeCache(orderDetailCache, key, {
+    writeHybridCache(orderDetailCache, key, persistedCacheKeys.orderDetail(key), {
       ...entry.value,
       vendor
     })
@@ -288,13 +449,24 @@ function refreshVendorReferences(vendor: VendorProfile) {
 function cacheVendorProfile(vendor: VendorProfile | null, userId: string) {
   writeCache(vendorProfileCache, userId, vendor)
   if (vendor) {
+    writePersistedCache(persistedCacheKeys.vendorProfile(userId), vendor)
+  } else {
+    deletePersistedCache(persistedCacheKeys.vendorProfile(userId))
+  }
+  if (vendor) {
     refreshVendorReferences(vendor)
   }
   return vendor
 }
 
 function cacheUserProfile(user: UserProfile | null, userId: string) {
-  return writeCache(userProfileCache, userId, user)
+  writeCache(userProfileCache, userId, user)
+  if (user) {
+    writePersistedCache(persistedCacheKeys.userProfile(userId), user)
+  } else {
+    deletePersistedCache(persistedCacheKeys.userProfile(userId))
+  }
+  return user
 }
 
 function updateCachedOrderCollections(
@@ -303,7 +475,12 @@ function updateCachedOrderCollections(
 ) {
   const cachedOrder = readCache(orderDetailCache, orderId)
   if (cachedOrder) {
-    writeCache(orderDetailCache, orderId, updater(cachedOrder))
+    writeHybridCache(
+      orderDetailCache,
+      orderId,
+      persistedCacheKeys.orderDetail(orderId),
+      updater(cachedOrder)
+    )
   }
 
   for (const [key, entry] of buyerOrdersCache) {
@@ -316,9 +493,10 @@ function updateCachedOrderCollections(
       continue
     }
 
-    writeCache(
+    writeHybridCache(
       buyerOrdersCache,
       key,
+      persistedCacheKeys.buyerOrders(key),
       entry.value.map((order) => (order.id === orderId ? updater(order) : order))
     )
   }
@@ -333,9 +511,10 @@ function updateCachedOrderCollections(
       continue
     }
 
-    writeCache(
+    writeHybridCache(
       sellerOrdersCache,
       key,
+      persistedCacheKeys.sellerOrders(key),
       entry.value.map((order) => (order.id === orderId ? updater(order) : order))
     )
   }
@@ -343,6 +522,7 @@ function updateCachedOrderCollections(
 
 function removeOrderFromVisibleCaches(orderId: string, actor: OrderArchiveActor) {
   orderDetailCache.delete(orderId)
+  deletePersistedCache(persistedCacheKeys.orderDetail(orderId))
 
   if (actor === "buyer") {
     for (const [key, entry] of buyerOrdersCache) {
@@ -355,9 +535,10 @@ function removeOrderFromVisibleCaches(orderId: string, actor: OrderArchiveActor)
         continue
       }
 
-      writeCache(
+      writeHybridCache(
         buyerOrdersCache,
         key,
+        persistedCacheKeys.buyerOrders(key),
         entry.value.filter((order) => order.id !== orderId)
       )
     }
@@ -372,13 +553,54 @@ function removeOrderFromVisibleCaches(orderId: string, actor: OrderArchiveActor)
         continue
       }
 
-      writeCache(
+      writeHybridCache(
         sellerOrdersCache,
         key,
+        persistedCacheKeys.sellerOrders(key),
         entry.value.filter((order) => order.id !== orderId)
       )
     }
   }
+}
+
+export function peekCachedVendors(query = ""): VendorSnapshot[] {
+  return (
+    readPersistedCache<VendorSnapshot[]>(
+      persistedCacheKeys.vendors(query.trim().toLowerCase())
+    ) ?? []
+  )
+}
+
+export function peekCachedMarketplaceSearch(
+  query = ""
+): MarketplaceSearchResults {
+  return (
+    readPersistedCache<MarketplaceSearchResults>(
+      persistedCacheKeys.marketplaceSearch(query.trim().toLowerCase())
+    ) ?? { products: [], vendors: [] }
+  )
+}
+
+export function peekCachedProductFeed(query = ""): ProductSearchResult[] {
+  return (
+    readPersistedCache<ProductSearchResult[]>(
+      persistedCacheKeys.productFeed(query.trim().toLowerCase())
+    ) ?? []
+  )
+}
+
+export function peekCachedBuyerOrders(userId: string): OrderDetail[] {
+  return readPersistedCache<OrderDetail[]>(persistedCacheKeys.buyerOrders(userId)) ?? []
+}
+
+export function peekCachedSellerOrders(userId: string): OrderDetail[] {
+  return (
+    readPersistedCache<OrderDetail[]>(persistedCacheKeys.sellerOrders(userId)) ?? []
+  )
+}
+
+export function peekCachedVendorDetail(vendorId: string): VendorDetail | null {
+  return readPersistedCache<VendorDetail>(persistedCacheKeys.vendorDetail(vendorId))
 }
 
 export async function loadVendors(query = ""): Promise<VendorSnapshot[]> {
@@ -387,7 +609,11 @@ export async function loadVendors(query = ""): Promise<VendorSnapshot[]> {
   }
 
   const cacheKey = query.trim().toLowerCase()
-  const cached = readCache(vendorListCache, cacheKey)
+  const cached = readHybridCache(
+    vendorListCache,
+    cacheKey,
+    persistedCacheKeys.vendors(cacheKey)
+  )
   if (cached) {
     return cached
   }
@@ -412,9 +638,10 @@ export async function loadVendors(query = ""): Promise<VendorSnapshot[]> {
     return canUseDemoMode ? getVendorSnapshots(query) : []
   }
 
-  return writeCache(
+  return writeHybridCache(
     vendorListCache,
     cacheKey,
+    persistedCacheKeys.vendors(cacheKey),
     data.map((row) => ({
       ...mapVendor(row),
       reviewCount: 0,
@@ -441,7 +668,11 @@ export async function loadMarketplaceSearch(
 
   const normalized = query.trim()
   const cacheKey = normalized.toLowerCase()
-  const cached = readCache(marketplaceSearchCache, cacheKey)
+  const cached = readHybridCache(
+    marketplaceSearchCache,
+    cacheKey,
+    persistedCacheKeys.marketplaceSearch(cacheKey)
+  )
   if (cached) {
     return cached
   }
@@ -577,10 +808,15 @@ export async function loadMarketplaceSearch(
         list.findIndex((candidate) => candidate.id === vendor.id) === index
     )
 
-  return writeCache(marketplaceSearchCache, cacheKey, {
-    products,
-    vendors
-  })
+  return writeHybridCache(
+    marketplaceSearchCache,
+    cacheKey,
+    persistedCacheKeys.marketplaceSearch(cacheKey),
+    {
+      products,
+      vendors
+    }
+  )
 }
 
 export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]> {
@@ -591,7 +827,11 @@ export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]
   }
 
   const cacheKey = normalized.toLowerCase()
-  const cached = readCache(productFeedCache, cacheKey)
+  const cached = readHybridCache(
+    productFeedCache,
+    cacheKey,
+    persistedCacheKeys.productFeed(cacheKey)
+  )
   if (cached) {
     return cached
   }
@@ -601,7 +841,12 @@ export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]
 
   if (normalized) {
     const results = await loadMarketplaceSearch(query)
-    return writeCache(productFeedCache, cacheKey, results.products)
+    return writeHybridCache(
+      productFeedCache,
+      cacheKey,
+      persistedCacheKeys.productFeed(cacheKey),
+      results.products
+    )
   }
 
   const { data: productRows, error: productError } = await supabase
@@ -639,9 +884,10 @@ export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]
     })
   )
 
-  return writeCache(
+  return writeHybridCache(
     productFeedCache,
     cacheKey,
+    persistedCacheKeys.productFeed(cacheKey),
     productRows
     .map((row): ProductSearchResult | null => {
       const vendor = vendorSnapshotMap.get(String(row.vendor_id))
@@ -661,7 +907,11 @@ export async function loadVendorDetail(vendorId: string): Promise<VendorDetail |
     return canUseDemoMode ? getVendorDetailDemo(vendorId) : null
   }
 
-  const cached = readCache(vendorDetailCache, vendorId)
+  const cached = readHybridCache(
+    vendorDetailCache,
+    vendorId,
+    persistedCacheKeys.vendorDetail(vendorId)
+  )
   if (cached) {
     return cached
   }
@@ -690,23 +940,28 @@ export async function loadVendorDetail(vendorId: string): Promise<VendorDetail |
   const mappedVendor = mapVendor(vendor)
   cacheVendorProfile(mappedVendor, mappedVendor.userId)
 
-  return writeCache(vendorDetailCache, vendorId, {
-    vendor: mappedVendor,
-    products: products?.map((product) => mapProduct(product)) ?? [],
-    reviews:
-      reviews?.map((review) => ({
-        id: String(review.id),
-        orderId: String(review.order_id),
-        buyerId: String(review.buyer_id),
-        vendorId: String(review.vendor_id),
-        rating: Number(review.rating),
-        comment: String(review.comment ?? ""),
-        createdAt: String(review.created_at ?? new Date().toISOString()),
-        buyerName: "Buyer"
-      })) ?? [],
-    averageRating: mappedVendor.rating,
-    reviewCount: reviewCount ?? reviews?.length ?? 0
-  })
+  return writeHybridCache(
+    vendorDetailCache,
+    vendorId,
+    persistedCacheKeys.vendorDetail(vendorId),
+    {
+      vendor: mappedVendor,
+      products: products?.map((product) => mapProduct(product)) ?? [],
+      reviews:
+        reviews?.map((review) => ({
+          id: String(review.id),
+          orderId: String(review.order_id),
+          buyerId: String(review.buyer_id),
+          vendorId: String(review.vendor_id),
+          rating: Number(review.rating),
+          comment: String(review.comment ?? ""),
+          createdAt: String(review.created_at ?? new Date().toISOString()),
+          buyerName: "Buyer"
+        })) ?? [],
+      averageRating: mappedVendor.rating,
+      reviewCount: reviewCount ?? reviews?.length ?? 0
+    }
+  )
 }
 
 export async function loadBuyerOrders(userId: string): Promise<OrderDetail[]> {
@@ -714,7 +969,11 @@ export async function loadBuyerOrders(userId: string): Promise<OrderDetail[]> {
     return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
   }
 
-  const cached = readCache(buyerOrdersCache, userId)
+  const cached = readHybridCache(
+    buyerOrdersCache,
+    userId,
+    persistedCacheKeys.buyerOrders(userId)
+  )
   if (cached) {
     return cached
   }
@@ -731,9 +990,10 @@ export async function loadBuyerOrders(userId: string): Promise<OrderDetail[]> {
 
   const hiddenOrderIds = getHiddenOrderIds("buyer", userId)
 
-  return writeCache(
+  return writeHybridCache(
     buyerOrdersCache,
     userId,
+    persistedCacheKeys.buyerOrders(userId),
     data
       .filter(
         (order) =>
@@ -749,7 +1009,11 @@ export async function loadSellerOrders(userId: string): Promise<OrderDetail[]> {
     return canUseDemoMode ? getSellerOrdersDemo(userId) : []
   }
 
-  const cached = readCache(sellerOrdersCache, userId)
+  const cached = readHybridCache(
+    sellerOrdersCache,
+    userId,
+    persistedCacheKeys.sellerOrders(userId)
+  )
   if (cached) {
     return cached
   }
@@ -770,9 +1034,10 @@ export async function loadSellerOrders(userId: string): Promise<OrderDetail[]> {
 
   const hiddenOrderIds = getHiddenOrderIds("seller", userId)
 
-  return writeCache(
+  return writeHybridCache(
     sellerOrdersCache,
     userId,
+    persistedCacheKeys.sellerOrders(userId),
     data
       .filter(
         (order) =>
@@ -788,7 +1053,11 @@ export async function loadOrderDetail(orderId: string) {
     return canUseDemoMode ? getOrderByIdDemo(orderId) : null
   }
 
-  const cached = readCache(orderDetailCache, orderId)
+  const cached = readHybridCache(
+    orderDetailCache,
+    orderId,
+    persistedCacheKeys.orderDetail(orderId)
+  )
   if (cached) {
     return cached
   }
@@ -804,7 +1073,12 @@ export async function loadOrderDetail(orderId: string) {
 
   if (error || !data) return canUseDemoMode ? getOrderByIdDemo(orderId) : null
 
-  return writeCache(orderDetailCache, orderId, mapOrder(data))
+  return writeHybridCache(
+    orderDetailCache,
+    orderId,
+    persistedCacheKeys.orderDetail(orderId),
+    mapOrder(data)
+  )
 }
 
 export async function loadSellerProducts(userId: string) {
@@ -812,7 +1086,11 @@ export async function loadSellerProducts(userId: string) {
     return canUseDemoMode ? getSellerProductsDemo(userId) : []
   }
 
-  const cached = readCache(sellerProductsCache, userId)
+  const cached = readHybridCache(
+    sellerProductsCache,
+    userId,
+    persistedCacheKeys.sellerProducts(userId)
+  )
   if (cached) {
     return cached
   }
@@ -830,9 +1108,10 @@ export async function loadSellerProducts(userId: string) {
 
   if (error || !data) return canUseDemoMode ? getSellerProductsDemo(userId) : []
 
-  return writeCache(
+  return writeHybridCache(
     sellerProductsCache,
     userId,
+    persistedCacheKeys.sellerProducts(userId),
     data.map((product) => mapProduct(product))
   )
 }
@@ -844,7 +1123,11 @@ export async function loadStoreAnalytics(userId: string): Promise<StoreAnalytics
       : { totalOrders: 0, totalRevenue: 0, averageRating: 0 }
   }
 
-  const cached = readCache(storeAnalyticsCache, userId)
+  const cached = readHybridCache(
+    storeAnalyticsCache,
+    userId,
+    persistedCacheKeys.storeAnalytics(userId)
+  )
   if (cached) {
     return cached
   }
@@ -872,13 +1155,18 @@ export async function loadStoreAnalytics(userId: string): Promise<StoreAnalytics
       : { totalOrders: 0, totalRevenue: 0, averageRating: vendor.rating }
   }
 
-  return writeCache(storeAnalyticsCache, userId, {
-    totalOrders: data.length,
-    totalRevenue: data
-      .filter((order) => String(order.status) !== "cancelled")
-      .reduce((sum, order) => sum + Number(order.total_amount ?? 0), 0),
-    averageRating: vendor.rating
-  })
+  return writeHybridCache(
+    storeAnalyticsCache,
+    userId,
+    persistedCacheKeys.storeAnalytics(userId),
+    {
+      totalOrders: data.length,
+      totalRevenue: data
+        .filter((order) => String(order.status) !== "cancelled")
+        .reduce((sum, order) => sum + Number(order.total_amount ?? 0), 0),
+      averageRating: vendor.rating
+    }
+  )
 }
 
 export async function loadVendorProfile(userId: string) {
@@ -889,6 +1177,13 @@ export async function loadVendorProfile(userId: string) {
   const cached = readCache(vendorProfileCache, userId)
   if (cached !== null) {
     return cached
+  }
+
+  const persisted = readPersistedCache<VendorProfile>(
+    persistedCacheKeys.vendorProfile(userId)
+  )
+  if (persisted) {
+    return cacheVendorProfile(persisted, userId)
   }
 
   const supabase = getSupabaseBrowserClient()
@@ -931,6 +1226,13 @@ export async function loadUserProfile(userId: string) {
   const cached = readCache(userProfileCache, userId)
   if (cached !== null) {
     return cached
+  }
+
+  const persisted = readPersistedCache<UserProfile>(
+    persistedCacheKeys.userProfile(userId)
+  )
+  if (persisted) {
+    return cacheUserProfile(persisted, userId)
   }
 
   const supabase = getSupabaseBrowserClient()
@@ -1027,6 +1329,10 @@ export async function saveSellerProfile(
   sellerOrdersCache.delete(userId)
   sellerProductsCache.delete(userId)
   storeAnalyticsCache.delete(userId)
+  deletePersistedCache(persistedCacheKeys.vendorDetail(vendor.id))
+  deletePersistedCache(persistedCacheKeys.sellerOrders(userId))
+  deletePersistedCache(persistedCacheKeys.sellerProducts(userId))
+  deletePersistedCache(persistedCacheKeys.storeAnalytics(userId))
   clearMarketplaceDiscoveryCaches()
   return vendor
 }
@@ -1091,6 +1397,9 @@ export async function saveProduct(input: ProductInput) {
   const product = mapProduct(response.data)
   sellerProductsCache.clear()
   vendorDetailCache.delete(input.vendorId)
+  clearPersistedCacheByPrefix("seller-products:")
+  clearPersistedCacheByPrefix("vendor-detail:")
+  clearPersistedCacheByPrefix("store-analytics:")
   clearMarketplaceDiscoveryCaches()
   return product
 }
@@ -1116,6 +1425,9 @@ export async function deleteProduct(productId: string) {
   }
   sellerProductsCache.clear()
   vendorDetailCache.clear()
+  clearPersistedCacheByPrefix("seller-products:")
+  clearPersistedCacheByPrefix("vendor-detail:")
+  clearPersistedCacheByPrefix("store-analytics:")
   clearMarketplaceDiscoveryCaches()
   return true
 }
@@ -1272,6 +1584,8 @@ export async function saveReview(input: {
 
   vendorDetailCache.delete(input.vendorId)
   storeAnalyticsCache.clear()
+  deletePersistedCache(persistedCacheKeys.vendorDetail(input.vendorId))
+  clearPersistedCacheByPrefix("store-analytics:")
 
   return data
 }

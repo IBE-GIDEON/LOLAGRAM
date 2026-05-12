@@ -8,7 +8,12 @@ import { ProductFeed } from "@/components/product-feed"
 import { useAuth } from "@/components/providers/auth-provider"
 import { Avatar, Input } from "@/components/ui"
 import { VendorList } from "@/components/vendor-list"
-import { loadProductFeed, loadVendors } from "@/lib/marketplace"
+import {
+  loadProductFeed,
+  loadVendors,
+  peekCachedProductFeed,
+  peekCachedVendors
+} from "@/lib/marketplace"
 import { type ProductSearchResult, type VendorSnapshot } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -21,19 +26,25 @@ export function HomePageClient({
   searchOnly?: boolean
 }) {
   const { profile } = useAuth()
-  const [activeTab, setActiveTab] = useState<HomeTab>(searchOnly ? "find" : "general")
+  const initialTab: HomeTab = searchOnly ? "find" : "general"
+  const initialVendors = initialTab === "find" ? peekCachedVendors("") : []
+  const initialProducts =
+    initialTab === "general" ? peekCachedProductFeed("") : []
+  const [activeTab, setActiveTab] = useState<HomeTab>(initialTab)
   const [query, setQuery] = useState("")
   const deferredQuery = useDeferredValue(query)
   const isFindTab = searchOnly || activeTab === "find"
-  const [vendors, setVendors] = useState<VendorSnapshot[]>([])
-  const [products, setProducts] = useState<ProductSearchResult[]>([])
-  const [loading, setLoading] = useState(true)
+  const [vendors, setVendors] = useState<VendorSnapshot[]>(initialVendors)
+  const [products, setProducts] = useState<ProductSearchResult[]>(initialProducts)
+  const [loading, setLoading] = useState(
+    initialTab === "find" ? initialVendors.length === 0 : initialProducts.length === 0
+  )
   const [visibleCount, setVisibleCount] = useState(INITIAL_PRODUCT_BATCH)
   const [scrollTop, setScrollTop] = useState(0)
 
   useEffect(() => {
     let ignore = false
-    setLoading(true)
+    setLoading((isFindTab ? vendors.length : products.length) === 0)
 
     if (isFindTab) {
       loadVendors(deferredQuery)
