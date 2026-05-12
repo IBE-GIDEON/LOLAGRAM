@@ -15,6 +15,8 @@ export type OrderStatus =
   | "delivered"
   | "cancelled"
 
+export type OrderArchiveActor = "buyer" | "seller"
+
 export interface UserProfile {
   id: string
   email: string

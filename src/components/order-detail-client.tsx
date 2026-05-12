@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import toast from "react-hot-toast"
 import { FiMessageCircle } from "react-icons/fi"
@@ -8,8 +9,19 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { Badge, Button, Card, SectionHeading } from "@/components/ui"
 import { ORDER_STATUS_META } from "@/lib/constants"
 import { formatCurrency, formatDateTime } from "@/lib/format"
-import { loadOrderDetail, loadVendorDetail, saveReview, updateOrderStatus } from "@/lib/marketplace"
-import { type OrderDetail, type OrderStatus, type VendorDetail } from "@/lib/types"
+import {
+  archiveCompletedOrder,
+  loadOrderDetail,
+  loadVendorDetail,
+  saveReview,
+  updateOrderStatus
+} from "@/lib/marketplace"
+import {
+  type OrderArchiveActor,
+  type OrderDetail,
+  type OrderStatus,
+  type VendorDetail
+} from "@/lib/types"
 
 const statusSteps: OrderStatus[] = [
   "pending",
@@ -20,6 +32,7 @@ const statusSteps: OrderStatus[] = [
 
 export function OrderDetailClient({ orderId }: { orderId: string }) {
   const { profile, vendorProfile } = useAuth()
+  const router = useRouter()
   const [order, setOrder] = useState<OrderDetail | null>(null)
   const [vendorData, setVendorData] = useState<VendorDetail | null>(null)
   const [reviewComment, setReviewComment] = useState("")
@@ -59,6 +72,14 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
     order?.buyerId === profile.id &&
     order.status === "delivered" &&
     !vendorData?.reviews.some((review) => review.orderId === order.id)
+  const archiveActor: OrderArchiveActor | null = canManage
+    ? "seller"
+    : profile && order?.buyerId === profile.id
+      ? "buyer"
+      : null
+  const canArchive =
+    Boolean(archiveActor) &&
+    (order?.status === "delivered" || order?.status === "cancelled")
 
   const nextActions = useMemo(() => {
     if (!order) return []
@@ -290,6 +311,53 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
             disabled={busy}
           >
             Submit Review
+          </Button>
+        </Card>
+      ) : null}
+
+      {canArchive && profile ? (
+        <Card className="p-4">
+          <p className="text-sm font-semibold text-ink">History</p>
+          <p className="mt-2 text-sm leading-6 text-muted">
+            Remove finished orders from your visible history without affecting the
+            other person&apos;s records.
+          </p>
+          <Button
+            variant="outline"
+            className="mt-4 w-full"
+            disabled={busy}
+            onClick={async () => {
+              const confirmed = window.confirm(
+                "Remove this completed order from your history?"
+              )
+              if (!confirmed) return
+
+              setBusy(true)
+              try {
+                const result = await archiveCompletedOrder(
+                  order.id,
+                  archiveActor!,
+                  profile.id
+                )
+                toast.success(
+                  result.localOnly
+                    ? "Order removed from this device history."
+                    : "Order removed from your history."
+                )
+                router.push("/orders")
+                router.refresh()
+              } catch (error) {
+                toast.error(
+                  error instanceof Error
+                    ? error.message
+                    : "Could not remove this order from history."
+                )
+              } finally {
+                setBusy(false)
+              }
+            }}
+          >
+            Remove from history
           </Button>
         </Card>
       ) : null}

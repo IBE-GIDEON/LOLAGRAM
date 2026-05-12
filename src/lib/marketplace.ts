@@ -30,6 +30,7 @@ import {
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import {
   type CheckoutPayload,
+  type OrderArchiveActor,
   type MarketplaceSearchResults,
   type OrderDetail,
   type OrderStatus,
@@ -121,6 +122,7 @@ const sellerProductsCache = new Map<string, CacheEntry<ReturnType<typeof mapProd
 const storeAnalyticsCache = new Map<string, CacheEntry<StoreAnalytics>>()
 const vendorProfileCache = new Map<string, CacheEntry<VendorProfile | null>>()
 const userProfileCache = new Map<string, CacheEntry<UserProfile | null>>()
+const HIDDEN_ORDERS_KEY = "lolagram-hidden-orders"
 
 function readCache<T>(cache: Map<string, CacheEntry<T>>, key: string): T | null {
   const entry = cache.get(key)
@@ -140,6 +142,52 @@ function writeCache<T>(cache: Map<string, CacheEntry<T>>, key: string, value: T)
     expiresAt: Date.now() + CACHE_TTL_MS
   })
   return value
+}
+
+type HiddenOrdersStore = {
+  buyer: Record<string, string[]>
+  seller: Record<string, string[]>
+}
+
+function getHiddenOrdersStore(): HiddenOrdersStore {
+  if (typeof window === "undefined") {
+    return { buyer: {}, seller: {} }
+  }
+
+  const raw = window.localStorage.getItem(HIDDEN_ORDERS_KEY)
+  if (!raw) {
+    return { buyer: {}, seller: {} }
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as HiddenOrdersStore
+    return {
+      buyer: parsed.buyer ?? {},
+      seller: parsed.seller ?? {}
+    }
+  } catch {
+    return { buyer: {}, seller: {} }
+  }
+}
+
+function saveHiddenOrdersStore(store: HiddenOrdersStore) {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  window.localStorage.setItem(HIDDEN_ORDERS_KEY, JSON.stringify(store))
+}
+
+function getHiddenOrderIds(actor: OrderArchiveActor, userId: string) {
+  return new Set(getHiddenOrdersStore()[actor][userId] ?? [])
+}
+
+function hideOrderLocally(actor: OrderArchiveActor, userId: string, orderId: string) {
+  const store = getHiddenOrdersStore()
+  const current = new Set(store[actor][userId] ?? [])
+  current.add(orderId)
+  store[actor][userId] = [...current]
+  saveHiddenOrdersStore(store)
 }
 
 function clearMarketplaceDiscoveryCaches() {
@@ -290,6 +338,46 @@ function updateCachedOrderCollections(
       key,
       entry.value.map((order) => (order.id === orderId ? updater(order) : order))
     )
+  }
+}
+
+function removeOrderFromVisibleCaches(orderId: string, actor: OrderArchiveActor) {
+  orderDetailCache.delete(orderId)
+
+  if (actor === "buyer") {
+    for (const [key, entry] of buyerOrdersCache) {
+      if (entry.expiresAt <= Date.now()) {
+        buyerOrdersCache.delete(key)
+        continue
+      }
+
+      if (!entry.value.some((order) => order.id === orderId)) {
+        continue
+      }
+
+      writeCache(
+        buyerOrdersCache,
+        key,
+        entry.value.filter((order) => order.id !== orderId)
+      )
+    }
+  } else {
+    for (const [key, entry] of sellerOrdersCache) {
+      if (entry.expiresAt <= Date.now()) {
+        sellerOrdersCache.delete(key)
+        continue
+      }
+
+      if (!entry.value.some((order) => order.id === orderId)) {
+        continue
+      }
+
+      writeCache(
+        sellerOrdersCache,
+        key,
+        entry.value.filter((order) => order.id !== orderId)
+      )
+    }
   }
 }
 
@@ -641,10 +729,18 @@ export async function loadBuyerOrders(userId: string): Promise<OrderDetail[]> {
 
   if (error || !data) return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
 
+  const hiddenOrderIds = getHiddenOrderIds("buyer", userId)
+
   return writeCache(
     buyerOrdersCache,
     userId,
-    data.map((order) => mapOrder(order))
+    data
+      .filter(
+        (order) =>
+          !order.buyer_hidden_at &&
+          !hiddenOrderIds.has(String(order.id))
+      )
+      .map((order) => mapOrder(order))
   )
 }
 
@@ -672,10 +768,18 @@ export async function loadSellerOrders(userId: string): Promise<OrderDetail[]> {
 
   if (error || !data) return canUseDemoMode ? getSellerOrdersDemo(userId) : []
 
+  const hiddenOrderIds = getHiddenOrderIds("seller", userId)
+
   return writeCache(
     sellerOrdersCache,
     userId,
-    data.map((order) => mapOrder(order, vendor))
+    data
+      .filter(
+        (order) =>
+          !order.seller_hidden_at &&
+          !hiddenOrderIds.has(String(order.id))
+      )
+      .map((order) => mapOrder(order, vendor))
   )
 }
 
@@ -745,11 +849,35 @@ export async function loadStoreAnalytics(userId: string): Promise<StoreAnalytics
     return cached
   }
 
-  const orders = await loadSellerOrders(userId)
+  const vendor = await loadVendorProfile(userId)
+  if (!vendor) {
+    return { totalOrders: 0, totalRevenue: 0, averageRating: 0 }
+  }
+
+  const supabase = getSupabaseBrowserClient()
+  if (!supabase) {
+    return canUseDemoMode
+      ? getStoreAnalyticsDemo(userId)
+      : { totalOrders: 0, totalRevenue: 0, averageRating: 0 }
+  }
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select("id, total_amount, status")
+    .eq("vendor_id", vendor.id)
+
+  if (error || !data) {
+    return canUseDemoMode
+      ? getStoreAnalyticsDemo(userId)
+      : { totalOrders: 0, totalRevenue: 0, averageRating: vendor.rating }
+  }
+
   return writeCache(storeAnalyticsCache, userId, {
-    totalOrders: orders.length,
-    totalRevenue: orders.reduce((sum, order) => sum + order.totalAmount, 0),
-    averageRating: orders[0]?.vendor?.rating ?? 0
+    totalOrders: data.length,
+    totalRevenue: data
+      .filter((order) => String(order.status) !== "cancelled")
+      .reduce((sum, order) => sum + Number(order.total_amount ?? 0), 0),
+    averageRating: vendor.rating
   })
 }
 
@@ -1057,6 +1185,52 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
   }))
 
   return response.json()
+}
+
+export async function archiveCompletedOrder(
+  orderId: string,
+  actor: OrderArchiveActor,
+  userId: string
+) {
+  if (!hasSupabase) {
+    hideOrderLocally(actor, userId, orderId)
+    removeOrderFromVisibleCaches(orderId, actor)
+    return { ok: true, localOnly: true }
+  }
+
+  const supabase = getSupabaseBrowserClient()
+  if (!supabase) {
+    hideOrderLocally(actor, userId, orderId)
+    removeOrderFromVisibleCaches(orderId, actor)
+    return { ok: true, localOnly: true }
+  }
+
+  const { error } = await supabase.rpc("hide_completed_order", {
+    target_order_id: orderId,
+    actor
+  })
+
+  if (error) {
+    const message = error.message.toLowerCase()
+    const canFallbackLocally =
+      message.includes("function") ||
+      message.includes("schema cache") ||
+      message.includes("does not exist") ||
+      message.includes("buyer_hidden_at") ||
+      message.includes("seller_hidden_at")
+
+    if (!canFallbackLocally) {
+      throw new Error(error.message)
+    }
+
+    hideOrderLocally(actor, userId, orderId)
+    removeOrderFromVisibleCaches(orderId, actor)
+    return { ok: true, localOnly: true }
+  }
+
+  hideOrderLocally(actor, userId, orderId)
+  removeOrderFromVisibleCaches(orderId, actor)
+  return { ok: true, localOnly: false }
 }
 
 export async function saveReview(input: {

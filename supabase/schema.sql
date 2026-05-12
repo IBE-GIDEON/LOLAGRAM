@@ -88,6 +88,12 @@ create table if not exists public.orders (
   created_at timestamptz not null default now()
 );
 
+alter table public.orders
+add column if not exists buyer_hidden_at timestamptz;
+
+alter table public.orders
+add column if not exists seller_hidden_at timestamptz;
+
 create index if not exists orders_buyer_idx on public.orders (buyer_id, created_at desc);
 create index if not exists orders_vendor_idx on public.orders (vendor_id, created_at desc);
 create index if not exists orders_reference_idx on public.orders (paystack_reference);
@@ -187,6 +193,69 @@ begin
   return coalesce(new, old);
 end;
 $$;
+
+create or replace function public.hide_completed_order(
+  target_order_id uuid,
+  actor text
+)
+returns public.orders
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_order public.orders;
+  current_user_id uuid := auth.uid();
+begin
+  if current_user_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select *
+  into target_order
+  from public.orders
+  where id = target_order_id;
+
+  if not found then
+    raise exception 'Order not found';
+  end if;
+
+  if target_order.status not in ('delivered', 'cancelled') then
+    raise exception 'Only completed or cancelled orders can be removed from history';
+  end if;
+
+  if actor = 'buyer' then
+    if target_order.buyer_id <> current_user_id then
+      raise exception 'Not allowed to hide this order as buyer';
+    end if;
+
+    update public.orders
+    set buyer_hidden_at = now()
+    where id = target_order_id
+    returning * into target_order;
+  elsif actor = 'seller' then
+    if not exists (
+      select 1
+      from public.vendor_profiles vp
+      where vp.id = target_order.vendor_id
+        and vp.user_id = current_user_id
+    ) then
+      raise exception 'Not allowed to hide this order as seller';
+    end if;
+
+    update public.orders
+    set seller_hidden_at = now()
+    where id = target_order_id
+    returning * into target_order;
+  else
+    raise exception 'Unknown order history actor';
+  end if;
+
+  return target_order;
+end;
+$$;
+
+grant execute on function public.hide_completed_order(uuid, text) to authenticated;
 
 drop trigger if exists reviews_after_write on public.reviews;
 create trigger reviews_after_write
