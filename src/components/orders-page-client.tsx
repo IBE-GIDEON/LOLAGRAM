@@ -25,13 +25,31 @@ export function OrdersPageClient() {
       return
     }
 
+    let ignore = false
     setFetching(true)
     const request =
       mode === "store" && vendorProfile
         ? loadSellerOrders(profile.id)
         : loadBuyerOrders(profile.id)
 
-    request.then(setOrders).finally(() => setFetching(false))
+    request
+      .then((nextOrders) => {
+        if (ignore) return
+        setOrders(nextOrders)
+      })
+      .finally(() => {
+        if (!ignore) {
+          setFetching(false)
+        }
+      })
+
+    if (vendorProfile) {
+      void (mode === "store" ? loadBuyerOrders(profile.id) : loadSellerOrders(profile.id))
+    }
+
+    return () => {
+      ignore = true
+    }
   }, [mode, profile, vendorProfile])
 
   if (loading) {

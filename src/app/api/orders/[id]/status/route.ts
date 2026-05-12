@@ -26,7 +26,7 @@ export async function PATCH(
     return NextResponse.json({ error: error?.message ?? "Order not found" }, { status: 500 })
   }
 
-  await sendPushNotification({
+  void sendPushNotification({
     userId: String(order.buyer_id),
     title:
       status === "confirmed"
@@ -41,6 +41,8 @@ export async function PATCH(
           ? "The seller has dispatched your items."
           : "Your seller marked this order as delivered.",
     url: `/orders/${params.id}`
+  }).catch(() => {
+    return null
   })
 
   return NextResponse.json({ ok: true })

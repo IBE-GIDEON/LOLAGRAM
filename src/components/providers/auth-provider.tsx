@@ -312,14 +312,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error
       }
 
-      await saveUserProfile({
+      const nextProfile = await saveUserProfile({
         ...profile,
         email: normalizedEmail
       })
-      await refreshProfile(profile.id)
+      setProfile(nextProfile)
       toast.success("Email updated. Check your inbox to confirm it.")
     },
-    [isDemoMode, profile, refreshProfile]
+    [isDemoMode, profile]
   )
 
   const signOut = useCallback(async () => {
@@ -332,10 +332,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const supabase = getSupabaseBrowserClient()
-    await supabase?.auth.signOut()
     setSessionUserId(null)
     setProfile(null)
     setVendorProfile(null)
+
+    await supabase?.auth.signOut()
   }, [isDemoMode])
 
   const upgradeAccountType = useCallback(
@@ -366,9 +367,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error
       }
 
-      await refreshProfile(sessionUserId)
+      setProfile((current) =>
+        current ? { ...current, accountType: nextType } : current
+      )
     },
-    [isDemoMode, profile, refreshProfile, sessionUserId]
+    [isDemoMode, profile, sessionUserId]
   )
 
   const value = useMemo<AuthContextValue>(

@@ -103,9 +103,205 @@ function getPaymentsConfigError() {
   return "Checkout needs live Paystack and Supabase configuration before launch."
 }
 
+const CACHE_TTL_MS = 20_000
+
+type CacheEntry<T> = {
+  value: T
+  expiresAt: number
+}
+
+const vendorListCache = new Map<string, CacheEntry<VendorSnapshot[]>>()
+const marketplaceSearchCache = new Map<string, CacheEntry<MarketplaceSearchResults>>()
+const productFeedCache = new Map<string, CacheEntry<ProductSearchResult[]>>()
+const vendorDetailCache = new Map<string, CacheEntry<VendorDetail | null>>()
+const buyerOrdersCache = new Map<string, CacheEntry<OrderDetail[]>>()
+const sellerOrdersCache = new Map<string, CacheEntry<OrderDetail[]>>()
+const orderDetailCache = new Map<string, CacheEntry<OrderDetail | null>>()
+const sellerProductsCache = new Map<string, CacheEntry<ReturnType<typeof mapProduct>[]>>()
+const storeAnalyticsCache = new Map<string, CacheEntry<StoreAnalytics>>()
+const vendorProfileCache = new Map<string, CacheEntry<VendorProfile | null>>()
+const userProfileCache = new Map<string, CacheEntry<UserProfile | null>>()
+
+function readCache<T>(cache: Map<string, CacheEntry<T>>, key: string): T | null {
+  const entry = cache.get(key)
+  if (!entry) return null
+
+  if (entry.expiresAt <= Date.now()) {
+    cache.delete(key)
+    return null
+  }
+
+  return entry.value
+}
+
+function writeCache<T>(cache: Map<string, CacheEntry<T>>, key: string, value: T): T {
+  cache.set(key, {
+    value,
+    expiresAt: Date.now() + CACHE_TTL_MS
+  })
+  return value
+}
+
+function clearMarketplaceDiscoveryCaches() {
+  vendorListCache.clear()
+  marketplaceSearchCache.clear()
+  productFeedCache.clear()
+}
+
+function mapOrder(row: Record<string, unknown>, vendor?: VendorProfile): OrderDetail {
+  const nestedVendor =
+    vendor ??
+    (row.vendor_profiles &&
+    typeof row.vendor_profiles === "object" &&
+    !Array.isArray(row.vendor_profiles)
+      ? mapVendor(row.vendor_profiles as Record<string, unknown>)
+      : undefined)
+
+  return {
+    id: String(row.id),
+    buyerId: String(row.buyer_id),
+    vendorId: String(row.vendor_id),
+    items: (row.items ?? []) as OrderDetail["items"],
+    totalAmount: Number(row.total_amount ?? 0),
+    status: String(row.status) as OrderStatus,
+    paystackReference: row.paystack_reference
+      ? String(row.paystack_reference)
+      : undefined,
+    deliveryAddress: String(row.delivery_address ?? ""),
+    createdAt: String(row.created_at ?? new Date().toISOString()),
+    vendor: nestedVendor
+  }
+}
+
+function refreshVendorReferences(vendor: VendorProfile) {
+  const cachedDetail = readCache(vendorDetailCache, vendor.id)
+  if (cachedDetail) {
+    writeCache(vendorDetailCache, vendor.id, {
+      ...cachedDetail,
+      vendor
+    })
+  }
+
+  for (const [key, entry] of buyerOrdersCache) {
+    if (entry.expiresAt <= Date.now()) {
+      buyerOrdersCache.delete(key)
+      continue
+    }
+
+    if (!entry.value.some((order) => order.vendorId === vendor.id)) {
+      continue
+    }
+
+    writeCache(
+      buyerOrdersCache,
+      key,
+      entry.value.map((order) =>
+        order.vendorId === vendor.id ? { ...order, vendor } : order
+      )
+    )
+  }
+
+  for (const [key, entry] of sellerOrdersCache) {
+    if (entry.expiresAt <= Date.now()) {
+      sellerOrdersCache.delete(key)
+      continue
+    }
+
+    if (!entry.value.some((order) => order.vendorId === vendor.id)) {
+      continue
+    }
+
+    writeCache(
+      sellerOrdersCache,
+      key,
+      entry.value.map((order) =>
+        order.vendorId === vendor.id ? { ...order, vendor } : order
+      )
+    )
+  }
+
+  for (const [key, entry] of orderDetailCache) {
+    if (entry.expiresAt <= Date.now()) {
+      orderDetailCache.delete(key)
+      continue
+    }
+
+    if (entry.value?.vendorId !== vendor.id) {
+      continue
+    }
+
+    writeCache(orderDetailCache, key, {
+      ...entry.value,
+      vendor
+    })
+  }
+}
+
+function cacheVendorProfile(vendor: VendorProfile | null, userId: string) {
+  writeCache(vendorProfileCache, userId, vendor)
+  if (vendor) {
+    refreshVendorReferences(vendor)
+  }
+  return vendor
+}
+
+function cacheUserProfile(user: UserProfile | null, userId: string) {
+  return writeCache(userProfileCache, userId, user)
+}
+
+function updateCachedOrderCollections(
+  orderId: string,
+  updater: (order: OrderDetail) => OrderDetail
+) {
+  const cachedOrder = readCache(orderDetailCache, orderId)
+  if (cachedOrder) {
+    writeCache(orderDetailCache, orderId, updater(cachedOrder))
+  }
+
+  for (const [key, entry] of buyerOrdersCache) {
+    if (entry.expiresAt <= Date.now()) {
+      buyerOrdersCache.delete(key)
+      continue
+    }
+
+    if (!entry.value.some((order) => order.id === orderId)) {
+      continue
+    }
+
+    writeCache(
+      buyerOrdersCache,
+      key,
+      entry.value.map((order) => (order.id === orderId ? updater(order) : order))
+    )
+  }
+
+  for (const [key, entry] of sellerOrdersCache) {
+    if (entry.expiresAt <= Date.now()) {
+      sellerOrdersCache.delete(key)
+      continue
+    }
+
+    if (!entry.value.some((order) => order.id === orderId)) {
+      continue
+    }
+
+    writeCache(
+      sellerOrdersCache,
+      key,
+      entry.value.map((order) => (order.id === orderId ? updater(order) : order))
+    )
+  }
+}
+
 export async function loadVendors(query = ""): Promise<VendorSnapshot[]> {
   if (!hasSupabase) {
     return canUseDemoMode ? getVendorSnapshots(query) : []
+  }
+
+  const cacheKey = query.trim().toLowerCase()
+  const cached = readCache(vendorListCache, cacheKey)
+  if (cached) {
+    return cached
   }
 
   const supabase = getSupabaseBrowserClient()
@@ -123,16 +319,20 @@ export async function loadVendors(query = ""): Promise<VendorSnapshot[]> {
     })
   }
 
-  const { data, error } = await request.limit(100)
+  const { data, error } = await request.limit(60)
   if (error || !data) {
     return canUseDemoMode ? getVendorSnapshots(query) : []
   }
 
-  return data.map((row) => ({
-    ...mapVendor(row),
-    reviewCount: 0,
-    productCount: 0
-  }))
+  return writeCache(
+    vendorListCache,
+    cacheKey,
+    data.map((row) => ({
+      ...mapVendor(row),
+      reviewCount: 0,
+      productCount: 0
+    }))
+  )
 }
 
 export async function loadMarketplaceSearch(
@@ -152,6 +352,12 @@ export async function loadMarketplaceSearch(
   }
 
   const normalized = query.trim()
+  const cacheKey = normalized.toLowerCase()
+  const cached = readCache(marketplaceSearchCache, cacheKey)
+  if (cached) {
+    return cached
+  }
+
   const vendorRequest = normalized
     ? supabase
         .from("vendor_profiles")
@@ -283,10 +489,10 @@ export async function loadMarketplaceSearch(
         list.findIndex((candidate) => candidate.id === vendor.id) === index
     )
 
-  return {
+  return writeCache(marketplaceSearchCache, cacheKey, {
     products,
     vendors
-  }
+  })
 }
 
 export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]> {
@@ -296,19 +502,25 @@ export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]
     return canUseDemoMode ? getProductFeed(query) : []
   }
 
+  const cacheKey = normalized.toLowerCase()
+  const cached = readCache(productFeedCache, cacheKey)
+  if (cached) {
+    return cached
+  }
+
   const supabase = getSupabaseBrowserClient()
   if (!supabase) return canUseDemoMode ? getProductFeed(query) : []
 
   if (normalized) {
     const results = await loadMarketplaceSearch(query)
-    return results.products
+    return writeCache(productFeedCache, cacheKey, results.products)
   }
 
   const { data: productRows, error: productError } = await supabase
     .from("products")
     .select("*")
     .order("created_at", { ascending: false })
-    .limit(100)
+    .limit(48)
 
   if (productError || !productRows) {
     return canUseDemoMode ? getProductFeed(query) : []
@@ -339,7 +551,10 @@ export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]
     })
   )
 
-  return productRows
+  return writeCache(
+    productFeedCache,
+    cacheKey,
+    productRows
     .map((row): ProductSearchResult | null => {
       const vendor = vendorSnapshotMap.get(String(row.vendor_id))
       if (!vendor) return null
@@ -350,6 +565,7 @@ export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]
       }
     })
     .filter((item): item is ProductSearchResult => Boolean(item))
+  )
 }
 
 export async function loadVendorDetail(vendorId: string): Promise<VendorDetail | null> {
@@ -357,10 +573,16 @@ export async function loadVendorDetail(vendorId: string): Promise<VendorDetail |
     return canUseDemoMode ? getVendorDetailDemo(vendorId) : null
   }
 
+  const cached = readCache(vendorDetailCache, vendorId)
+  if (cached) {
+    return cached
+  }
+
   const supabase = getSupabaseBrowserClient()
   if (!supabase) return canUseDemoMode ? getVendorDetailDemo(vendorId) : null
 
-  const [{ data: vendor }, { data: products }, { data: reviews }] = await Promise.all([
+  const [{ data: vendor }, { data: products }, { data: reviews, count: reviewCount }] =
+    await Promise.all([
     supabase.from("vendor_profiles").select("*").eq("id", vendorId).maybeSingle(),
     supabase
       .from("products")
@@ -369,15 +591,18 @@ export async function loadVendorDetail(vendorId: string): Promise<VendorDetail |
       .order("created_at", { ascending: false }),
     supabase
       .from("reviews")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("vendor_id", vendorId)
       .order("created_at", { ascending: false })
+      .limit(5)
   ])
 
   if (!vendor) return null
 
   const mappedVendor = mapVendor(vendor)
-  return {
+  cacheVendorProfile(mappedVendor, mappedVendor.userId)
+
+  return writeCache(vendorDetailCache, vendorId, {
     vendor: mappedVendor,
     products: products?.map((product) => mapProduct(product)) ?? [],
     reviews:
@@ -392,13 +617,18 @@ export async function loadVendorDetail(vendorId: string): Promise<VendorDetail |
         buyerName: "Buyer"
       })) ?? [],
     averageRating: mappedVendor.rating,
-    reviewCount: reviews?.length ?? 0
-  }
+    reviewCount: reviewCount ?? reviews?.length ?? 0
+  })
 }
 
 export async function loadBuyerOrders(userId: string): Promise<OrderDetail[]> {
   if (!hasSupabase) {
     return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
+  }
+
+  const cached = readCache(buyerOrdersCache, userId)
+  if (cached) {
+    return cached
   }
 
   const supabase = getSupabaseBrowserClient()
@@ -411,25 +641,21 @@ export async function loadBuyerOrders(userId: string): Promise<OrderDetail[]> {
 
   if (error || !data) return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
 
-  return data.map((order) => ({
-    id: String(order.id),
-    buyerId: String(order.buyer_id),
-    vendorId: String(order.vendor_id),
-    items: (order.items ?? []) as OrderDetail["items"],
-    totalAmount: Number(order.total_amount ?? 0),
-    status: String(order.status) as OrderStatus,
-    paystackReference: order.paystack_reference
-      ? String(order.paystack_reference)
-      : undefined,
-    deliveryAddress: String(order.delivery_address ?? ""),
-    createdAt: String(order.created_at ?? new Date().toISOString()),
-    vendor: order.vendor_profiles ? mapVendor(order.vendor_profiles) : undefined
-  }))
+  return writeCache(
+    buyerOrdersCache,
+    userId,
+    data.map((order) => mapOrder(order))
+  )
 }
 
 export async function loadSellerOrders(userId: string): Promise<OrderDetail[]> {
   if (!hasSupabase) {
     return canUseDemoMode ? getSellerOrdersDemo(userId) : []
+  }
+
+  const cached = readCache(sellerOrdersCache, userId)
+  if (cached) {
+    return cached
   }
 
   const vendor = await loadVendorProfile(userId)
@@ -446,20 +672,11 @@ export async function loadSellerOrders(userId: string): Promise<OrderDetail[]> {
 
   if (error || !data) return canUseDemoMode ? getSellerOrdersDemo(userId) : []
 
-  return data.map((order) => ({
-    id: String(order.id),
-    buyerId: String(order.buyer_id),
-    vendorId: String(order.vendor_id),
-    items: (order.items ?? []) as OrderDetail["items"],
-    totalAmount: Number(order.total_amount ?? 0),
-    status: String(order.status) as OrderStatus,
-    paystackReference: order.paystack_reference
-      ? String(order.paystack_reference)
-      : undefined,
-    deliveryAddress: String(order.delivery_address ?? ""),
-    createdAt: String(order.created_at ?? new Date().toISOString()),
-    vendor
-  }))
+  return writeCache(
+    sellerOrdersCache,
+    userId,
+    data.map((order) => mapOrder(order, vendor))
+  )
 }
 
 export async function loadOrderDetail(orderId: string) {
@@ -467,35 +684,33 @@ export async function loadOrderDetail(orderId: string) {
     return canUseDemoMode ? getOrderByIdDemo(orderId) : null
   }
 
+  const cached = readCache(orderDetailCache, orderId)
+  if (cached) {
+    return cached
+  }
+
   const supabase = getSupabaseBrowserClient()
   if (!supabase) return canUseDemoMode ? getOrderByIdDemo(orderId) : null
 
   const { data, error } = await supabase
     .from("orders")
-    .select("*")
+    .select("*, vendor_profiles(*)")
     .eq("id", orderId)
     .maybeSingle()
 
   if (error || !data) return canUseDemoMode ? getOrderByIdDemo(orderId) : null
 
-  return {
-    id: String(data.id),
-    buyerId: String(data.buyer_id),
-    vendorId: String(data.vendor_id),
-    items: (data.items ?? []) as OrderDetail["items"],
-    totalAmount: Number(data.total_amount ?? 0),
-    status: String(data.status) as OrderStatus,
-    paystackReference: data.paystack_reference
-      ? String(data.paystack_reference)
-      : undefined,
-    deliveryAddress: String(data.delivery_address ?? ""),
-    createdAt: String(data.created_at ?? new Date().toISOString())
-  } satisfies OrderDetail
+  return writeCache(orderDetailCache, orderId, mapOrder(data))
 }
 
 export async function loadSellerProducts(userId: string) {
   if (!hasSupabase) {
     return canUseDemoMode ? getSellerProductsDemo(userId) : []
+  }
+
+  const cached = readCache(sellerProductsCache, userId)
+  if (cached) {
+    return cached
   }
 
   const vendor = await loadVendorProfile(userId)
@@ -511,7 +726,11 @@ export async function loadSellerProducts(userId: string) {
 
   if (error || !data) return canUseDemoMode ? getSellerProductsDemo(userId) : []
 
-  return data.map((product) => mapProduct(product))
+  return writeCache(
+    sellerProductsCache,
+    userId,
+    data.map((product) => mapProduct(product))
+  )
 }
 
 export async function loadStoreAnalytics(userId: string): Promise<StoreAnalytics> {
@@ -521,17 +740,27 @@ export async function loadStoreAnalytics(userId: string): Promise<StoreAnalytics
       : { totalOrders: 0, totalRevenue: 0, averageRating: 0 }
   }
 
+  const cached = readCache(storeAnalyticsCache, userId)
+  if (cached) {
+    return cached
+  }
+
   const orders = await loadSellerOrders(userId)
-  return {
+  return writeCache(storeAnalyticsCache, userId, {
     totalOrders: orders.length,
     totalRevenue: orders.reduce((sum, order) => sum + order.totalAmount, 0),
     averageRating: orders[0]?.vendor?.rating ?? 0
-  }
+  })
 }
 
 export async function loadVendorProfile(userId: string) {
   if (!hasSupabase) {
     return canUseDemoMode ? getVendorByUserId(userId) : null
+  }
+
+  const cached = readCache(vendorProfileCache, userId)
+  if (cached !== null) {
+    return cached
   }
 
   const supabase = getSupabaseBrowserClient()
@@ -542,8 +771,10 @@ export async function loadVendorProfile(userId: string) {
     .eq("user_id", userId)
     .maybeSingle()
 
-  if (error || !data) return canUseDemoMode ? getVendorByUserId(userId) : null
-  return mapVendor(data)
+  if (error || !data) {
+    return cacheVendorProfile(canUseDemoMode ? getVendorByUserId(userId) : null, userId)
+  }
+  return cacheVendorProfile(mapVendor(data), userId)
 }
 
 export async function findOrCreateDemoUser(values: SignUpFormValues) {
@@ -569,6 +800,11 @@ export async function loadUserProfile(userId: string) {
     return canUseDemoMode ? getDemoUserById(userId) : null
   }
 
+  const cached = readCache(userProfileCache, userId)
+  if (cached !== null) {
+    return cached
+  }
+
   const supabase = getSupabaseBrowserClient()
   if (!supabase) return canUseDemoMode ? getDemoUserById(userId) : null
   const { data, error } = await supabase
@@ -577,8 +813,10 @@ export async function loadUserProfile(userId: string) {
     .eq("id", userId)
     .maybeSingle()
 
-  if (error || !data) return canUseDemoMode ? getDemoUserById(userId) : null
-  return mapUser(data)
+  if (error || !data) {
+    return cacheUserProfile(canUseDemoMode ? getDemoUserById(userId) : null, userId)
+  }
+  return cacheUserProfile(mapUser(data), userId)
 }
 
 export async function saveUserProfile(input: UserProfile) {
@@ -614,7 +852,7 @@ export async function saveUserProfile(input: UserProfile) {
     throw new Error(error?.message ?? "Unable to save profile")
   }
 
-  return mapUser(data)
+  return cacheUserProfile(mapUser(data), input.id)
 }
 
 export async function saveSellerProfile(
@@ -655,7 +893,14 @@ export async function saveSellerProfile(
     throw new Error(error?.message ?? "Unable to save seller profile")
   }
 
-  return mapVendor(data)
+  const vendor = mapVendor(data)
+  cacheVendorProfile(vendor, userId)
+  vendorDetailCache.delete(vendor.id)
+  sellerOrdersCache.delete(userId)
+  sellerProductsCache.delete(userId)
+  storeAnalyticsCache.delete(userId)
+  clearMarketplaceDiscoveryCaches()
+  return vendor
 }
 
 export async function saveProduct(input: ProductInput) {
@@ -715,7 +960,11 @@ export async function saveProduct(input: ProductInput) {
     throw new Error(response.error?.message ?? "Unable to save product")
   }
 
-  return mapProduct(response.data)
+  const product = mapProduct(response.data)
+  sellerProductsCache.clear()
+  vendorDetailCache.delete(input.vendorId)
+  clearMarketplaceDiscoveryCaches()
+  return product
 }
 
 export async function deleteProduct(productId: string) {
@@ -737,6 +986,9 @@ export async function deleteProduct(productId: string) {
   if (error) {
     throw new Error(error.message)
   }
+  sellerProductsCache.clear()
+  vendorDetailCache.clear()
+  clearMarketplaceDiscoveryCaches()
   return true
 }
 
@@ -799,6 +1051,11 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
     throw new Error("Unable to update order status")
   }
 
+  updateCachedOrderCollections(orderId, (order) => ({
+    ...order,
+    status
+  }))
+
   return response.json()
 }
 
@@ -838,6 +1095,9 @@ export async function saveReview(input: {
   if (error || !data) {
     throw new Error(error?.message ?? "Unable to save review")
   }
+
+  vendorDetailCache.delete(input.vendorId)
+  storeAnalyticsCache.clear()
 
   return data
 }

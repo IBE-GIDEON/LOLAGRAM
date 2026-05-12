@@ -667,7 +667,6 @@ export function ProfilePageClient() {
         onClick={async () => {
           if (profile.accountType === "buyer") {
             await upgradeAccountType("both")
-            await refreshProfile(profile.id)
             toast.success("Your account can now shop and sell.")
           } else {
             await signOut()

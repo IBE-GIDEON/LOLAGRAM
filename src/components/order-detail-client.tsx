@@ -27,12 +27,30 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    loadOrderDetail(orderId).then((nextOrder) => {
+    let ignore = false
+
+    async function hydrateOrder() {
+      const nextOrder = await loadOrderDetail(orderId)
+      if (ignore) return
+
       setOrder(nextOrder)
-      if (nextOrder?.vendorId) {
-        loadVendorDetail(nextOrder.vendorId).then(setVendorData)
+
+      if (!nextOrder?.vendorId) {
+        setVendorData(null)
+        return
       }
-    })
+
+      const nextVendorData = await loadVendorDetail(nextOrder.vendorId)
+      if (!ignore) {
+        setVendorData(nextVendorData)
+      }
+    }
+
+    void hydrateOrder()
+
+    return () => {
+      ignore = true
+    }
   }, [orderId])
 
   const canManage = profile && vendorProfile && order?.vendorId === vendorProfile.id
@@ -142,12 +160,24 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
               <Button
                 key={status}
                 onClick={async () => {
+                  const previousStatus = order.status
                   setBusy(true)
+                  setOrder((current) =>
+                    current ? { ...current, status } : current
+                  )
+
                   try {
                     await updateOrderStatus(order.id, status)
-                    const refreshed = await loadOrderDetail(orderId)
-                    setOrder(refreshed)
                     toast.success(`Order marked ${ORDER_STATUS_META[status].label}.`)
+                  } catch (error) {
+                    setOrder((current) =>
+                      current ? { ...current, status: previousStatus } : current
+                    )
+                    toast.error(
+                      error instanceof Error
+                        ? error.message
+                        : "Could not update this order."
+                    )
                   } finally {
                     setBusy(false)
                   }
@@ -200,9 +230,59 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
                   rating: reviewRating,
                   comment: reviewComment
                 })
+
+                const nextReview = {
+                  id: `review-${order.id}`,
+                  orderId: order.id,
+                  buyerId: profile.id,
+                  vendorId: order.vendorId,
+                  rating: reviewRating,
+                  comment: reviewComment,
+                  createdAt: new Date().toISOString(),
+                  buyerName: profile.fullName
+                }
+
+                setVendorData((current) => {
+                  if (!current) {
+                    const nextAverage = reviewRating
+                    const baseVendor = order.vendor
+                    if (!baseVendor) return current
+
+                    return {
+                      vendor: {
+                        ...baseVendor,
+                        rating: nextAverage
+                      },
+                      products: [],
+                      reviews: [nextReview],
+                      reviewCount: 1,
+                      averageRating: nextAverage
+                    }
+                  }
+
+                  const nextCount = current.reviewCount + 1
+                  const nextAverage =
+                    (current.averageRating * current.reviewCount + reviewRating) /
+                    nextCount
+
+                  return {
+                    ...current,
+                    vendor: {
+                      ...current.vendor,
+                      rating: nextAverage
+                    },
+                    reviews: [nextReview, ...current.reviews].slice(0, 5),
+                    reviewCount: nextCount,
+                    averageRating: nextAverage
+                  }
+                })
+
+                setReviewComment("")
                 toast.success("Thanks for the review.")
-                const refreshedVendor = await loadVendorDetail(order.vendorId)
-                setVendorData(refreshedVendor)
+              } catch (error) {
+                toast.error(
+                  error instanceof Error ? error.message : "Could not save review."
+                )
               } finally {
                 setBusy(false)
               }
