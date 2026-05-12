@@ -323,34 +323,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error("Supabase is not configured")
       }
 
-      const { data, error } = await supabase.auth.signUp({
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...values,
+          email: normalizedEmail
+        })
+      })
+
+      const result = (await response.json().catch(() => null)) as
+        | { error?: string; userId?: string }
+        | null
+
+      if (!response.ok) {
+        throw new Error(result?.error ?? "Unable to create account")
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
-        password: values.password,
-        options: {
-          emailRedirectTo: `${env.appUrl}/profile`,
-          data: {
-            full_name: values.fullName,
-            account_type: values.accountType,
-            phone: values.phone
-          }
-        }
+        password: values.password
       })
 
       if (error || !data.user) {
-        throw error ?? new Error("Unable to create account")
-      }
-
-      await supabase.from("users").upsert({
-        id: data.user.id,
-        email: normalizedEmail,
-        phone: values.phone,
-        full_name: values.fullName,
-        account_type: values.accountType
-      })
-
-      if (!data.session) {
-        toast.success("Account created. Check your email to confirm it, then sign in.")
-        return
+        throw error ?? new Error("Account created, but automatic sign in failed.")
       }
 
       setSessionUserId(data.user.id)
