@@ -43,7 +43,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
     let ignore = false
 
     async function hydrateOrder() {
-      const nextOrder = await loadOrderDetail(orderId)
+      const nextOrder = await loadOrderDetail(orderId, { fresh: true })
       if (ignore) return
 
       setOrder(nextOrder)

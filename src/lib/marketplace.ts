@@ -1221,15 +1221,20 @@ export async function loadVendorDetail(vendorId: string): Promise<VendorDetail |
   )
 }
 
-export async function loadBuyerOrders(userId: string): Promise<OrderDetail[]> {
+export async function loadBuyerOrders(
+  userId: string,
+  options: { fresh?: boolean } = {}
+): Promise<OrderDetail[]> {
   if (!hasSupabase) {
     return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
   }
 
   const cached =
-    readCache(buyerOrdersCache, userId) ??
-    readPersistedOrderList(persistedCacheKeys.buyerOrders(userId))
-  if (cached) {
+    options.fresh
+      ? null
+      : readCache(buyerOrdersCache, userId) ??
+        readPersistedOrderList(persistedCacheKeys.buyerOrders(userId))
+  if (cached !== null) {
     writeHybridCache(
       buyerOrdersCache,
       userId,
@@ -1265,15 +1270,20 @@ export async function loadBuyerOrders(userId: string): Promise<OrderDetail[]> {
   )
 }
 
-export async function loadSellerOrders(userId: string): Promise<OrderDetail[]> {
+export async function loadSellerOrders(
+  userId: string,
+  options: { fresh?: boolean } = {}
+): Promise<OrderDetail[]> {
   if (!hasSupabase) {
     return canUseDemoMode ? getSellerOrdersDemo(userId) : []
   }
 
   const cached =
-    readCache(sellerOrdersCache, userId) ??
-    readPersistedOrderList(persistedCacheKeys.sellerOrders(userId))
-  if (cached) {
+    options.fresh
+      ? null
+      : readCache(sellerOrdersCache, userId) ??
+        readPersistedOrderList(persistedCacheKeys.sellerOrders(userId))
+  if (cached !== null) {
     writeHybridCache(
       sellerOrdersCache,
       userId,
@@ -1313,17 +1323,22 @@ export async function loadSellerOrders(userId: string): Promise<OrderDetail[]> {
   )
 }
 
-export async function loadOrderDetail(orderId: string) {
+export async function loadOrderDetail(
+  orderId: string,
+  options: { fresh?: boolean } = {}
+) {
   if (!hasSupabase) {
     return canUseDemoMode ? getOrderByIdDemo(orderId) : null
   }
 
   const cached =
-    readCache(orderDetailCache, orderId) ??
-    normalizeCachedOrder(
-      readPersistedCache<OrderDetail>(persistedCacheKeys.orderDetail(orderId))
-    )
-  if (cached) {
+    options.fresh
+      ? null
+      : readCache(orderDetailCache, orderId) ??
+        normalizeCachedOrder(
+          readPersistedCache<OrderDetail>(persistedCacheKeys.orderDetail(orderId))
+        )
+  if (cached !== null) {
     writeHybridCache(
       orderDetailCache,
       orderId,

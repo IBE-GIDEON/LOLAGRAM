@@ -61,8 +61,8 @@ export function OrdersPageClient() {
     setFetching(true)
     const request =
       mode === "store" && vendorProfile
-        ? loadSellerOrders(profile.id)
-        : loadBuyerOrders(profile.id)
+        ? loadSellerOrders(profile.id, { fresh: true })
+        : loadBuyerOrders(profile.id, { fresh: true })
 
     request
       .then((nextOrders) => {
@@ -76,7 +76,9 @@ export function OrdersPageClient() {
       })
 
     if (vendorProfile) {
-      void (mode === "store" ? loadBuyerOrders(profile.id) : loadSellerOrders(profile.id))
+      void (mode === "store"
+        ? loadBuyerOrders(profile.id, { fresh: true })
+        : loadSellerOrders(profile.id, { fresh: true }))
     }
 
     return () => {

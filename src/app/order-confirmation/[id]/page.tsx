@@ -21,7 +21,7 @@ export default function OrderConfirmationPage({
   const [order, setOrder] = useState<OrderDetail | null>(null)
 
   useEffect(() => {
-    loadOrderDetail(params.id).then(setOrder)
+    loadOrderDetail(params.id, { fresh: true }).then(setOrder)
   }, [params.id])
 
   const orderStatusMeta = order ? getOrderStatusMeta(order.status) : null
