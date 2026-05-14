@@ -22,7 +22,7 @@ import {
   updateOrderStatusDemo,
   upsertDemoUser
 } from "@/lib/demo-store"
-import { canUseDemoMode, env, hasSupabase } from "@/lib/env"
+import { canUseDemoMode, hasSupabase } from "@/lib/env"
 import {
   normalizeProductPhotoUrls,
   serializeLegacyPhotoUrl
@@ -34,7 +34,9 @@ import {
   type MarketplaceSearchResults,
   type OrderDetail,
   type OrderStatus,
-  type PaystackInitializeResponse,
+  type PaymentMethod,
+  type PaymentStatus,
+  type PlaceOrderResponse,
   type ProductInput,
    type ProductSearchResult,
   type SellerProfileInput,
@@ -68,6 +70,10 @@ function mapVendor(row: Record<string, unknown>): VendorProfile {
     category: String(row.category) as VendorProfile["category"],
     city: String(row.city),
     whatsappNumber: String(row.whatsapp_number),
+    bankName: row.bank_name ? String(row.bank_name) : undefined,
+    accountName: row.account_name ? String(row.account_name) : undefined,
+    accountNumber: row.account_number ? String(row.account_number) : undefined,
+    paymentNote: row.payment_note ? String(row.payment_note) : undefined,
     isActive: Boolean(row.is_active),
     totalSales: Number(row.total_sales ?? 0),
     rating: Number(row.rating ?? 0),
@@ -110,8 +116,8 @@ function getLaunchConfigError(feature: string) {
   return `${feature} needs live Supabase configuration before launch.`
 }
 
-function getPaymentsConfigError() {
-  return "Checkout needs live Paystack and Supabase configuration before launch."
+function getOrderPlacementError() {
+  return "Order placement needs live Supabase configuration before launch."
 }
 
 const CACHE_TTL_MS = 20_000
@@ -369,6 +375,17 @@ function mapOrder(row: Record<string, unknown>, vendor?: VendorProfile): OrderDe
       ? mapVendor(row.vendor_profiles as Record<string, unknown>)
       : undefined)
 
+  const paymentMethod = (
+    row.payment_method ? String(row.payment_method) : "pay_on_delivery"
+  ) as PaymentMethod
+  const paymentStatus = (
+    row.payment_status
+      ? String(row.payment_status)
+      : paymentMethod === "vendor_transfer"
+        ? "awaiting_seller_confirmation"
+        : "pay_on_delivery"
+  ) as PaymentStatus
+
   return {
     id: String(row.id),
     buyerId: String(row.buyer_id),
@@ -376,8 +393,13 @@ function mapOrder(row: Record<string, unknown>, vendor?: VendorProfile): OrderDe
     items: (row.items ?? []) as OrderDetail["items"],
     totalAmount: Number(row.total_amount ?? 0),
     status: String(row.status) as OrderStatus,
-    paystackReference: row.paystack_reference
-      ? String(row.paystack_reference)
+    paymentMethod,
+    paymentStatus,
+    paymentReference: (row.payment_reference ?? row.paystack_reference)
+      ? String(row.payment_reference ?? row.paystack_reference)
+      : undefined,
+    buyerPaymentNote: row.buyer_payment_note
+      ? String(row.buyer_payment_note)
       : undefined,
     deliveryAddress: String(row.delivery_address ?? ""),
     createdAt: String(row.created_at ?? new Date().toISOString()),
@@ -1326,12 +1348,25 @@ export async function saveSellerProfile(
       bio: input.bio,
       city: input.city,
       whatsapp_number: input.whatsappNumber,
+      bank_name: input.bankName,
+      account_name: input.accountName,
+      account_number: input.accountNumber,
+      payment_note: input.paymentNote,
       is_active: true
     })
     .select()
     .single()
 
   if (error || !data) {
+    const message = error?.message?.toLowerCase() ?? ""
+    if (
+      message.includes("bank_name") ||
+      message.includes("account_name") ||
+      message.includes("account_number") ||
+      message.includes("payment_note")
+    ) {
+      throw new Error("Run the latest Supabase seller-payment SQL patch, then try again.")
+    }
     throw new Error(error?.message ?? "Unable to save seller profile")
   }
 
@@ -1444,9 +1479,9 @@ export async function deleteProduct(productId: string) {
   return true
 }
 
-export async function startCheckout(
+export async function placeOrder(
   payload: CheckoutPayload
-): Promise<PaystackInitializeResponse> {
+): Promise<PlaceOrderResponse> {
   if (!hasSupabase) {
     if (canUseDemoMode) {
       const order = createOrderDemo({
@@ -1455,21 +1490,24 @@ export async function startCheckout(
         items: payload.items,
         totalAmount: payload.totalAmount,
         status: "pending",
-        paystackReference: createId("paystack"),
+        paymentMethod: payload.paymentMethod,
+        paymentStatus:
+          payload.paymentMethod === "vendor_transfer"
+            ? "awaiting_seller_confirmation"
+            : "pay_on_delivery",
+        buyerPaymentNote: payload.buyerPaymentNote,
         deliveryAddress: payload.deliveryAddress
       })
 
       return {
-        checkoutUrl: `${env.appUrl}/order-confirmation/${order.id}`,
-        orderId: order.id,
-        reference: order.paystackReference ?? createId("ref")
+        orderId: order.id
       }
     }
 
-    throw new Error(getPaymentsConfigError())
+    throw new Error(getOrderPlacementError())
   }
 
-  const response = await fetch("/api/paystack/initialize", {
+  const response = await fetch("/api/orders", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -1479,16 +1517,19 @@ export async function startCheckout(
     const data = (await response.json().catch(() => null)) as
       | { error?: string }
       | null
-    throw new Error(data?.error ?? "Unable to start checkout")
+    throw new Error(data?.error ?? "Unable to place order")
   }
 
-  return (await response.json()) as PaystackInitializeResponse
+  return (await response.json()) as PlaceOrderResponse
 }
 
-export async function updateOrderStatus(orderId: string, status: OrderStatus) {
+export async function updateOrderStatus(
+  orderId: string,
+  updates: { status?: OrderStatus; paymentStatus?: PaymentStatus }
+) {
   if (!hasSupabase) {
     if (canUseDemoMode) {
-      return updateOrderStatusDemo(orderId, status)
+      return updateOrderStatusDemo(orderId, updates)
     }
     throw new Error(getLaunchConfigError("Order status updates"))
   }
@@ -1496,7 +1537,7 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
   const response = await fetch(`/api/orders/${orderId}/status`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status })
+    body: JSON.stringify(updates)
   })
 
   if (!response.ok) {
@@ -1505,7 +1546,8 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
 
   updateCachedOrderCollections(orderId, (order) => ({
     ...order,
-    status
+    ...(updates.status ? { status: updates.status } : {}),
+    ...(updates.paymentStatus ? { paymentStatus: updates.paymentStatus } : {})
   }))
 
   return response.json()

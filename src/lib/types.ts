@@ -16,6 +16,12 @@ export type OrderStatus =
   | "cancelled"
 
 export type OrderArchiveActor = "buyer" | "seller"
+export type PaymentMethod = "pay_on_delivery" | "vendor_transfer"
+export type PaymentStatus =
+  | "awaiting_seller_confirmation"
+  | "pay_on_delivery"
+  | "awaiting_vendor_payment"
+  | "paid_to_vendor"
 
 export interface UserProfile {
   id: string
@@ -36,6 +42,10 @@ export interface VendorProfile {
   category: VendorCategory
   city: string
   whatsappNumber: string
+  bankName?: string
+  accountName?: string
+  accountNumber?: string
+  paymentNote?: string
   isActive: boolean
   totalSales: number
   rating: number
@@ -68,7 +78,10 @@ export interface Order {
   items: OrderItem[]
   totalAmount: number
   status: OrderStatus
-  paystackReference?: string
+  paymentMethod: PaymentMethod
+  paymentStatus: PaymentStatus
+  paymentReference?: string
+  buyerPaymentNote?: string
   deliveryAddress: string
   createdAt: string
 }
@@ -159,6 +172,10 @@ export interface SellerProfileInput {
   bio: string
   city: string
   whatsappNumber: string
+  bankName?: string
+  accountName?: string
+  accountNumber?: string
+  paymentNote?: string
 }
 
 export interface ProductInput {
@@ -178,12 +195,12 @@ export interface CheckoutPayload {
   items: OrderItem[]
   totalAmount: number
   deliveryAddress: string
+  paymentMethod: PaymentMethod
+  buyerPaymentNote?: string
 }
 
-export interface PaystackInitializeResponse {
-  checkoutUrl: string
+export interface PlaceOrderResponse {
   orderId: string
-  reference: string
 }
 
 export interface AuthSessionState {

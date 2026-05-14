@@ -3,8 +3,12 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 
-import { Button, Card, SectionHeading } from "@/components/ui"
-import { ORDER_STATUS_META } from "@/lib/constants"
+import { Card, SectionHeading } from "@/components/ui"
+import {
+  ORDER_STATUS_META,
+  PAYMENT_METHOD_META,
+  PAYMENT_STATUS_META
+} from "@/lib/constants"
 import { formatCurrency } from "@/lib/format"
 import { loadOrderDetail } from "@/lib/marketplace"
 import { type OrderDetail } from "@/lib/types"
@@ -26,8 +30,8 @@ export default function OrderConfirmationPage({
       <Card className="p-6 text-center">
         <p className="text-2xl font-bold text-ink">Your order is in</p>
         <p className="mt-2 text-sm leading-6 text-muted">
-          LOLAGRAM has your order and your seller will receive a notification right
-          away.
+          Your seller will receive this order right away and confirm the next step
+          from their store dashboard.
         </p>
         {order ? (
           <div className="mt-5 space-y-3 rounded-[24px] bg-canvas p-4 text-left">
@@ -47,20 +51,37 @@ export default function OrderConfirmationPage({
                 {formatCurrency(order.totalAmount)}
               </span>
             </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted">Payment method</span>
+              <span className="font-semibold text-ink">
+                {PAYMENT_METHOD_META[order.paymentMethod].label}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted">Payment status</span>
+              <span className="font-semibold text-ink">
+                {PAYMENT_STATUS_META[order.paymentStatus].label}
+              </span>
+            </div>
+            <p className="rounded-2xl bg-surface px-4 py-3 text-sm leading-6 text-muted">
+              {order.paymentMethod === "vendor_transfer"
+                ? "Wait for the seller to confirm the order first. Once they do, you will see their direct payment details inside the order."
+                : "This order is set to pay on delivery. Inspect it first, then pay when it arrives."}
+            </p>
           </div>
         ) : null}
         <div className="mt-5 grid grid-cols-2 gap-3">
           <Link
-            href="/orders"
+            href={order ? `/orders/${order.id}` : "/orders"}
             className="inline-flex items-center justify-center rounded-full bg-chrome px-4 py-3 text-sm font-semibold text-white"
           >
-            View orders
+            Open order
           </Link>
           <Link
-            href="/"
+            href="/orders"
             className="inline-flex items-center justify-center rounded-full border border-border bg-surface px-4 py-3 text-sm font-semibold text-ink"
           >
-            Back home
+            All orders
           </Link>
         </div>
       </Card>

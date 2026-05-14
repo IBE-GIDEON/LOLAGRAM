@@ -35,6 +35,10 @@ create table if not exists public.vendor_profiles (
   category public.vendor_category not null default 'other',
   city text not null,
   whatsapp_number text not null,
+  bank_name text,
+  account_name text,
+  account_number text,
+  payment_note text,
   is_active boolean not null default true,
   total_sales integer not null default 0,
   rating double precision not null default 0,
@@ -45,6 +49,10 @@ create table if not exists public.vendor_profiles (
 alter table public.vendor_profiles drop column if exists search_text;
 alter table public.vendor_profiles
 add column if not exists search_text tsvector not null default ''::tsvector;
+alter table public.vendor_profiles add column if not exists bank_name text;
+alter table public.vendor_profiles add column if not exists account_name text;
+alter table public.vendor_profiles add column if not exists account_number text;
+alter table public.vendor_profiles add column if not exists payment_note text;
 
 create unique index if not exists vendor_profiles_user_id_key on public.vendor_profiles(user_id);
 create index if not exists vendor_profiles_recent_idx on public.vendor_profiles (created_at desc);
@@ -83,6 +91,10 @@ create table if not exists public.orders (
   items jsonb not null default '[]'::jsonb,
   total_amount numeric(12, 2) not null,
   status public.order_status not null default 'pending',
+  payment_method text not null default 'pay_on_delivery',
+  payment_status text not null default 'pay_on_delivery',
+  payment_reference text,
+  buyer_payment_note text,
   paystack_reference text,
   delivery_address text not null,
   created_at timestamptz not null default now()
@@ -93,6 +105,10 @@ add column if not exists buyer_hidden_at timestamptz;
 
 alter table public.orders
 add column if not exists seller_hidden_at timestamptz;
+alter table public.orders add column if not exists payment_method text not null default 'pay_on_delivery';
+alter table public.orders add column if not exists payment_status text not null default 'pay_on_delivery';
+alter table public.orders add column if not exists payment_reference text;
+alter table public.orders add column if not exists buyer_payment_note text;
 
 create index if not exists orders_buyer_idx on public.orders (buyer_id, created_at desc);
 create index if not exists orders_vendor_idx on public.orders (vendor_id, created_at desc);

@@ -10,6 +10,7 @@ import {
   type Order,
   type OrderDetail,
   type OrderStatus,
+  type PaymentStatus,
   type Product,
   type ProductInput,
   type ProductSearchResult,
@@ -270,6 +271,10 @@ export function saveSellerProfileDemo(userId: string, input: SellerProfileInput)
       existing.bio = input.bio
       existing.city = input.city
       existing.whatsappNumber = input.whatsappNumber
+      existing.bankName = input.bankName
+      existing.accountName = input.accountName
+      existing.accountNumber = input.accountNumber
+      existing.paymentNote = input.paymentNote
       existing.isActive = true
       return existing
     }
@@ -283,6 +288,10 @@ export function saveSellerProfileDemo(userId: string, input: SellerProfileInput)
       category: input.category,
       city: input.city,
       whatsappNumber: input.whatsappNumber,
+      bankName: input.bankName,
+      accountName: input.accountName,
+      accountNumber: input.accountNumber,
+      paymentNote: input.paymentNote,
       isActive: true,
       totalSales: 0,
       rating: 0,
@@ -390,16 +399,25 @@ export function createOrderDemo(order: Omit<Order, "id" | "createdAt">): Order {
   })
 }
 
-export function updateOrderStatusDemo(orderId: string, status: OrderStatus) {
+export function updateOrderStatusDemo(
+  orderId: string,
+  updates: { status?: OrderStatus; paymentStatus?: PaymentStatus }
+) {
   return withState((state) => {
     const order = state.orders.find((item) => item.id === orderId)
     if (!order) {
       throw new Error("Order not found")
     }
 
-    order.status = status
+    if (updates.status) {
+      order.status = updates.status
+    }
 
-    if (status === "delivered") {
+    if (updates.paymentStatus) {
+      order.paymentStatus = updates.paymentStatus
+    }
+
+    if (updates.status === "delivered") {
       const vendor = state.vendors.find((item) => item.id === order.vendorId)
       if (vendor) {
         vendor.totalSales += order.totalAmount

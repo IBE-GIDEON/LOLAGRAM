@@ -21,11 +21,27 @@ export async function POST(request: Request) {
     items: payload.items,
     total_amount: payload.totalAmount,
     delivery_address: payload.deliveryAddress,
+    payment_method: payload.paymentMethod,
+    payment_status:
+      payload.paymentMethod === "vendor_transfer"
+        ? "awaiting_seller_confirmation"
+        : "pay_on_delivery",
+    buyer_payment_note: payload.buyerPaymentNote ?? null,
     status: "pending",
-    paystack_reference: "offline-sync"
   })
 
   if (error) {
+    const message = error.message.toLowerCase()
+    if (
+      message.includes("payment_method") ||
+      message.includes("payment_status") ||
+      message.includes("buyer_payment_note")
+    ) {
+      return NextResponse.json(
+        { error: "Run the latest Supabase order-payment SQL patch, then sync again." },
+        { status: 500 }
+      )
+    }
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 

@@ -1,17 +1,17 @@
 # LOLAGRAM
 
-LOLAGRAM is a mobile-first Nigerian marketplace built with Next.js 14, TypeScript, Tailwind CSS, Supabase, Paystack, and Web Push. It is designed to feel like WhatsApp on the vendor discovery side, with premium Instagram-style store pages and seller tooling in the same app.
+LOLAGRAM is a mobile-first Nigerian marketplace built with Next.js 14, TypeScript, Tailwind CSS, Supabase, and Web Push. It is designed to feel like WhatsApp on the vendor discovery side, with premium Instagram-style store pages and seller tooling in the same app.
 
 ## Features
 
 - WhatsApp-style vendor discovery feed with search and pagination
 - Single app for buyers and sellers with role switching
 - Email-plus-password auth with required phone number for buyer and seller profiles
-- Vendor store pages with product grid, cart, checkout CTA, and reviews
+- Vendor store pages with product grid, order-first cart flow, and reviews
 - Buyer and seller orders views
 - Seller onboarding and product management
 - PWA manifest, install prompt support, service worker, offline banner, and order sync queue
-- Paystack initialization and webhook route handlers
+- Direct-to-vendor payment flow with optional pay-on-delivery
 - Supabase schema and Row Level Security policies
 
 ## Setup
@@ -23,7 +23,7 @@ npm install
 ```
 
 2. Create `.env.local` from `.env.example`.
-3. Add your Supabase, Paystack, and VAPID credentials.
+3. Add your Supabase and VAPID credentials.
 4. Run the app:
 
 ```bash
@@ -40,7 +40,7 @@ Use [PRODUCTION-LAUNCH.md](/C:/Users/HOME%20PC/Documents/LOLAGRAM/PRODUCTION-LAU
 
 - live environment variables
 - email/password auth setup with required phone collection
-- Paystack webhook and production payments
+- vendor-direct payment details and pay-on-delivery setup
 - storage and multi-image product uploads
 - push notifications
 - launch checks for the first 500 users

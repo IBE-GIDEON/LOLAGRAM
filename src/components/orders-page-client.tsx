@@ -6,7 +6,7 @@ import toast from "react-hot-toast"
 
 import { useAuth } from "@/components/providers/auth-provider"
 import { Badge, Button, Card, SectionHeading } from "@/components/ui"
-import { ORDER_STATUS_META } from "@/lib/constants"
+import { ORDER_STATUS_META, PAYMENT_METHOD_META, PAYMENT_STATUS_META } from "@/lib/constants"
 import { formatCurrency, formatDate } from "@/lib/format"
 import {
   archiveCompletedOrder,
@@ -142,8 +142,8 @@ export function OrdersPageClient() {
           <p className="text-lg font-semibold text-ink">No orders yet</p>
           <p className="mt-2 text-sm text-muted">
             {mode === "store"
-              ? "Incoming store orders will appear here as soon as buyers checkout."
-              : "Your first checkout will show up here with a live status timeline."}
+              ? "Incoming store orders will appear here as soon as buyers place orders."
+              : "Your first order will show up here with payment details and a live status timeline."}
           </p>
         </Card>
       ) : (
@@ -159,6 +159,10 @@ export function OrdersPageClient() {
                         : order.vendor?.storeName ?? "Vendor order"}
                     </p>
                     <p className="mt-1 text-sm text-muted">{formatDate(order.createdAt)}</p>
+                    <p className="mt-2 text-xs leading-5 text-muted">
+                      {PAYMENT_METHOD_META[order.paymentMethod].label} ·{" "}
+                      {PAYMENT_STATUS_META[order.paymentStatus].label}
+                    </p>
                     <p className="mt-2 text-base font-bold text-brand">
                       {formatCurrency(order.totalAmount)}
                     </p>

@@ -7,7 +7,11 @@ import { FiMessageCircle } from "react-icons/fi"
 
 import { useAuth } from "@/components/providers/auth-provider"
 import { Badge, Button, Card, SectionHeading } from "@/components/ui"
-import { ORDER_STATUS_META } from "@/lib/constants"
+import {
+  ORDER_STATUS_META,
+  PAYMENT_METHOD_META,
+  PAYMENT_STATUS_META
+} from "@/lib/constants"
 import { formatCurrency, formatDateTime } from "@/lib/format"
 import {
   archiveCompletedOrder,
@@ -20,15 +24,11 @@ import {
   type OrderArchiveActor,
   type OrderDetail,
   type OrderStatus,
+  type PaymentStatus,
   type VendorDetail
 } from "@/lib/types"
 
-const statusSteps: OrderStatus[] = [
-  "pending",
-  "confirmed",
-  "dispatched",
-  "delivered"
-]
+const statusSteps: OrderStatus[] = ["pending", "confirmed", "dispatched", "delivered"]
 
 export function OrderDetailClient({ orderId }: { orderId: string }) {
   const { profile, vendorProfile } = useAuth()
@@ -48,13 +48,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
 
       setOrder(nextOrder)
 
-      if (!nextOrder?.vendorId) {
-        setVendorData(null)
-        return
-      }
-
-      const isBuyerViewer = profile?.id === nextOrder.buyerId
-      if (!isBuyerViewer) {
+      if (!nextOrder?.vendorId || profile?.id !== nextOrder.buyerId) {
         setVendorData(null)
         return
       }
@@ -74,12 +68,11 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
 
   const isSellerViewer = Boolean(profile && vendorProfile && order?.vendorId === vendorProfile.id)
   const isBuyerViewer = Boolean(profile && order?.buyerId === profile.id)
-  const canManage = isSellerViewer
   const canReview =
     isBuyerViewer &&
     order?.status === "delivered" &&
     !vendorData?.reviews.some((review) => review.orderId === order?.id)
-  const archiveActor: OrderArchiveActor | null = canManage
+  const archiveActor: OrderArchiveActor | null = isSellerViewer
     ? "seller"
     : isBuyerViewer
       ? "buyer"
@@ -88,24 +81,82 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
     Boolean(archiveActor) &&
     (order?.status === "delivered" || order?.status === "cancelled")
 
-  const nextActions = useMemo(() => {
-    if (!order) return []
-    if (order.status === "pending") return ["confirmed"] as OrderStatus[]
-    if (order.status === "confirmed") return ["dispatched"] as OrderStatus[]
-    if (order.status === "dispatched") return ["delivered"] as OrderStatus[]
-    return []
-  }, [order])
-
   if (!order) {
     return <div className="p-4 text-sm text-muted">Loading order...</div>
   }
 
-  const vendorName = vendorData?.vendor.storeName ?? order.vendor?.storeName ?? "Vendor"
-  const whatsappNumber = vendorData?.vendor.whatsappNumber
+  const activeVendor = vendorData?.vendor ?? order.vendor
+  const vendorName = activeVendor?.storeName ?? "Vendor"
+  const whatsappNumber = activeVendor?.whatsappNumber
   const orderCounterpartyTitle = isSellerViewer ? "Store order" : vendorName
   const orderCounterpartyMeta = isSellerViewer
-    ? "Update this order as you confirm, dispatch, and deliver it."
-    : "Track every update from this seller in one place."
+    ? "Confirm, collect payment if needed, then dispatch and deliver."
+    : "Track seller updates and payment instructions in one place."
+  const paymentMethodMeta = PAYMENT_METHOD_META[order.paymentMethod]
+  const paymentStatusMeta = PAYMENT_STATUS_META[order.paymentStatus]
+  const vendorTransferReady = Boolean(
+    activeVendor?.bankName && activeVendor?.accountName && activeVendor?.accountNumber
+  )
+
+  const sellerCanConfirm = isSellerViewer && order.status === "pending"
+  const sellerCanReject = isSellerViewer && order.status === "pending"
+  const sellerCanMarkPaid =
+    isSellerViewer &&
+    order.paymentMethod === "vendor_transfer" &&
+    order.status === "confirmed" &&
+    order.paymentStatus !== "paid_to_vendor"
+  const sellerCanDispatch =
+    isSellerViewer &&
+    order.status === "confirmed" &&
+    (order.paymentMethod === "pay_on_delivery" || order.paymentStatus === "paid_to_vendor")
+  const sellerCanDeliver = isSellerViewer && order.status === "dispatched"
+
+  const applyOrderUpdate = async (
+    updates: { status?: OrderStatus; paymentStatus?: PaymentStatus },
+    successMessage: string
+  ) => {
+    const previousOrder = order
+    setBusy(true)
+    setOrder((current) => (current ? { ...current, ...updates } : current))
+
+    try {
+      await updateOrderStatus(order.id, updates)
+      toast.success(successMessage)
+    } catch (error) {
+      setOrder(previousOrder)
+      toast.error(
+        error instanceof Error ? error.message : "Could not update this order."
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const sellerProgressMessage = useMemo(() => {
+    if (!isSellerViewer) {
+      return null
+    }
+
+    if (order.status === "cancelled") {
+      return "This order is cancelled."
+    }
+
+    if (order.status === "delivered") {
+      return "This order is already delivered."
+    }
+
+    if (order.paymentMethod === "vendor_transfer" && order.status === "confirmed") {
+      return order.paymentStatus === "paid_to_vendor"
+        ? "Direct payment is confirmed. You can dispatch the order now."
+        : "Wait for the buyer to pay you directly, then mark payment received."
+    }
+
+    if (order.status === "dispatched") {
+      return "The order is already on the way to the buyer."
+    }
+
+    return "Only your store can move this order forward. Buyers just see the updates."
+  }, [isSellerViewer, order])
 
   return (
     <div className="space-y-4 p-4 pb-safe-nav">
@@ -140,17 +191,13 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
         </div>
 
         <div className="mt-5 rounded-2xl bg-canvas p-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-muted">
-            Delivery Address
-          </p>
+          <p className="text-xs uppercase tracking-[0.18em] text-muted">Delivery Address</p>
           <p className="mt-2 text-sm leading-6 text-ink">{order.deliveryAddress}</p>
         </div>
 
         <div className="mt-5 flex items-center justify-between">
           <p className="text-sm text-muted">Total</p>
-          <p className="text-xl font-bold text-brand">
-            {formatCurrency(order.totalAmount)}
-          </p>
+          <p className="text-xl font-bold text-brand">{formatCurrency(order.totalAmount)}</p>
         </div>
 
         {isBuyerViewer && whatsappNumber ? (
@@ -161,9 +208,70 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
             className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full border border-whatsapp/25 bg-surface px-4 py-3 text-sm font-semibold text-whatsapp"
           >
             <FiMessageCircle />
-            Vendor WhatsApp
+            Chat Seller on WhatsApp
           </a>
         ) : null}
+      </Card>
+
+      <Card className="p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge className="bg-canvas text-ink">{paymentMethodMeta.label}</Badge>
+          <Badge className={paymentStatusMeta.className}>{paymentStatusMeta.label}</Badge>
+        </div>
+        <p className="mt-3 text-sm leading-6 text-muted">{paymentStatusMeta.helper}</p>
+
+        {isBuyerViewer ? (
+          <div className="mt-4 rounded-2xl bg-canvas p-4">
+            {order.paymentMethod === "pay_on_delivery" ? (
+              <p className="text-sm leading-6 text-ink">
+                This seller will collect cash or transfer when the order arrives.
+                Inspect it first before paying.
+              </p>
+            ) : order.paymentStatus === "awaiting_seller_confirmation" ? (
+              <p className="text-sm leading-6 text-ink">
+                Wait for the seller to confirm this order first. Once they do,
+                their direct payment details will show here.
+              </p>
+            ) : vendorTransferReady ? (
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted">Bank</span>
+                  <span className="font-semibold text-ink">{activeVendor?.bankName}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted">Account name</span>
+                  <span className="font-semibold text-ink">{activeVendor?.accountName}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted">Account number</span>
+                  <span className="font-semibold text-ink">{activeVendor?.accountNumber}</span>
+                </div>
+                {activeVendor?.paymentNote ? (
+                  <p className="mt-3 rounded-2xl bg-surface px-4 py-3 text-sm leading-6 text-muted">
+                    {activeVendor.paymentNote}
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-sm leading-6 text-ink">
+                This seller has not added bank details yet. Use WhatsApp to agree on
+                how you will complete direct payment.
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="mt-4 rounded-2xl bg-canvas p-4">
+            <p className="text-sm leading-6 text-ink">
+              {order.paymentMethod === "pay_on_delivery"
+                ? "The buyer will pay when the order arrives."
+                : order.paymentStatus === "paid_to_vendor"
+                  ? "You already marked the buyer's direct payment as received."
+                  : order.status === "pending"
+                    ? "Confirm this order first so the buyer can see your direct payment instructions."
+                    : "Wait for the buyer's transfer, then mark payment received."}
+            </p>
+          </div>
+        )}
       </Card>
 
       {isBuyerViewer ? (
@@ -178,9 +286,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
               return (
                 <div key={status} className="flex items-center gap-3">
                   <div
-                    className={`h-3 w-3 rounded-full ${
-                      reached ? "bg-brand" : "bg-border"
-                    }`}
+                    className={`h-3 w-3 rounded-full ${reached ? "bg-brand" : "bg-border"}`}
                   />
                   <p className={reached ? "font-medium text-ink" : "text-muted"}>
                     {ORDER_STATUS_META[status].label}
@@ -195,52 +301,81 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
       {isSellerViewer ? (
         <Card className="p-4">
           <p className="text-sm font-semibold text-ink">Fulfil this order</p>
-          <p className="mt-2 text-sm leading-6 text-muted">
-            Only your store can move this order forward. Buyers just see the updates.
-          </p>
-          {nextActions.length > 0 ? (
-            <div className="mt-4 flex flex-wrap gap-3">
-              {nextActions.map((status) => (
-                <Button
-                  key={status}
-                  onClick={async () => {
-                    const previousStatus = order.status
-                    setBusy(true)
-                    setOrder((current) =>
-                      current ? { ...current, status } : current
-                    )
+          <p className="mt-2 text-sm leading-6 text-muted">{sellerProgressMessage}</p>
 
-                    try {
-                      await updateOrderStatus(order.id, status)
-                      toast.success(`Order marked ${ORDER_STATUS_META[status].label}.`)
-                    } catch (error) {
-                      setOrder((current) =>
-                        current ? { ...current, status: previousStatus } : current
-                      )
-                      toast.error(
-                        error instanceof Error
-                          ? error.message
-                          : "Could not update this order."
-                      )
-                    } finally {
-                      setBusy(false)
-                    }
-                  }}
-                  disabled={busy}
-                >
-                  {status === "confirmed"
-                    ? "Confirm Order"
-                    : status === "dispatched"
-                      ? "Mark Dispatched"
-                      : "Mark Delivered"}
-                </Button>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-4 rounded-2xl bg-canvas px-4 py-3 text-sm text-muted">
-              This order is already {ORDER_STATUS_META[order.status].label.toLowerCase()}.
-            </p>
-          )}
+          <div className="mt-4 flex flex-wrap gap-3">
+            {sellerCanConfirm ? (
+              <Button
+                disabled={busy}
+                onClick={() =>
+                  applyOrderUpdate(
+                    {
+                      status: "confirmed",
+                      paymentStatus:
+                        order.paymentMethod === "vendor_transfer"
+                          ? "awaiting_vendor_payment"
+                          : "pay_on_delivery"
+                    },
+                    order.paymentMethod === "vendor_transfer"
+                      ? "Order confirmed. Buyer can now pay you directly."
+                      : "Order confirmed."
+                  )
+                }
+              >
+                Confirm Order
+              </Button>
+            ) : null}
+
+            {sellerCanReject ? (
+              <Button
+                variant="outline"
+                className="border-rose-200 text-rose-700 hover:border-rose-300 hover:text-rose-800"
+                disabled={busy}
+                onClick={() =>
+                  applyOrderUpdate({ status: "cancelled" }, "Order cancelled.")
+                }
+              >
+                Reject Order
+              </Button>
+            ) : null}
+
+            {sellerCanMarkPaid ? (
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() =>
+                  applyOrderUpdate(
+                    { paymentStatus: "paid_to_vendor" },
+                    "Direct payment marked as received."
+                  )
+                }
+              >
+                Mark Payment Received
+              </Button>
+            ) : null}
+
+            {sellerCanDispatch ? (
+              <Button
+                disabled={busy}
+                onClick={() =>
+                  applyOrderUpdate({ status: "dispatched" }, "Order marked dispatched.")
+                }
+              >
+                Mark Dispatched
+              </Button>
+            ) : null}
+
+            {sellerCanDeliver ? (
+              <Button
+                disabled={busy}
+                onClick={() =>
+                  applyOrderUpdate({ status: "delivered" }, "Order marked delivered.")
+                }
+              >
+                Mark Delivered
+              </Button>
+            ) : null}
+          </div>
         </Card>
       ) : null}
 
@@ -312,8 +447,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
 
                   const nextCount = current.reviewCount + 1
                   const nextAverage =
-                    (current.averageRating * current.reviewCount + reviewRating) /
-                    nextCount
+                    (current.averageRating * current.reviewCount + reviewRating) / nextCount
 
                   return {
                     ...current,
@@ -330,9 +464,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
                 setReviewComment("")
                 toast.success("Thanks for the review.")
               } catch (error) {
-                toast.error(
-                  error instanceof Error ? error.message : "Could not save review."
-                )
+                toast.error(error instanceof Error ? error.message : "Could not save review.")
               } finally {
                 setBusy(false)
               }
@@ -357,18 +489,12 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
             className="mt-4 w-full"
             disabled={busy}
             onClick={async () => {
-              const confirmed = window.confirm(
-                "Remove this completed order from your history?"
-              )
+              const confirmed = window.confirm("Remove this completed order from your history?")
               if (!confirmed) return
 
               setBusy(true)
               try {
-                const result = await archiveCompletedOrder(
-                  order.id,
-                  archiveActor!,
-                  profile.id
-                )
+                const result = await archiveCompletedOrder(order.id, archiveActor!, profile.id)
                 toast.success(
                   result.localOnly
                     ? "Order removed from this device history."

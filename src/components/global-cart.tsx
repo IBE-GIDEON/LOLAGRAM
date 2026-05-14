@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import toast from "react-hot-toast"
 import { FiShoppingBag, FiTrash2 } from "react-icons/fi"
@@ -8,13 +9,15 @@ import { FiShoppingBag, FiTrash2 } from "react-icons/fi"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useCart } from "@/components/providers/cart-provider"
 import { BottomSheet, Button, Card } from "@/components/ui"
+import { PAYMENT_METHOD_META } from "@/lib/constants"
 import { formatCurrency } from "@/lib/format"
-import { loadVendorDetail, startCheckout } from "@/lib/marketplace"
+import { loadVendorDetail, placeOrder } from "@/lib/marketplace"
 import { getPrimaryProductImage } from "@/lib/product-images"
 import { queueOfflineOrder } from "@/lib/offline-orders"
-import { type VendorDetail } from "@/lib/types"
+import { type PaymentMethod, type VendorDetail } from "@/lib/types"
 
 export function GlobalCart() {
+  const router = useRouter()
   const { profile } = useAuth()
   const {
     vendorId,
@@ -29,6 +32,7 @@ export function GlobalCart() {
   const [deliveryAddress, setDeliveryAddress] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [vendorData, setVendorData] = useState<VendorDetail | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pay_on_delivery")
 
   useEffect(() => {
     if (!vendorId) {
@@ -45,6 +49,18 @@ export function GlobalCart() {
       (vendorData?.products ?? []).map((product) => [product.id, product] as const)
     )
   }, [vendorData?.products])
+
+  const vendorTransferReady = Boolean(
+    vendorData?.vendor.bankName &&
+      vendorData?.vendor.accountName &&
+      vendorData?.vendor.accountNumber
+  )
+
+  useEffect(() => {
+    if (paymentMethod === "vendor_transfer" && !vendorTransferReady) {
+      setPaymentMethod("pay_on_delivery")
+    }
+  }, [paymentMethod, vendorTransferReady])
 
   if (!vendorId || itemCount === 0) {
     return null
@@ -66,7 +82,8 @@ export function GlobalCart() {
       vendorId,
       items,
       totalAmount: subtotal,
-      deliveryAddress
+      deliveryAddress,
+      paymentMethod
     }
 
     if (!navigator.onLine) {
@@ -79,12 +96,12 @@ export function GlobalCart() {
 
     setSubmitting(true)
     try {
-      const response = await startCheckout(payload)
+      const response = await placeOrder(payload)
       clearCart()
       setOpen(false)
-      window.location.assign(response.checkoutUrl)
+      router.push(`/order-confirmation/${response.orderId}`)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Checkout failed.")
+      toast.error(error instanceof Error ? error.message : "Could not place order.")
     } finally {
       setSubmitting(false)
     }
@@ -200,6 +217,45 @@ export function GlobalCart() {
               value={deliveryAddress}
               onChange={(event) => setDeliveryAddress(event.target.value)}
             />
+
+            <div className="mt-4 space-y-3">
+              <p className="text-sm font-semibold text-ink">Choose how you want to pay</p>
+              <div className="space-y-2">
+                {(["pay_on_delivery", "vendor_transfer"] as PaymentMethod[]).map((method) => {
+                  const methodMeta = PAYMENT_METHOD_META[method]
+                  const disabled = method === "vendor_transfer" && !vendorTransferReady
+
+                  return (
+                    <button
+                      key={method}
+                      type="button"
+                      disabled={disabled}
+                      className={`w-full rounded-[22px] border px-4 py-3 text-left transition ${
+                        paymentMethod === method
+                          ? "border-brand/40 bg-brand/5"
+                          : "border-border bg-surface"
+                      } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+                      onClick={() => setPaymentMethod(method)}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-ink">{methodMeta.label}</p>
+                        {paymentMethod === method ? (
+                          <span className="rounded-full bg-chrome px-2.5 py-1 text-[10px] font-semibold text-white">
+                            Selected
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-sm leading-6 text-muted">
+                        {disabled
+                          ? "This seller has not added direct payment details yet."
+                          : methodMeta.helper}
+                      </p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
             <div className="mt-4 flex items-center justify-between">
               <p className="text-sm text-muted">Subtotal</p>
               <p className="text-lg font-bold text-brand">
@@ -211,15 +267,20 @@ export function GlobalCart() {
               onClick={handleCheckout}
               disabled={submitting}
             >
-              {submitting ? "Starting checkout..." : "Pay with Paystack"}
+              {submitting ? "Placing order..." : "Place Order"}
             </Button>
+            <p className="mt-3 text-xs leading-5 text-muted">
+              {paymentMethod === "pay_on_delivery"
+                ? "You will inspect the order first and pay when it arrives."
+                : "You only pay the seller directly after they confirm the order."}
+            </p>
             {!profile ? (
               <p className="mt-3 text-xs text-muted">
                 Sign in from{" "}
                 <Link href="/profile" className="font-semibold text-brand" onClick={() => setOpen(false)}>
                   Profile
                 </Link>{" "}
-                before checkout.
+                before placing an order.
               </p>
             ) : null}
           </Card>

@@ -9,8 +9,6 @@ Set these in Vercel production:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY`
-- `PAYSTACK_SECRET_KEY`
 - `VAPID_PUBLIC_KEY`
 - `VAPID_PRIVATE_KEY`
 - `NEXT_PUBLIC_APP_URL`
@@ -19,7 +17,7 @@ Optional:
 
 - `NEXT_PUBLIC_ENABLE_DEMO_MODE=false`
 
-For launch, leave demo mode off. The app now refuses fake checkout, fake storage, and fake profile behavior in production.
+For launch, leave demo mode off. The app now refuses fake orders, fake storage, and fake profile behavior in production.
 
 ## 2. Supabase Setup
 
@@ -52,21 +50,24 @@ Before launch, verify:
 - buyer to seller upgrade works
 - session persists in the installed PWA
 
-## 4. Payments
+## 4. Order and Payment Setup
 
-In Paystack:
+In seller onboarding or store edit:
 
-- switch to live keys
-- set the callback domain to your production app URL
-- add webhook URL:
-  - `https://your-domain.com/api/paystack/webhook`
-- verify webhook signature handling
+- add WhatsApp number
+- choose whether to rely on `Pay on Delivery` only or also enable `Pay Vendor Directly`
+- if using direct payment, fill in:
+  - bank name
+  - account name
+  - account number
+  - optional payment note for buyers
 
-Before launch, run one real low-value payment and confirm:
+Before launch, verify:
 
-- order is created
-- Paystack redirects back correctly
-- seller receives the new-order flow
+- buyers can place an order without paying the platform first
+- `Pay on Delivery` works from cart to order confirmation
+- `Pay Vendor Directly` only appears for sellers who added payment details
+- sellers can confirm an order, mark direct payment received, dispatch, and deliver
 
 ## 5. Push Notifications
 
@@ -111,13 +112,12 @@ Recommended minimum production readiness:
 - connect Vercel project to `main`
 - enable Vercel Analytics and runtime logs
 - monitor Supabase database usage, auth usage, and storage bandwidth
-- monitor Paystack webhook delivery
 - set up one support WhatsApp number for launch-day issues
 - keep one admin account ready to verify seller onboarding issues quickly
 
 Operational checks:
 
-- test buyer flow from search to payment
+- test buyer flow from search to order placement
 - test seller flow from onboarding to order status update
 - test offline order queue once on Android
 - test add-to-home-screen install on Android Chrome
@@ -131,14 +131,13 @@ Before opening onboarding:
 2. Confirm env vars in production.
 3. Run one real buyer order.
 4. Confirm seller sees the order.
-5. Confirm product gallery, cart removal, and checkout all work on mobile.
+5. Confirm product gallery, cart removal, and order placement all work on mobile.
 
 During launch:
 
 1. Watch Vercel logs.
 2. Watch Supabase auth and database dashboards.
-3. Watch Paystack webhook delivery.
-4. Keep a support person available for store onboarding issues.
+3. Keep a support person available for store onboarding issues.
 
 ## 10. Nice-to-Have Next
 
@@ -148,4 +147,4 @@ After the first launch wave, prioritize:
 - image deletion from Supabase storage when product images are removed
 - vendor and product analytics dashboards
 - server-side search ranking improvements
-- rate limiting for auth and checkout endpoints
+- rate limiting for auth and order endpoints

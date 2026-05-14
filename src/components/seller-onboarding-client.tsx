@@ -29,6 +29,10 @@ export function SellerOnboardingClient() {
   const [whatsappNumber, setWhatsappNumber] = useState(
     vendorProfile?.whatsappNumber ?? profile?.phone ?? "+234"
   )
+  const [bankName, setBankName] = useState(vendorProfile?.bankName ?? "")
+  const [accountName, setAccountName] = useState(vendorProfile?.accountName ?? "")
+  const [accountNumber, setAccountNumber] = useState(vendorProfile?.accountNumber ?? "")
+  const [paymentNote, setPaymentNote] = useState(vendorProfile?.paymentNote ?? "")
   const [productName, setProductName] = useState("")
   const [productPrice, setProductPrice] = useState("")
   const [productDescription, setProductDescription] = useState("")
@@ -67,8 +71,8 @@ export function SellerOnboardingClient() {
         <Card className="p-5">
           <p className="text-lg font-semibold text-ink">Sign in first</p>
           <p className="mt-2 text-sm text-muted">
-            Your seller onboarding is tied to the same phone-auth account you use
-            as a buyer.
+            Your seller onboarding is tied to the same LOLAGRAM account you use as
+            a buyer.
           </p>
           <Link
             href="/profile"
@@ -157,6 +161,35 @@ export function SellerOnboardingClient() {
             value={whatsappNumber}
             onChange={(event) => setWhatsappNumber(event.target.value)}
           />
+          <div className="rounded-[24px] bg-canvas p-4">
+            <p className="text-sm font-semibold text-ink">Direct payment details</p>
+            <p className="mt-1 text-xs leading-5 text-muted">
+              Optional for launch. Add these if you want buyers to pay you directly
+              after you confirm their order.
+            </p>
+            <div className="mt-3 space-y-3">
+              <Input
+                placeholder="Bank name"
+                value={bankName}
+                onChange={(event) => setBankName(event.target.value)}
+              />
+              <Input
+                placeholder="Account name"
+                value={accountName}
+                onChange={(event) => setAccountName(event.target.value)}
+              />
+              <Input
+                placeholder="Account number"
+                value={accountNumber}
+                onChange={(event) => setAccountNumber(event.target.value)}
+              />
+              <Textarea
+                placeholder="Optional payment note for buyers"
+                value={paymentNote}
+                onChange={(event) => setPaymentNote(event.target.value)}
+              />
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <Button variant="secondary" onClick={() => setStep(1)}>
               Back
@@ -275,7 +308,11 @@ export function SellerOnboardingClient() {
                     storePhotoUrl,
                     bio: bio.trim(),
                     city: city.trim(),
-                    whatsappNumber: whatsappNumber.trim()
+                    whatsappNumber: whatsappNumber.trim(),
+                    bankName: bankName.trim() || undefined,
+                    accountName: accountName.trim() || undefined,
+                    accountNumber: accountNumber.trim() || undefined,
+                    paymentNote: paymentNote.trim() || undefined
                   })
 
                   await saveProduct({

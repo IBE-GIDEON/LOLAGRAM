@@ -1,5 +1,7 @@
 import {
   type AccountType,
+  type PaymentMethod,
+  type PaymentStatus,
   type OrderStatus,
   type VendorCategory
 } from "@/lib/types"
@@ -69,6 +71,46 @@ export const ORDER_STATUS_META: Record<
   cancelled: {
     label: "Cancelled",
     className: "bg-rose-100 text-rose-800"
+  }
+}
+
+export const PAYMENT_METHOD_META: Record<
+  PaymentMethod,
+  { label: string; helper: string }
+> = {
+  pay_on_delivery: {
+    label: "Pay on Delivery",
+    helper: "Inspect the item first, then pay when it arrives."
+  },
+  vendor_transfer: {
+    label: "Pay Vendor Directly",
+    helper: "Pay the seller after they confirm your order."
+  }
+}
+
+export const PAYMENT_STATUS_META: Record<
+  PaymentStatus,
+  { label: string; className: string; helper: string }
+> = {
+  awaiting_seller_confirmation: {
+    label: "Waiting for Seller",
+    className: "bg-slate-100 text-slate-800",
+    helper: "Your seller needs to confirm before any payment moves."
+  },
+  pay_on_delivery: {
+    label: "Pay on Delivery",
+    className: "bg-emerald-100 text-emerald-800",
+    helper: "Payment happens at delivery."
+  },
+  awaiting_vendor_payment: {
+    label: "Awaiting Vendor Payment",
+    className: "bg-amber-100 text-amber-800",
+    helper: "Pay the seller directly and let them confirm receipt."
+  },
+  paid_to_vendor: {
+    label: "Paid to Vendor",
+    className: "bg-sky-100 text-sky-800",
+    helper: "The seller marked your direct payment as received."
   }
 }
 

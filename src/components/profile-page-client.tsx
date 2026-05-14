@@ -604,6 +604,13 @@ export function ProfilePageClient() {
                     <p className="mt-1 text-sm text-muted">
                       {vendorProfile?.bio ?? "Complete your store profile."}
                     </p>
+                    <p className="mt-2 text-xs text-muted">
+                      {vendorProfile?.bankName &&
+                      vendorProfile?.accountName &&
+                      vendorProfile?.accountNumber
+                        ? "Direct vendor payment is ready for buyers."
+                        : "Add bank details in Edit Store if you want buyers to pay you directly."}
+                    </p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Badge>{vendorProfile?.category ?? "Category"}</Badge>
                       <Badge>{vendorProfile?.city ?? "City"}</Badge>
