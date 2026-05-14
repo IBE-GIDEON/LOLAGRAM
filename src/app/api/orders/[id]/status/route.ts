@@ -49,36 +49,45 @@ export async function PATCH(
     return NextResponse.json({ error: error?.message ?? "Order not found" }, { status: 500 })
   }
 
+  const { data: vendor } = await supabase
+    .from("vendor_profiles")
+    .select("store_name")
+    .eq("id", String(order.vendor_id))
+    .maybeSingle()
+
+  const storeName = getStoreName(vendor?.store_name)
+  const orderRef = getOrderRef(params.id)
+
   const pushTitle =
     status === "confirmed"
-      ? "Your LOLAGRAM order is confirmed"
+      ? `${storeName} confirmed ${orderRef}`
       : status === "dispatched"
-        ? "Your LOLAGRAM order is on the way"
+        ? `${storeName} dispatched ${orderRef}`
         : status === "delivered"
-          ? "Your LOLAGRAM order has been delivered"
+          ? `${storeName} delivered ${orderRef}`
           : status === "cancelled"
-            ? "Your LOLAGRAM order was cancelled"
+            ? `${storeName} cancelled ${orderRef}`
             : paymentStatus === "paid_to_vendor"
-              ? "Your payment was confirmed"
+              ? `${storeName} confirmed your payment`
               : paymentStatus === "awaiting_vendor_payment"
-                ? "Pay your seller directly"
+                ? `${storeName} is ready for payment`
                 : null
 
   const pushBody =
     status === "confirmed"
       ? String(order.payment_method) === "vendor_transfer"
-        ? "The seller confirmed your order. Pay the vendor directly to continue."
-        : "The seller confirmed your order."
+        ? `${storeName} confirmed your order. Open ${orderRef} to see direct payment details.`
+        : `${storeName} confirmed your order and will prepare it for delivery.`
       : status === "dispatched"
-        ? "The seller has dispatched your items."
+        ? `${storeName} has dispatched your items.`
         : status === "delivered"
-          ? "Your seller marked this order as delivered."
+          ? `${storeName} marked this order as delivered.`
           : status === "cancelled"
-            ? "The seller cancelled this order."
+            ? `${storeName} cancelled this order.`
             : paymentStatus === "paid_to_vendor"
-              ? "The seller marked your direct payment as received."
+              ? `${storeName} marked your direct payment as received.`
               : paymentStatus === "awaiting_vendor_payment"
-                ? "Your seller is ready for direct vendor payment now."
+                ? `Open ${orderRef} to pay ${storeName} directly.`
                 : null
 
   if (pushTitle && pushBody) {
@@ -91,4 +100,13 @@ export async function PATCH(
   }
 
   return NextResponse.json({ ok: true, order })
+}
+
+function getStoreName(value: unknown) {
+  const normalized = typeof value === "string" ? value.trim() : ""
+  return normalized || "Your seller"
+}
+
+function getOrderRef(orderId: string) {
+  return `#${orderId.slice(0, 6).toUpperCase()}`
 }

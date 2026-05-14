@@ -56,11 +56,20 @@ export async function POST(request: Request) {
     .eq("id", payload.vendorId)
     .maybeSingle()
 
+  const { data: buyer } = await supabase
+    .from("users")
+    .select("full_name")
+    .eq("id", payload.buyerId)
+    .maybeSingle()
+
   if (vendor?.user_id) {
+    const buyerName = getDisplayName(buyer?.full_name)
+    const orderRef = getOrderRef(String(data.id))
+
     void sendPushNotification({
       userId: String(vendor.user_id),
       title: "New Order on LOLAGRAM",
-      body: `${payload.items[0]?.name ?? "A buyer"} just placed an order in your store.`,
+      body: `${buyerName} placed Order ${orderRef} in your store.`,
       url: `/orders/${data.id}`
     }).catch(() => null)
   }
@@ -69,4 +78,18 @@ export async function POST(request: Request) {
     ok: true,
     orderId: data.id
   })
+}
+
+function getDisplayName(value: unknown) {
+  const normalized = typeof value === "string" ? value.trim() : ""
+  if (!normalized) {
+    return "A buyer"
+  }
+
+  const firstName = normalized.split(/\s+/)[0] ?? normalized
+  return firstName.length > 18 ? `${firstName.slice(0, 18)}…` : firstName
+}
+
+function getOrderRef(orderId: string) {
+  return `#${orderId.slice(0, 6).toUpperCase()}`
 }

@@ -68,18 +68,22 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close()
 
   const targetUrl = event.notification.data?.url || "/orders"
+  const absoluteTargetUrl = new URL(targetUrl, self.location.origin).href
 
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if ("focus" in client) {
-          client.navigate(targetUrl)
+        if ("focus" in client && sameOriginWindow(client.url)) {
+          if (client.url !== absoluteTargetUrl && "navigate" in client) {
+            return client.navigate(absoluteTargetUrl).then(() => client.focus())
+          }
+
           return client.focus()
         }
       }
 
       if (clients.openWindow) {
-        return clients.openWindow(targetUrl)
+        return clients.openWindow(absoluteTargetUrl)
       }
 
       return undefined
@@ -187,5 +191,13 @@ function readPushPayload(event) {
     return {
       body: event.data.text()
     }
+  }
+}
+
+function sameOriginWindow(url) {
+  try {
+    return new URL(url).origin === self.location.origin
+  } catch (error) {
+    return false
   }
 }
