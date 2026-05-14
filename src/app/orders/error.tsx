@@ -16,6 +16,29 @@ export default function OrdersError({
     console.error("Orders route crashed", error)
   }, [error])
 
+  const refreshOrders = () => {
+    try {
+      const rawStore = window.localStorage.getItem("lolagram-persisted-cache-v1")
+      const store = rawStore ? (JSON.parse(rawStore) as Record<string, unknown>) : {}
+
+      for (const key of Object.keys(store)) {
+        if (
+          key.startsWith("buyer-orders:") ||
+          key.startsWith("seller-orders:") ||
+          key.startsWith("order-detail:")
+        ) {
+          delete store[key]
+        }
+      }
+
+      window.localStorage.setItem("lolagram-persisted-cache-v1", JSON.stringify(store))
+    } catch {
+      // If local storage is unavailable, retrying the route is still safe.
+    }
+
+    reset()
+  }
+
   return (
     <div className="space-y-4 p-4 pb-safe-nav">
       <SectionHeading title="Orders" />
@@ -23,13 +46,13 @@ export default function OrdersError({
         <div>
           <p className="text-lg font-semibold text-ink">We could not open this order yet</p>
           <p className="mt-2 text-sm leading-6 text-muted">
-            The app hit stale order data on this device. Try reloading this screen,
-            then open the order again.
+            Refresh the order data and try again. If this keeps happening, the
+            live database may be missing the latest order-payment columns or policies.
           </p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
-          <Button className="flex-1" onClick={reset}>
-            Try again
+          <Button className="flex-1" onClick={refreshOrders}>
+            Refresh orders
           </Button>
           <Link
             href="/orders"

@@ -34,6 +34,7 @@ export function OrdersPageClient() {
     () => loading || (profile ? peekCachedBuyerOrders(profile.id).length === 0 : true)
   )
   const [archivingOrderId, setArchivingOrderId] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!profile) {
@@ -59,6 +60,7 @@ export function OrdersPageClient() {
 
     let ignore = false
     setFetching(true)
+    setLoadError(null)
     const request =
       mode === "store" && vendorProfile
         ? loadSellerOrders(profile.id, { fresh: true })
@@ -69,6 +71,14 @@ export function OrdersPageClient() {
         if (ignore) return
         setOrders(nextOrders)
       })
+      .catch((error) => {
+        if (ignore) return
+        console.error("Could not load orders", error)
+        setOrders([])
+        setLoadError(
+          error instanceof Error ? error.message : "Could not load orders right now."
+        )
+      })
       .finally(() => {
         if (!ignore) {
           setFetching(false)
@@ -78,7 +88,9 @@ export function OrdersPageClient() {
     if (vendorProfile) {
       void (mode === "store"
         ? loadBuyerOrders(profile.id, { fresh: true })
-        : loadSellerOrders(profile.id, { fresh: true }))
+        : loadSellerOrders(profile.id, { fresh: true })).catch((error) =>
+        console.error("Could not prefetch alternate order mode", error)
+      )
     }
 
     return () => {
@@ -146,6 +158,14 @@ export function OrdersPageClient() {
             />
           ))}
         </div>
+      ) : loadError ? (
+        <Card className="p-5">
+          <p className="text-lg font-semibold text-ink">Orders could not load</p>
+          <p className="mt-2 text-sm leading-6 text-muted">{loadError}</p>
+          <Button className="mt-4 w-full" onClick={() => window.location.reload()}>
+            Refresh orders
+          </Button>
+        </Card>
       ) : orders.length === 0 ? (
         <Card className="p-5">
           <p className="text-lg font-semibold text-ink">No orders yet</p>

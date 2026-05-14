@@ -38,24 +38,54 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
   const [reviewComment, setReviewComment] = useState("")
   const [reviewRating, setReviewRating] = useState(5)
   const [busy, setBusy] = useState(false)
+  const [loadingOrder, setLoadingOrder] = useState(true)
+  const [orderError, setOrderError] = useState<string | null>(null)
 
   useEffect(() => {
     let ignore = false
 
     async function hydrateOrder() {
-      const nextOrder = await loadOrderDetail(orderId, { fresh: true })
-      if (ignore) return
+      setLoadingOrder(true)
+      setOrderError(null)
 
-      setOrder(nextOrder)
+      try {
+        const nextOrder = await loadOrderDetail(orderId, { fresh: true })
+        if (ignore) return
 
-      if (!nextOrder?.vendorId || profile?.id !== nextOrder.buyerId) {
-        setVendorData(null)
-        return
-      }
+        setOrder(nextOrder)
 
-      const nextVendorData = await loadVendorDetail(nextOrder.vendorId)
-      if (!ignore) {
-        setVendorData(nextVendorData)
+        if (!nextOrder) {
+          setVendorData(null)
+          setOrderError(
+            "This order was not found, or this account does not have access to it."
+          )
+          return
+        }
+
+        if (!nextOrder.vendorId || profile?.id !== nextOrder.buyerId) {
+          setVendorData(null)
+          return
+        }
+
+        const nextVendorData = await loadVendorDetail(nextOrder.vendorId)
+        if (!ignore) {
+          setVendorData(nextVendorData)
+        }
+      } catch (error) {
+        if (!ignore) {
+          console.error("Could not load order detail", error)
+          setOrder(null)
+          setVendorData(null)
+          setOrderError(
+            error instanceof Error
+              ? error.message
+              : "This order could not load right now."
+          )
+        }
+      } finally {
+        if (!ignore) {
+          setLoadingOrder(false)
+        }
       }
     }
 
@@ -83,8 +113,31 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
     Boolean(archiveActor) &&
     (order?.status === "delivered" || order?.status === "cancelled")
 
-  if (!order) {
+  if (loadingOrder && !order) {
     return <div className="p-4 text-sm text-muted">Loading order...</div>
+  }
+
+  if (!order) {
+    return (
+      <div className="space-y-4 p-4 pb-safe-nav">
+        <SectionHeading title="Order detail" />
+        <Card className="space-y-4 p-5">
+          <div>
+            <p className="text-lg font-semibold text-ink">Order could not open</p>
+            <p className="mt-2 text-sm leading-6 text-muted">
+              {orderError ??
+                "This order is not available on this account. Go back to orders and try again."}
+            </p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <Button onClick={() => window.location.reload()}>Reload order</Button>
+            <Button variant="outline" onClick={() => router.push("/orders")}>
+              Back to orders
+            </Button>
+          </div>
+        </Card>
+      </div>
+    )
   }
 
   const activeVendor = vendorData?.vendor ?? order.vendor

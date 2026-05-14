@@ -55,6 +55,8 @@ import {
   type VendorSnapshot
 } from "@/lib/types"
 
+type SupabaseBrowserClient = NonNullable<ReturnType<typeof getSupabaseBrowserClient>>
+
 function mapUser(row: Record<string, unknown>): UserProfile {
   return {
     id: String(row.id),
@@ -587,6 +589,15 @@ function clearOrderCaches() {
   clearPersistedCacheByPrefix("store-analytics:")
 }
 
+function logMarketplaceError(scope: string, error: unknown) {
+  if (process.env.NODE_ENV === "production") {
+    console.error(`[lolagram:${scope}]`, error)
+    return
+  }
+
+  console.warn(`[lolagram:${scope}]`, error)
+}
+
 function mapOrder(row: Record<string, unknown>, vendor?: VendorProfile): OrderDetail {
   const nestedVendor =
     vendor ??
@@ -618,6 +629,41 @@ function mapOrder(row: Record<string, unknown>, vendor?: VendorProfile): OrderDe
     createdAt: String(row.created_at ?? new Date().toISOString()),
     vendor: nestedVendor
   }
+}
+
+async function fetchVendorProfileById(
+  supabase: SupabaseBrowserClient,
+  vendorId: string
+) {
+  const { data, error } = await supabase
+    .from("vendor_profiles")
+    .select("*")
+    .eq("id", vendorId)
+    .maybeSingle()
+
+  if (error || !data) {
+    if (error) {
+      logMarketplaceError("fetch-vendor-for-order", error)
+    }
+    return undefined
+  }
+
+  return mapVendor(data)
+}
+
+async function mapOrderWithVendorFallback(
+  supabase: SupabaseBrowserClient,
+  row: Record<string, unknown>,
+  vendor?: VendorProfile
+) {
+  const mappedOrder = mapOrder(row, vendor)
+
+  if (mappedOrder.vendor) {
+    return mappedOrder
+  }
+
+  const fallbackVendor = await fetchVendorProfileById(supabase, mappedOrder.vendorId)
+  return fallbackVendor ? { ...mappedOrder, vendor: fallbackVendor } : mappedOrder
 }
 
 function refreshVendorReferences(vendor: VendorProfile) {
@@ -1246,27 +1292,46 @@ export async function loadBuyerOrders(
 
   const supabase = getSupabaseBrowserClient()
   if (!supabase) return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
-  const { data, error } = await supabase
+
+  let response = await supabase
     .from("orders")
     .select("*, vendor_profiles(*)")
     .eq("buyer_id", userId)
     .order("created_at", { ascending: false })
 
-  if (error || !data) return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
+  if (response.error) {
+    logMarketplaceError("buyer-orders-joined-query", response.error)
+    response = await supabase
+      .from("orders")
+      .select("*")
+      .eq("buyer_id", userId)
+      .order("created_at", { ascending: false })
+  }
+
+  if (response.error || !response.data) {
+    if (response.error) {
+      logMarketplaceError("buyer-orders-query", response.error)
+    }
+    return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
+  }
 
   const hiddenOrderIds = getHiddenOrderIds("buyer", userId)
+  const visibleRows = response.data.filter(
+    (order) =>
+      !order.buyer_hidden_at &&
+      !hiddenOrderIds.has(String(order.id))
+  )
+  const orders = await Promise.all(
+    visibleRows.map((order) =>
+      mapOrderWithVendorFallback(supabase, order as Record<string, unknown>)
+    )
+  )
 
   return writeHybridCache(
     buyerOrdersCache,
     userId,
     persistedCacheKeys.buyerOrders(userId),
-    data
-      .filter(
-        (order) =>
-          !order.buyer_hidden_at &&
-          !hiddenOrderIds.has(String(order.id))
-      )
-      .map((order) => mapOrder(order))
+    orders
   )
 }
 
@@ -1305,7 +1370,12 @@ export async function loadSellerOrders(
     .eq("vendor_id", vendor.id)
     .order("created_at", { ascending: false })
 
-  if (error || !data) return canUseDemoMode ? getSellerOrdersDemo(userId) : []
+  if (error || !data) {
+    if (error) {
+      logMarketplaceError("seller-orders-query", error)
+    }
+    return canUseDemoMode ? getSellerOrdersDemo(userId) : []
+  }
 
   const hiddenOrderIds = getHiddenOrderIds("seller", userId)
 
@@ -1351,19 +1421,38 @@ export async function loadOrderDetail(
   const supabase = getSupabaseBrowserClient()
   if (!supabase) return canUseDemoMode ? getOrderByIdDemo(orderId) : null
 
-  const { data, error } = await supabase
+  let response = await supabase
     .from("orders")
     .select("*, vendor_profiles(*)")
     .eq("id", orderId)
     .maybeSingle()
 
-  if (error || !data) return canUseDemoMode ? getOrderByIdDemo(orderId) : null
+  if (response.error) {
+    logMarketplaceError("order-detail-joined-query", response.error)
+    response = await supabase
+      .from("orders")
+      .select("*")
+      .eq("id", orderId)
+      .maybeSingle()
+  }
+
+  if (response.error || !response.data) {
+    if (response.error) {
+      logMarketplaceError("order-detail-query", response.error)
+    }
+    return canUseDemoMode ? getOrderByIdDemo(orderId) : null
+  }
+
+  const order = await mapOrderWithVendorFallback(
+    supabase,
+    response.data as Record<string, unknown>
+  )
 
   return writeHybridCache(
     orderDetailCache,
     orderId,
     persistedCacheKeys.orderDetail(orderId),
-    mapOrder(data)
+    order
   )
 }
 
