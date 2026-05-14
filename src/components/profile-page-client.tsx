@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import toast from "react-hot-toast"
-import { FiBell, FiEdit3, FiKey, FiLogOut, FiMail, FiShoppingBag, FiUser } from "react-icons/fi"
+import { FiBell, FiCheck, FiEdit3, FiKey, FiLogOut, FiMail, FiShoppingBag, FiUser } from "react-icons/fi"
 
 import { useAuth } from "@/components/providers/auth-provider"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -19,6 +19,15 @@ import {
 import { VIEW_MODE_KEY } from "@/lib/constants"
 
 type AuthMode = "signin" | "signup" | "forgot"
+type PushStatus =
+  | "checking"
+  | "unsupported"
+  | "install-required"
+  | "ready"
+  | "enabling"
+  | "enabled"
+  | "blocked"
+  | "unconfigured"
 
 export function ProfilePageClient() {
   const {
@@ -57,6 +66,7 @@ export function ProfilePageClient() {
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("")
   const [analytics, setAnalytics] = useState<StoreAnalytics | null>(null)
   const [viewMode, setViewMode] = useState<"buyer" | "seller">("buyer")
+  const [pushStatus, setPushStatus] = useState<PushStatus>("checking")
 
   useEffect(() => {
     if (!profile) return
@@ -82,58 +92,99 @@ export function ProfilePageClient() {
     }
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+
+    async function syncPushStatus() {
+      if (!profile) {
+        setPushStatus("checking")
+        return
+      }
+
+      const status = await getPushStatus()
+      if (!cancelled) {
+        setPushStatus(status)
+      }
+    }
+
+    syncPushStatus().catch(() => {
+      if (!cancelled) {
+        setPushStatus("ready")
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [profile])
+
   const requestPushAccess = async () => {
     if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+      setPushStatus("unsupported")
       toast.error("Push notifications are not supported on this device.")
       return
     }
 
     if (isIos() && !isStandaloneWebApp()) {
+      setPushStatus("install-required")
       toast.error(
         "On iPhone, install LOLAGRAM to your Home Screen and open it from the app icon before enabling notifications."
       )
       return
     }
 
-    const permission = await Notification.requestPermission()
-    if (permission !== "granted") {
-      toast.error("Notification permission was not granted.")
-      return
-    }
+    setPushStatus("enabling")
 
-    const publicKeyResponse = await fetch("/api/push/public-key")
-    const { publicKey } = (await publicKeyResponse.json()) as {
-      publicKey?: string
-    }
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission !== "granted") {
+        setPushStatus(permission === "denied" ? "blocked" : "ready")
+        toast.error("Notification permission was not granted.")
+        return
+      }
 
-    if (!publicKey) {
-      toast.error("Push notifications are not configured yet.")
-      return
-    }
+      const publicKeyResponse = await fetch("/api/push/public-key")
+      const { publicKey } = (await publicKeyResponse.json()) as {
+        publicKey?: string
+      }
 
-    const registration = await navigator.serviceWorker.ready
-    const existingSubscription = await registration.pushManager.getSubscription()
-    const subscription =
-      existingSubscription ??
-      (await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey)
-      }))
+      if (!publicKey) {
+        setPushStatus("unconfigured")
+        toast.error("Push notifications are not configured yet.")
+        return
+      }
 
-    const response = await fetch("/api/push/subscribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: profile?.id,
-        subscription
+      const registration = await navigator.serviceWorker.ready
+      const existingSubscription = await registration.pushManager.getSubscription()
+      const subscription =
+        existingSubscription ??
+        (await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey)
+        }))
+
+      const response = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: profile?.id,
+          subscription
+        })
       })
-    })
 
-    if (!response.ok) {
-      throw new Error("Could not save your notification subscription.")
+      if (!response.ok) {
+        throw new Error("Could not save your notification subscription.")
+      }
+
+      setPushStatus("enabled")
+      toast.success("Push notifications enabled.")
+    } catch (error) {
+      const status = await getPushStatus()
+      setPushStatus(status)
+      toast.error(
+        error instanceof Error ? error.message : "Could not enable push notifications."
+      )
     }
-
-    toast.success("Push notifications enabled.")
   }
 
   if (loading) {
@@ -352,6 +403,7 @@ export function ProfilePageClient() {
   const showSellerSection =
     viewMode === "seller" &&
     (profile.accountType === "seller" || profile.accountType === "both")
+  const pushButtonDisabled = !["ready"].includes(pushStatus)
 
   return (
     <div className="space-y-4 p-4 pb-safe-nav">
@@ -543,17 +595,30 @@ export function ProfilePageClient() {
           <div>
             <p className="text-sm font-semibold text-ink">Notification settings</p>
             <p className="mt-1 text-sm text-muted">
-              Get order alerts, confirmations, and delivery updates.
+              {getPushStatusDescription(pushStatus)}
             </p>
           </div>
-          <FiBell className="text-brand" />
+          {pushStatus === "enabled" ? (
+            <Badge className="bg-emerald-100 text-success">
+              <FiCheck className="mr-1" />
+              Enabled
+            </Badge>
+          ) : (
+            <FiBell className="text-brand" />
+          )}
         </div>
         <Button
-          className="mt-4 w-full"
-          variant="outline"
+          variant={pushStatus === "enabled" ? "primary" : "outline"}
+          disabled={pushButtonDisabled}
+          aria-disabled={pushButtonDisabled}
+          className={
+            pushStatus === "enabled"
+              ? "mt-4 w-full bg-success text-white hover:brightness-95"
+              : "mt-4 w-full"
+          }
           onClick={requestPushAccess}
         >
-          Enable push notifications
+          {getPushButtonLabel(pushStatus)}
         </Button>
       </Card>
 
@@ -745,4 +810,85 @@ function isStandaloneWebApp() {
   }
 
   return window.matchMedia("(display-mode: standalone)").matches || Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone)
+}
+
+async function getPushStatus(): Promise<PushStatus> {
+  if (
+    typeof window === "undefined" ||
+    !("serviceWorker" in navigator) ||
+    !("PushManager" in window) ||
+    !("Notification" in window)
+  ) {
+    return "unsupported"
+  }
+
+  if (isIos() && !isStandaloneWebApp()) {
+    return "install-required"
+  }
+
+  if (Notification.permission === "denied") {
+    return "blocked"
+  }
+
+  try {
+    const response = await fetch("/api/push/public-key")
+    const { publicKey } = (await response.json()) as { publicKey?: string }
+
+    if (!publicKey) {
+      return "unconfigured"
+    }
+
+    if (Notification.permission !== "granted") {
+      return "ready"
+    }
+
+    const registration = await navigator.serviceWorker.ready
+    const subscription = await registration.pushManager.getSubscription()
+
+    return subscription ? "enabled" : "ready"
+  } catch (error) {
+    return Notification.permission === "granted" ? "ready" : "ready"
+  }
+}
+
+function getPushButtonLabel(status: PushStatus) {
+  switch (status) {
+    case "checking":
+      return "Checking notification status..."
+    case "enabled":
+      return "Push notifications enabled"
+    case "enabling":
+      return "Enabling notifications..."
+    case "blocked":
+      return "Notifications blocked"
+    case "unsupported":
+      return "Notifications not supported"
+    case "install-required":
+      return "Install app to enable notifications"
+    case "unconfigured":
+      return "Notifications not configured"
+    default:
+      return "Enable push notifications"
+  }
+}
+
+function getPushStatusDescription(status: PushStatus) {
+  switch (status) {
+    case "enabled":
+      return "This device will receive order alerts, confirmations, and delivery updates."
+    case "enabling":
+      return "We are connecting this device for order alerts now."
+    case "blocked":
+      return "Notifications are blocked for LOLAGRAM on this device. Allow them in your browser or iPhone settings."
+    case "unsupported":
+      return "This device or browser does not support web push notifications."
+    case "install-required":
+      return "On iPhone, add LOLAGRAM to your Home Screen and open it from the app icon before enabling notifications."
+    case "unconfigured":
+      return "Push notifications are not configured on the server yet."
+    case "checking":
+      return "Checking this device for notification support."
+    default:
+      return "Get order alerts, confirmations, and delivery updates."
+  }
 }
