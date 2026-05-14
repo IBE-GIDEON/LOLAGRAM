@@ -155,7 +155,7 @@ export function OrdersPageClient() {
                   <div>
                     <p className="font-semibold text-ink">
                       {mode === "store"
-                        ? order.buyer?.fullName ?? "Buyer order"
+                        ? order.buyer?.fullName ?? "Customer order"
                         : order.vendor?.storeName ?? "Vendor order"}
                     </p>
                     <p className="mt-1 text-sm text-muted">{formatDate(order.createdAt)}</p>

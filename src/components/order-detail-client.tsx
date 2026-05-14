@@ -53,6 +53,12 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
         return
       }
 
+      const isBuyerViewer = profile?.id === nextOrder.buyerId
+      if (!isBuyerViewer) {
+        setVendorData(null)
+        return
+      }
+
       const nextVendorData = await loadVendorDetail(nextOrder.vendorId)
       if (!ignore) {
         setVendorData(nextVendorData)
@@ -64,17 +70,18 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
     return () => {
       ignore = true
     }
-  }, [orderId])
+  }, [orderId, profile?.id])
 
-  const canManage = profile && vendorProfile && order?.vendorId === vendorProfile.id
+  const isSellerViewer = Boolean(profile && vendorProfile && order?.vendorId === vendorProfile.id)
+  const isBuyerViewer = Boolean(profile && order?.buyerId === profile.id)
+  const canManage = isSellerViewer
   const canReview =
-    profile &&
-    order?.buyerId === profile.id &&
-    order.status === "delivered" &&
-    !vendorData?.reviews.some((review) => review.orderId === order.id)
+    isBuyerViewer &&
+    order?.status === "delivered" &&
+    !vendorData?.reviews.some((review) => review.orderId === order?.id)
   const archiveActor: OrderArchiveActor | null = canManage
     ? "seller"
-    : profile && order?.buyerId === profile.id
+    : isBuyerViewer
       ? "buyer"
       : null
   const canArchive =
@@ -95,6 +102,10 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
 
   const vendorName = vendorData?.vendor.storeName ?? order.vendor?.storeName ?? "Vendor"
   const whatsappNumber = vendorData?.vendor.whatsappNumber
+  const orderCounterpartyTitle = isSellerViewer ? "Store order" : vendorName
+  const orderCounterpartyMeta = isSellerViewer
+    ? "Update this order as you confirm, dispatch, and deliver it."
+    : "Track every update from this seller in one place."
 
   return (
     <div className="space-y-4 p-4 pb-safe-nav">
@@ -103,8 +114,11 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
       <Card className="p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-lg font-semibold text-ink">{vendorName}</p>
-            <p className="mt-1 text-sm text-muted">{formatDateTime(order.createdAt)}</p>
+            <p className="text-lg font-semibold text-ink">{orderCounterpartyTitle}</p>
+            <p className="mt-1 text-sm text-muted">{orderCounterpartyMeta}</p>
+            <p className="mt-2 text-xs uppercase tracking-[0.16em] text-muted">
+              {formatDateTime(order.createdAt)}
+            </p>
           </div>
           <Badge className={ORDER_STATUS_META[order.status].className}>
             {ORDER_STATUS_META[order.status].label}
@@ -139,7 +153,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
           </p>
         </div>
 
-        {whatsappNumber ? (
+        {isBuyerViewer && whatsappNumber ? (
           <a
             href={`https://wa.me/${whatsappNumber}`}
             target="_blank"
@@ -152,71 +166,85 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
         ) : null}
       </Card>
 
-      <Card className="p-4">
-        <p className="text-sm font-semibold text-ink">Status timeline</p>
-        <div className="mt-4 space-y-3">
-          {statusSteps.map((status, index) => {
-            const reached = statusSteps.indexOf(order.status) >= index
-            return (
-              <div key={status} className="flex items-center gap-3">
-                <div
-                  className={`h-3 w-3 rounded-full ${
-                    reached ? "bg-brand" : "bg-border"
-                  }`}
-                />
-                <p className={reached ? "font-medium text-ink" : "text-muted"}>
-                  {ORDER_STATUS_META[status].label}
-                </p>
-              </div>
-            )
-          })}
-        </div>
-      </Card>
-
-      {canManage && nextActions.length > 0 ? (
+      {isBuyerViewer ? (
         <Card className="p-4">
-          <p className="text-sm font-semibold text-ink">Update order status</p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            {nextActions.map((status) => (
-              <Button
-                key={status}
-                onClick={async () => {
-                  const previousStatus = order.status
-                  setBusy(true)
-                  setOrder((current) =>
-                    current ? { ...current, status } : current
-                  )
-
-                  try {
-                    await updateOrderStatus(order.id, status)
-                    toast.success(`Order marked ${ORDER_STATUS_META[status].label}.`)
-                  } catch (error) {
-                    setOrder((current) =>
-                      current ? { ...current, status: previousStatus } : current
-                    )
-                    toast.error(
-                      error instanceof Error
-                        ? error.message
-                        : "Could not update this order."
-                    )
-                  } finally {
-                    setBusy(false)
-                  }
-                }}
-                disabled={busy}
-              >
-                {status === "confirmed"
-                  ? "Confirm Order"
-                  : status === "dispatched"
-                    ? "Mark Dispatched"
-                    : "Mark Delivered"}
-              </Button>
-            ))}
+          <p className="text-sm font-semibold text-ink">Status timeline</p>
+          <p className="mt-2 text-sm leading-6 text-muted">
+            Your seller updates this timeline as the order moves forward.
+          </p>
+          <div className="mt-4 space-y-3">
+            {statusSteps.map((status, index) => {
+              const reached = statusSteps.indexOf(order.status) >= index
+              return (
+                <div key={status} className="flex items-center gap-3">
+                  <div
+                    className={`h-3 w-3 rounded-full ${
+                      reached ? "bg-brand" : "bg-border"
+                    }`}
+                  />
+                  <p className={reached ? "font-medium text-ink" : "text-muted"}>
+                    {ORDER_STATUS_META[status].label}
+                  </p>
+                </div>
+              )
+            })}
           </div>
         </Card>
       ) : null}
 
-      {canReview ? (
+      {isSellerViewer ? (
+        <Card className="p-4">
+          <p className="text-sm font-semibold text-ink">Fulfil this order</p>
+          <p className="mt-2 text-sm leading-6 text-muted">
+            Only your store can move this order forward. Buyers just see the updates.
+          </p>
+          {nextActions.length > 0 ? (
+            <div className="mt-4 flex flex-wrap gap-3">
+              {nextActions.map((status) => (
+                <Button
+                  key={status}
+                  onClick={async () => {
+                    const previousStatus = order.status
+                    setBusy(true)
+                    setOrder((current) =>
+                      current ? { ...current, status } : current
+                    )
+
+                    try {
+                      await updateOrderStatus(order.id, status)
+                      toast.success(`Order marked ${ORDER_STATUS_META[status].label}.`)
+                    } catch (error) {
+                      setOrder((current) =>
+                        current ? { ...current, status: previousStatus } : current
+                      )
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Could not update this order."
+                      )
+                    } finally {
+                      setBusy(false)
+                    }
+                  }}
+                  disabled={busy}
+                >
+                  {status === "confirmed"
+                    ? "Confirm Order"
+                    : status === "dispatched"
+                      ? "Mark Dispatched"
+                      : "Mark Delivered"}
+                </Button>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-4 rounded-2xl bg-canvas px-4 py-3 text-sm text-muted">
+              This order is already {ORDER_STATUS_META[order.status].label.toLowerCase()}.
+            </p>
+          )}
+        </Card>
+      ) : null}
+
+      {isBuyerViewer && canReview ? (
         <Card className="p-4">
           <p className="text-sm font-semibold text-ink">Leave a review</p>
           <div className="mt-4 flex gap-2">
@@ -320,8 +348,9 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
         <Card className="p-4">
           <p className="text-sm font-semibold text-ink">History</p>
           <p className="mt-2 text-sm leading-6 text-muted">
-            Remove finished orders from your visible history without affecting the
-            other person&apos;s records.
+            {isSellerViewer
+              ? "Remove this finished order from your store history only. The buyer keeps their own copy."
+              : "Remove this finished order from your purchase history only. The seller keeps their own copy."}
           </p>
           <Button
             variant="outline"
