@@ -56,12 +56,6 @@ export function GlobalCart() {
       vendorData?.vendor.accountNumber
   )
 
-  useEffect(() => {
-    if (paymentMethod === "vendor_transfer" && !vendorTransferReady) {
-      setPaymentMethod("pay_on_delivery")
-    }
-  }, [paymentMethod, vendorTransferReady])
-
   if (!vendorId || itemCount === 0) {
     return null
   }
@@ -223,18 +217,18 @@ export function GlobalCart() {
               <div className="space-y-2">
                 {(["pay_on_delivery", "vendor_transfer"] as PaymentMethod[]).map((method) => {
                   const methodMeta = PAYMENT_METHOD_META[method]
-                  const disabled = method === "vendor_transfer" && !vendorTransferReady
+                  const needsSellerDetails =
+                    method === "vendor_transfer" && !vendorTransferReady
 
                   return (
                     <button
                       key={method}
                       type="button"
-                      disabled={disabled}
                       className={`w-full rounded-[22px] border px-4 py-3 text-left transition ${
                         paymentMethod === method
                           ? "border-brand/40 bg-brand/5"
                           : "border-border bg-surface"
-                      } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+                      }`}
                       onClick={() => setPaymentMethod(method)}
                     >
                       <div className="flex items-center justify-between gap-3">
@@ -246,8 +240,8 @@ export function GlobalCart() {
                         ) : null}
                       </div>
                       <p className="mt-1 text-sm leading-6 text-muted">
-                        {disabled
-                          ? "This seller has not added direct payment details yet."
+                        {needsSellerDetails
+                          ? "Place the order now. The seller can share payment details after confirming."
                           : methodMeta.helper}
                       </p>
                     </button>

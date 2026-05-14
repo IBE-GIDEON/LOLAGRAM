@@ -264,6 +264,16 @@ function normalizeCachedOrderList(value: unknown): OrderDetail[] {
     .filter((order): order is OrderDetail => Boolean(order))
 }
 
+function readPersistedOrderList(key: string): OrderDetail[] | null {
+  const rawValue = readPersistedCache<unknown>(key)
+  if (rawValue === null) {
+    return null
+  }
+
+  const orders = normalizeCachedOrderList(rawValue)
+  return orders.length > 0 ? orders : null
+}
+
 function normalizeCachedVendorDetail(value: unknown): VendorDetail | null {
   const row = asRecord(value)
   if (!row) {
@@ -564,6 +574,17 @@ function clearMarketplaceDiscoveryCaches() {
   clearPersistedCacheByPrefix("vendors:")
   clearPersistedCacheByPrefix("marketplace-search:")
   clearPersistedCacheByPrefix("product-feed:")
+}
+
+function clearOrderCaches() {
+  buyerOrdersCache.clear()
+  sellerOrdersCache.clear()
+  orderDetailCache.clear()
+  storeAnalyticsCache.clear()
+  clearPersistedCacheByPrefix("buyer-orders:")
+  clearPersistedCacheByPrefix("seller-orders:")
+  clearPersistedCacheByPrefix("order-detail:")
+  clearPersistedCacheByPrefix("store-analytics:")
 }
 
 function mapOrder(row: Record<string, unknown>, vendor?: VendorProfile): OrderDetail {
@@ -1207,9 +1228,7 @@ export async function loadBuyerOrders(userId: string): Promise<OrderDetail[]> {
 
   const cached =
     readCache(buyerOrdersCache, userId) ??
-    normalizeCachedOrderList(
-      readPersistedCache<OrderDetail[]>(persistedCacheKeys.buyerOrders(userId))
-    )
+    readPersistedOrderList(persistedCacheKeys.buyerOrders(userId))
   if (cached) {
     writeHybridCache(
       buyerOrdersCache,
@@ -1253,9 +1272,7 @@ export async function loadSellerOrders(userId: string): Promise<OrderDetail[]> {
 
   const cached =
     readCache(sellerOrdersCache, userId) ??
-    normalizeCachedOrderList(
-      readPersistedCache<OrderDetail[]>(persistedCacheKeys.sellerOrders(userId))
-    )
+    readPersistedOrderList(persistedCacheKeys.sellerOrders(userId))
   if (cached) {
     writeHybridCache(
       sellerOrdersCache,
@@ -1719,6 +1736,7 @@ export async function placeOrder(
         deliveryAddress: payload.deliveryAddress
       })
 
+      clearOrderCaches()
       return {
         orderId: order.id
       }
@@ -1740,6 +1758,7 @@ export async function placeOrder(
     throw new Error(data?.error ?? "Unable to place order")
   }
 
+  clearOrderCaches()
   return (await response.json()) as PlaceOrderResponse
 }
 
