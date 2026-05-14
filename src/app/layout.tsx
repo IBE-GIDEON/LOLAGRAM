@@ -12,6 +12,8 @@ const inter = Inter({
   display: "swap"
 })
 
+const FAVICON_VERSION = "20260514"
+
 export const metadata: Metadata = {
   title: "LOLAGRAM",
   description:
@@ -19,12 +21,12 @@ export const metadata: Metadata = {
   applicationName: "LOLAGRAM",
   icons: {
     icon: [
-      { url: "/favicon.ico", sizes: "any" },
+      { url: `/favicon.ico?v=${FAVICON_VERSION}`, sizes: "any" },
       { url: "/icons/icon-64.png", sizes: "64x64", type: "image/png" },
       { url: "/icons/icon-128.png", sizes: "128x128", type: "image/png" }
     ],
     apple: [{ url: "/icons/apple-icon-180.png", sizes: "180x180", type: "image/png" }],
-    shortcut: [{ url: "/favicon.ico", sizes: "any" }]
+    shortcut: [{ url: `/favicon.ico?v=${FAVICON_VERSION}`, sizes: "any" }]
   },
   appleWebApp: {
     capable: true,
