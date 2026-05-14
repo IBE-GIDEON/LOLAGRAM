@@ -49,6 +49,44 @@ self.addEventListener("sync", (event) => {
   }
 })
 
+self.addEventListener("push", (event) => {
+  const payload = readPushPayload(event)
+  const title = payload.title || "LOLAGRAM"
+  const options = {
+    body: payload.body || "You have a new update on LOLAGRAM.",
+    icon: "/pwa/icon-192.png",
+    badge: "/pwa/icon-192.png",
+    data: {
+      url: payload.url || "/orders"
+    }
+  }
+
+  event.waitUntil(self.registration.showNotification(title, options))
+})
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close()
+
+  const targetUrl = event.notification.data?.url || "/orders"
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ("focus" in client) {
+          client.navigate(targetUrl)
+          return client.focus()
+        }
+      }
+
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl)
+      }
+
+      return undefined
+    })
+  )
+})
+
 async function cacheFirst(request, cacheName, limit) {
   const cache = await caches.open(cacheName)
   const cached = await cache.match(request)
@@ -134,6 +172,20 @@ async function flushOrders() {
       }
     } catch (error) {
       return
+    }
+  }
+}
+
+function readPushPayload(event) {
+  if (!event.data) {
+    return {}
+  }
+
+  try {
+    return event.data.json()
+  } catch (error) {
+    return {
+      body: event.data.text()
     }
   }
 }

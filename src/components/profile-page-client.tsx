@@ -83,8 +83,15 @@ export function ProfilePageClient() {
   }, [])
 
   const requestPushAccess = async () => {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
       toast.error("Push notifications are not supported on this device.")
+      return
+    }
+
+    if (isIos() && !isStandaloneWebApp()) {
+      toast.error(
+        "On iPhone, install LOLAGRAM to your Home Screen and open it from the app icon before enabling notifications."
+      )
       return
     }
 
@@ -105,12 +112,15 @@ export function ProfilePageClient() {
     }
 
     const registration = await navigator.serviceWorker.ready
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey)
-    })
+    const existingSubscription = await registration.pushManager.getSubscription()
+    const subscription =
+      existingSubscription ??
+      (await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey)
+      }))
 
-    await fetch("/api/push/subscribe", {
+    const response = await fetch("/api/push/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -118,6 +128,10 @@ export function ProfilePageClient() {
         subscription
       })
     })
+
+    if (!response.ok) {
+      throw new Error("Could not save your notification subscription.")
+    }
 
     toast.success("Push notifications enabled.")
   }
@@ -715,4 +729,20 @@ function urlBase64ToUint8Array(base64String: string) {
   }
 
   return outputArray
+}
+
+function isIos() {
+  if (typeof navigator === "undefined") {
+    return false
+  }
+
+  return /iphone|ipad|ipod/i.test(navigator.userAgent)
+}
+
+function isStandaloneWebApp() {
+  if (typeof window === "undefined") {
+    return false
+  }
+
+  return window.matchMedia("(display-mode: standalone)").matches || Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone)
 }
