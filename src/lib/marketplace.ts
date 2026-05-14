@@ -29,6 +29,12 @@ import {
 } from "@/lib/product-images"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import {
+  normalizeOrderItems,
+  normalizeOrderStatus,
+  normalizePaymentMethod,
+  normalizePaymentStatus
+} from "@/lib/constants"
+import {
   type CheckoutPayload,
   type OrderArchiveActor,
   type MarketplaceSearchResults,
@@ -375,24 +381,16 @@ function mapOrder(row: Record<string, unknown>, vendor?: VendorProfile): OrderDe
       ? mapVendor(row.vendor_profiles as Record<string, unknown>)
       : undefined)
 
-  const paymentMethod = (
-    row.payment_method ? String(row.payment_method) : "pay_on_delivery"
-  ) as PaymentMethod
-  const paymentStatus = (
-    row.payment_status
-      ? String(row.payment_status)
-      : paymentMethod === "vendor_transfer"
-        ? "awaiting_seller_confirmation"
-        : "pay_on_delivery"
-  ) as PaymentStatus
+  const paymentMethod = normalizePaymentMethod(row.payment_method)
+  const paymentStatus = normalizePaymentStatus(row.payment_status, paymentMethod)
 
   return {
     id: String(row.id),
     buyerId: String(row.buyer_id),
     vendorId: String(row.vendor_id),
-    items: (row.items ?? []) as OrderDetail["items"],
+    items: normalizeOrderItems(row.items),
     totalAmount: Number(row.total_amount ?? 0),
-    status: String(row.status) as OrderStatus,
+    status: normalizeOrderStatus(row.status),
     paymentMethod,
     paymentStatus,
     paymentReference: (row.payment_reference ?? row.paystack_reference)

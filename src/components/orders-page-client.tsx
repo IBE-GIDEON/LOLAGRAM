@@ -1,12 +1,16 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useEffect, useState } from "react"
 import toast from "react-hot-toast"
 
 import { useAuth } from "@/components/providers/auth-provider"
 import { Badge, Button, Card, SectionHeading } from "@/components/ui"
-import { ORDER_STATUS_META, PAYMENT_METHOD_META, PAYMENT_STATUS_META } from "@/lib/constants"
+import {
+  getOrderStatusMeta,
+  getPaymentMethodMeta,
+  getPaymentStatusMeta
+} from "@/lib/constants"
 import { formatCurrency, formatDate } from "@/lib/format"
 import {
   archiveCompletedOrder,
@@ -134,7 +138,10 @@ export function OrdersPageClient() {
       {fetching ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-24 animate-pulse rounded-[26px] bg-surface shadow-soft" />
+            <div
+              key={index}
+              className="h-24 animate-pulse rounded-[26px] bg-surface shadow-soft"
+            />
           ))}
         </div>
       ) : orders.length === 0 ? (
@@ -148,88 +155,96 @@ export function OrdersPageClient() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {orders.map((order) => (
-            <Card key={order.id} className="p-4 transition hover:bg-canvas">
-              <Link href={`/orders/${order.id}`} className="block">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-ink">
-                      {mode === "store"
-                        ? order.buyer?.fullName ?? "Customer order"
-                        : order.vendor?.storeName ?? "Vendor order"}
-                    </p>
-                    <p className="mt-1 text-sm text-muted">{formatDate(order.createdAt)}</p>
-                    <p className="mt-2 text-xs leading-5 text-muted">
-                      {PAYMENT_METHOD_META[order.paymentMethod].label} ·{" "}
-                      {PAYMENT_STATUS_META[order.paymentStatus].label}
-                    </p>
-                    <p className="mt-2 text-base font-bold text-brand">
-                      {formatCurrency(order.totalAmount)}
-                    </p>
-                  </div>
-                  <Badge className={ORDER_STATUS_META[order.status].className}>
-                    {ORDER_STATUS_META[order.status].label}
-                  </Badge>
-                </div>
-              </Link>
+          {orders.map((order) => {
+            const paymentMethodMeta = getPaymentMethodMeta(order.paymentMethod)
+            const paymentStatusMeta = getPaymentStatusMeta(
+              order.paymentStatus,
+              order.paymentMethod
+            )
+            const orderStatusMeta = getOrderStatusMeta(order.status)
 
-              <div className="mt-4 flex gap-2">
-                <Link
-                  href={`/orders/${order.id}`}
-                  className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-surface px-4 py-3 text-sm font-semibold text-ink transition hover:bg-canvas"
-                >
-                  Open order
+            return (
+              <Card key={order.id} className="p-4 transition hover:bg-canvas">
+                <Link href={`/orders/${order.id}`} className="block">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-ink">
+                        {mode === "store"
+                          ? order.buyer?.fullName ?? "Customer order"
+                          : order.vendor?.storeName ?? "Vendor order"}
+                      </p>
+                      <p className="mt-1 text-sm text-muted">{formatDate(order.createdAt)}</p>
+                      <p className="mt-2 text-xs leading-5 text-muted">
+                        {paymentMethodMeta.label} · {paymentStatusMeta.label}
+                      </p>
+                      <p className="mt-2 text-base font-bold text-brand">
+                        {formatCurrency(order.totalAmount)}
+                      </p>
+                    </div>
+                    <Badge className={orderStatusMeta.className}>
+                      {orderStatusMeta.label}
+                    </Badge>
+                  </div>
                 </Link>
 
-                {(order.status === "delivered" || order.status === "cancelled") && profile ? (
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    disabled={archivingOrderId === order.id}
-                    onClick={async () => {
-                      const actor = mode === "store" ? "seller" : "buyer"
-                      const confirmed = window.confirm(
-                        mode === "store"
-                          ? "Remove this order from your store history only?"
-                          : "Remove this order from your purchase history only?"
-                      )
-
-                      if (!confirmed) return
-
-                      setArchivingOrderId(order.id)
-                      try {
-                        const result = await archiveCompletedOrder(
-                          order.id,
-                          actor,
-                          profile.id
-                        )
-                        setOrders((current) =>
-                          current.filter((currentOrder) => currentOrder.id !== order.id)
-                        )
-                        toast.success(
-                          result.localOnly
-                            ? "Removed from this device only for now."
-                            : mode === "store"
-                              ? "Removed from your store history."
-                              : "Removed from your purchase history."
-                        )
-                      } catch (error) {
-                        toast.error(
-                          error instanceof Error
-                            ? error.message
-                            : "Could not remove this order from history."
-                        )
-                      } finally {
-                        setArchivingOrderId(null)
-                      }
-                    }}
+                <div className="mt-4 flex gap-2">
+                  <Link
+                    href={`/orders/${order.id}`}
+                    className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-surface px-4 py-3 text-sm font-semibold text-ink transition hover:bg-canvas"
                   >
-                    {mode === "store" ? "Remove store copy" : "Remove purchase copy"}
-                  </Button>
-                ) : null}
-              </div>
-            </Card>
-          ))}
+                    Open order
+                  </Link>
+
+                  {(order.status === "delivered" || order.status === "cancelled") && profile ? (
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      disabled={archivingOrderId === order.id}
+                      onClick={async () => {
+                        const actor = mode === "store" ? "seller" : "buyer"
+                        const confirmed = window.confirm(
+                          mode === "store"
+                            ? "Remove this order from your store history only?"
+                            : "Remove this order from your purchase history only?"
+                        )
+
+                        if (!confirmed) return
+
+                        setArchivingOrderId(order.id)
+                        try {
+                          const result = await archiveCompletedOrder(
+                            order.id,
+                            actor,
+                            profile.id
+                          )
+                          setOrders((current) =>
+                            current.filter((currentOrder) => currentOrder.id !== order.id)
+                          )
+                          toast.success(
+                            result.localOnly
+                              ? "Removed from this device only for now."
+                              : mode === "store"
+                                ? "Removed from your store history."
+                                : "Removed from your purchase history."
+                          )
+                        } catch (error) {
+                          toast.error(
+                            error instanceof Error
+                              ? error.message
+                              : "Could not remove this order from history."
+                          )
+                        } finally {
+                          setArchivingOrderId(null)
+                        }
+                      }}
+                    >
+                      {mode === "store" ? "Remove store copy" : "Remove purchase copy"}
+                    </Button>
+                  ) : null}
+                </div>
+              </Card>
+            )
+          })}
         </div>
       )}
     </div>

@@ -8,9 +8,9 @@ import { FiMessageCircle } from "react-icons/fi"
 import { useAuth } from "@/components/providers/auth-provider"
 import { Badge, Button, Card, SectionHeading } from "@/components/ui"
 import {
-  ORDER_STATUS_META,
-  PAYMENT_METHOD_META,
-  PAYMENT_STATUS_META
+  getOrderStatusMeta,
+  getPaymentMethodMeta,
+  getPaymentStatusMeta
 } from "@/lib/constants"
 import { formatCurrency, formatDateTime } from "@/lib/format"
 import {
@@ -92,8 +92,12 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
   const orderCounterpartyMeta = isSellerViewer
     ? "Confirm, collect payment if needed, then dispatch and deliver."
     : "Track seller updates and payment instructions in one place."
-  const paymentMethodMeta = PAYMENT_METHOD_META[order.paymentMethod]
-  const paymentStatusMeta = PAYMENT_STATUS_META[order.paymentStatus]
+  const paymentMethodMeta = getPaymentMethodMeta(order.paymentMethod)
+  const paymentStatusMeta = getPaymentStatusMeta(
+    order.paymentStatus,
+    order.paymentMethod
+  )
+  const orderStatusMeta = getOrderStatusMeta(order.status)
   const vendorTransferReady = Boolean(
     activeVendor?.bankName && activeVendor?.accountName && activeVendor?.accountNumber
   )
@@ -171,8 +175,8 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
               {formatDateTime(order.createdAt)}
             </p>
           </div>
-          <Badge className={ORDER_STATUS_META[order.status].className}>
-            {ORDER_STATUS_META[order.status].label}
+          <Badge className={orderStatusMeta.className}>
+            {orderStatusMeta.label}
           </Badge>
         </div>
 
@@ -289,7 +293,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
                     className={`h-3 w-3 rounded-full ${reached ? "bg-brand" : "bg-border"}`}
                   />
                   <p className={reached ? "font-medium text-ink" : "text-muted"}>
-                    {ORDER_STATUS_META[status].label}
+                    {getOrderStatusMeta(status).label}
                   </p>
                 </div>
               )

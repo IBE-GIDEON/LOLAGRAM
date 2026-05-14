@@ -5,9 +5,9 @@ import { useEffect, useState } from "react"
 
 import { Card, SectionHeading } from "@/components/ui"
 import {
-  ORDER_STATUS_META,
-  PAYMENT_METHOD_META,
-  PAYMENT_STATUS_META
+  getOrderStatusMeta,
+  getPaymentMethodMeta,
+  getPaymentStatusMeta
 } from "@/lib/constants"
 import { formatCurrency } from "@/lib/format"
 import { loadOrderDetail } from "@/lib/marketplace"
@@ -23,6 +23,12 @@ export default function OrderConfirmationPage({
   useEffect(() => {
     loadOrderDetail(params.id).then(setOrder)
   }, [params.id])
+
+  const orderStatusMeta = order ? getOrderStatusMeta(order.status) : null
+  const paymentMethodMeta = order ? getPaymentMethodMeta(order.paymentMethod) : null
+  const paymentStatusMeta = order
+    ? getPaymentStatusMeta(order.paymentStatus, order.paymentMethod)
+    : null
 
   return (
     <div className="space-y-4 p-4 pb-safe-nav">
@@ -42,7 +48,7 @@ export default function OrderConfirmationPage({
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted">Status</span>
               <span className="font-semibold text-brand">
-                {ORDER_STATUS_META[order.status].label}
+                {orderStatusMeta?.label}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -54,13 +60,13 @@ export default function OrderConfirmationPage({
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted">Payment method</span>
               <span className="font-semibold text-ink">
-                {PAYMENT_METHOD_META[order.paymentMethod].label}
+                {paymentMethodMeta?.label}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted">Payment status</span>
               <span className="font-semibold text-ink">
-                {PAYMENT_STATUS_META[order.paymentStatus].label}
+                {paymentStatusMeta?.label}
               </span>
             </div>
             <p className="rounded-2xl bg-surface px-4 py-3 text-sm leading-6 text-muted">

@@ -1,5 +1,6 @@
 import {
   type AccountType,
+  type OrderItem,
   type PaymentMethod,
   type PaymentStatus,
   type OrderStatus,
@@ -112,6 +113,77 @@ export const PAYMENT_STATUS_META: Record<
     className: "bg-sky-100 text-sky-800",
     helper: "The seller marked your direct payment as received."
   }
+}
+
+export function normalizeOrderStatus(value: unknown): OrderStatus {
+  return value === "confirmed" ||
+    value === "dispatched" ||
+    value === "delivered" ||
+    value === "cancelled"
+    ? value
+    : "pending"
+}
+
+export function normalizePaymentMethod(value: unknown): PaymentMethod {
+  return value === "vendor_transfer" ? "vendor_transfer" : "pay_on_delivery"
+}
+
+export function normalizePaymentStatus(
+  value: unknown,
+  paymentMethod: PaymentMethod
+): PaymentStatus {
+  if (
+    value === "awaiting_seller_confirmation" ||
+    value === "pay_on_delivery" ||
+    value === "awaiting_vendor_payment" ||
+    value === "paid_to_vendor"
+  ) {
+    return value
+  }
+
+  if (value === "awaiting_confirmation") {
+    return "awaiting_seller_confirmation"
+  }
+
+  if (value === "paid" || value === "paid_to_platform" || value === "payment_received") {
+    return paymentMethod === "vendor_transfer" ? "paid_to_vendor" : "pay_on_delivery"
+  }
+
+  return paymentMethod === "vendor_transfer"
+    ? "awaiting_seller_confirmation"
+    : "pay_on_delivery"
+}
+
+export function normalizeOrderItems(value: unknown): OrderItem[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .filter(
+      (item): item is Record<string, unknown> =>
+        Boolean(item) && typeof item === "object" && !Array.isArray(item)
+    )
+    .map((item, index) => ({
+      productId: String(item.productId ?? item.product_id ?? `item-${index}`),
+      name: String(item.name ?? "Item"),
+      price: Number(item.price ?? 0),
+      quantity: Math.max(1, Number(item.quantity ?? 1))
+    }))
+}
+
+export function getOrderStatusMeta(value: unknown) {
+  return ORDER_STATUS_META[normalizeOrderStatus(value)]
+}
+
+export function getPaymentMethodMeta(value: unknown) {
+  return PAYMENT_METHOD_META[normalizePaymentMethod(value)]
+}
+
+export function getPaymentStatusMeta(value: unknown, paymentMethod: unknown) {
+  return PAYMENT_STATUS_META[
+    normalizePaymentStatus(value, normalizePaymentMethod(paymentMethod))
+  ]
 }
 
 export const BOTTOM_NAV_ITEMS = [
