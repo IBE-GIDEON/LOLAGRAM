@@ -68,10 +68,12 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
 
   const isSellerViewer = Boolean(profile && vendorProfile && order?.vendorId === vendorProfile.id)
   const isBuyerViewer = Boolean(profile && order?.buyerId === profile.id)
+  const orderItems = Array.isArray(order?.items) ? order.items : []
+  const vendorReviews = Array.isArray(vendorData?.reviews) ? vendorData.reviews : []
   const canReview =
     isBuyerViewer &&
     order?.status === "delivered" &&
-    !vendorData?.reviews.some((review) => review.orderId === order?.id)
+    !vendorReviews.some((review) => review.orderId === order?.id)
   const archiveActor: OrderArchiveActor | null = isSellerViewer
     ? "seller"
     : isBuyerViewer
@@ -181,7 +183,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
         </div>
 
         <div className="mt-5 space-y-3">
-          {order.items.map((item) => (
+          {orderItems.map((item) => (
             <div key={item.productId} className="flex items-center justify-between text-sm">
               <div>
                 <p className="font-medium text-ink">{item.name}</p>
@@ -449,6 +451,9 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
                     }
                   }
 
+                  const currentReviews = Array.isArray(current.reviews)
+                    ? current.reviews
+                    : []
                   const nextCount = current.reviewCount + 1
                   const nextAverage =
                     (current.averageRating * current.reviewCount + reviewRating) / nextCount
@@ -459,7 +464,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
                       ...current.vendor,
                       rating: nextAverage
                     },
-                    reviews: [nextReview, ...current.reviews].slice(0, 5),
+                    reviews: [nextReview, ...currentReviews].slice(0, 5),
                     reviewCount: nextCount,
                     averageRating: nextAverage
                   }

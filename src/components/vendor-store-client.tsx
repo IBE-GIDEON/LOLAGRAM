@@ -48,7 +48,7 @@ export function VendorStoreClient({
   }, [data, initialProductId])
 
   const reviewPreview = useMemo(
-    () => data?.reviews.slice(0, 5) ?? [],
+    () => (Array.isArray(data?.reviews) ? data.reviews.slice(0, 5) : []),
     [data?.reviews]
   )
   const selectedProductImages = useMemo(

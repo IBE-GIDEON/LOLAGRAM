@@ -45,6 +45,7 @@ import {
   type PlaceOrderResponse,
   type ProductInput,
    type ProductSearchResult,
+  type ReviewWithBuyer,
   type SellerProfileInput,
   type SignUpFormValues,
   type StoreAnalytics,
@@ -105,6 +106,199 @@ function mapProduct(row: Record<string, unknown>) {
     photoUrls,
     inStock: Boolean(row.in_stock),
     createdAt: String(row.created_at ?? new Date().toISOString())
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null
+  }
+
+  return value as Record<string, unknown>
+}
+
+function normalizeCachedUser(value: unknown): UserProfile | null {
+  const row = asRecord(value)
+  if (!row?.id) {
+    return null
+  }
+
+  return {
+    id: String(row.id),
+    email: String(row.email ?? row.recovery_email ?? ""),
+    phone: String(row.phone ?? ""),
+    fullName: String(row.fullName ?? row.full_name ?? ""),
+    profilePhotoUrl: row.profilePhotoUrl
+      ? String(row.profilePhotoUrl)
+      : row.profile_photo_url
+        ? String(row.profile_photo_url)
+        : undefined,
+    accountType: String(
+      row.accountType ?? row.account_type ?? "buyer"
+    ) as UserProfile["accountType"],
+    createdAt: String(row.createdAt ?? row.created_at ?? new Date().toISOString())
+  }
+}
+
+function normalizeCachedVendor(value: unknown): VendorProfile | null {
+  const row = asRecord(value)
+  if (!row?.id || !(row.userId ?? row.user_id)) {
+    return null
+  }
+
+  return {
+    id: String(row.id),
+    userId: String(row.userId ?? row.user_id),
+    storeName: String(row.storeName ?? row.store_name ?? "Vendor"),
+    storePhotoUrl: row.storePhotoUrl
+      ? String(row.storePhotoUrl)
+      : row.store_photo_url
+        ? String(row.store_photo_url)
+        : undefined,
+    bio: row.bio ? String(row.bio) : undefined,
+    category: String(
+      row.category ?? "other"
+    ) as VendorProfile["category"],
+    city: String(row.city ?? ""),
+    whatsappNumber: String(row.whatsappNumber ?? row.whatsapp_number ?? ""),
+    bankName: row.bankName
+      ? String(row.bankName)
+      : row.bank_name
+        ? String(row.bank_name)
+        : undefined,
+    accountName: row.accountName
+      ? String(row.accountName)
+      : row.account_name
+        ? String(row.account_name)
+        : undefined,
+    accountNumber: row.accountNumber
+      ? String(row.accountNumber)
+      : row.account_number
+        ? String(row.account_number)
+        : undefined,
+    paymentNote: row.paymentNote
+      ? String(row.paymentNote)
+      : row.payment_note
+        ? String(row.payment_note)
+        : undefined,
+    isActive: Boolean(row.isActive ?? row.is_active ?? true),
+    totalSales: Number(row.totalSales ?? row.total_sales ?? 0),
+    rating: Number(row.rating ?? 0),
+    createdAt: String(row.createdAt ?? row.created_at ?? new Date().toISOString())
+  }
+}
+
+function normalizeCachedReview(value: unknown): ReviewWithBuyer | null {
+  const row = asRecord(value)
+  if (!row?.id) {
+    return null
+  }
+
+  return {
+    id: String(row.id),
+    orderId: String(row.orderId ?? row.order_id ?? ""),
+    buyerId: String(row.buyerId ?? row.buyer_id ?? ""),
+    vendorId: String(row.vendorId ?? row.vendor_id ?? ""),
+    rating: Math.max(1, Number(row.rating ?? 0)),
+    comment: String(row.comment ?? ""),
+    createdAt: String(row.createdAt ?? row.created_at ?? new Date().toISOString()),
+    buyerName: getReviewerDisplayName(
+      row.buyerName
+        ? String(row.buyerName)
+        : row.buyer_name
+          ? String(row.buyer_name)
+          : undefined
+    )
+  }
+}
+
+function normalizeCachedOrder(value: unknown): OrderDetail | null {
+  const row = asRecord(value)
+  if (!row?.id || !(row.buyerId ?? row.buyer_id) || !(row.vendorId ?? row.vendor_id)) {
+    return null
+  }
+
+  const paymentMethod = normalizePaymentMethod(
+    row.paymentMethod ?? row.payment_method
+  )
+
+  return {
+    id: String(row.id),
+    buyerId: String(row.buyerId ?? row.buyer_id),
+    vendorId: String(row.vendorId ?? row.vendor_id),
+    items: normalizeOrderItems(row.items),
+    totalAmount: Number(row.totalAmount ?? row.total_amount ?? 0),
+    status: normalizeOrderStatus(row.status),
+    paymentMethod,
+    paymentStatus: normalizePaymentStatus(
+      row.paymentStatus ?? row.payment_status,
+      paymentMethod
+    ),
+    paymentReference:
+      row.paymentReference || row.payment_reference || row.paystack_reference
+        ? String(
+            row.paymentReference ?? row.payment_reference ?? row.paystack_reference
+          )
+        : undefined,
+    buyerPaymentNote: row.buyerPaymentNote
+      ? String(row.buyerPaymentNote)
+      : row.buyer_payment_note
+        ? String(row.buyer_payment_note)
+        : undefined,
+    deliveryAddress: String(
+      row.deliveryAddress ?? row.delivery_address ?? ""
+    ),
+    createdAt: String(row.createdAt ?? row.created_at ?? new Date().toISOString()),
+    vendor: normalizeCachedVendor(row.vendor ?? row.vendor_profiles) ?? undefined,
+    buyer: normalizeCachedUser(row.buyer) ?? undefined
+  }
+}
+
+function normalizeCachedOrderList(value: unknown): OrderDetail[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((order) => normalizeCachedOrder(order))
+    .filter((order): order is OrderDetail => Boolean(order))
+}
+
+function normalizeCachedVendorDetail(value: unknown): VendorDetail | null {
+  const row = asRecord(value)
+  if (!row) {
+    return null
+  }
+
+  const vendor = normalizeCachedVendor(row.vendor)
+  if (!vendor) {
+    return null
+  }
+
+  const products = Array.isArray(row.products)
+    ? row.products
+        .map((product) => {
+          const productRow = asRecord(product)
+          return productRow ? mapProduct(productRow) : null
+        })
+        .filter(
+          (product): product is ReturnType<typeof mapProduct> => Boolean(product)
+        )
+    : []
+
+  const reviews = Array.isArray(row.reviews)
+    ? row.reviews
+        .map((review) => normalizeCachedReview(review))
+        .filter((review): review is ReviewWithBuyer => Boolean(review))
+    : []
+
+  return {
+    vendor,
+    owner: normalizeCachedUser(row.owner) ?? undefined,
+    products,
+    reviews,
+    reviewCount: Number(row.reviewCount ?? row.review_count ?? reviews.length),
+    averageRating: Number(row.averageRating ?? row.average_rating ?? vendor.rating)
   }
 }
 
@@ -620,17 +814,21 @@ export function peekCachedProductFeed(query = ""): ProductSearchResult[] {
 }
 
 export function peekCachedBuyerOrders(userId: string): OrderDetail[] {
-  return readPersistedCache<OrderDetail[]>(persistedCacheKeys.buyerOrders(userId)) ?? []
+  return normalizeCachedOrderList(
+    readPersistedCache<OrderDetail[]>(persistedCacheKeys.buyerOrders(userId))
+  )
 }
 
 export function peekCachedSellerOrders(userId: string): OrderDetail[] {
-  return (
-    readPersistedCache<OrderDetail[]>(persistedCacheKeys.sellerOrders(userId)) ?? []
+  return normalizeCachedOrderList(
+    readPersistedCache<OrderDetail[]>(persistedCacheKeys.sellerOrders(userId))
   )
 }
 
 export function peekCachedVendorDetail(vendorId: string): VendorDetail | null {
-  return readPersistedCache<VendorDetail>(persistedCacheKeys.vendorDetail(vendorId))
+  return normalizeCachedVendorDetail(
+    readPersistedCache<VendorDetail>(persistedCacheKeys.vendorDetail(vendorId))
+  )
 }
 
 export async function loadVendors(query = ""): Promise<VendorSnapshot[]> {
@@ -937,12 +1135,18 @@ export async function loadVendorDetail(vendorId: string): Promise<VendorDetail |
     return canUseDemoMode ? getVendorDetailDemo(vendorId) : null
   }
 
-  const cached = readHybridCache(
-    vendorDetailCache,
-    vendorId,
-    persistedCacheKeys.vendorDetail(vendorId)
-  )
+  const cached =
+    readCache(vendorDetailCache, vendorId) ??
+    normalizeCachedVendorDetail(
+      readPersistedCache<VendorDetail>(persistedCacheKeys.vendorDetail(vendorId))
+    )
   if (cached) {
+    writeHybridCache(
+      vendorDetailCache,
+      vendorId,
+      persistedCacheKeys.vendorDetail(vendorId),
+      cached
+    )
     return cached
   }
 
@@ -1001,12 +1205,18 @@ export async function loadBuyerOrders(userId: string): Promise<OrderDetail[]> {
     return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
   }
 
-  const cached = readHybridCache(
-    buyerOrdersCache,
-    userId,
-    persistedCacheKeys.buyerOrders(userId)
-  )
+  const cached =
+    readCache(buyerOrdersCache, userId) ??
+    normalizeCachedOrderList(
+      readPersistedCache<OrderDetail[]>(persistedCacheKeys.buyerOrders(userId))
+    )
   if (cached) {
+    writeHybridCache(
+      buyerOrdersCache,
+      userId,
+      persistedCacheKeys.buyerOrders(userId),
+      cached
+    )
     return cached
   }
 
@@ -1041,12 +1251,18 @@ export async function loadSellerOrders(userId: string): Promise<OrderDetail[]> {
     return canUseDemoMode ? getSellerOrdersDemo(userId) : []
   }
 
-  const cached = readHybridCache(
-    sellerOrdersCache,
-    userId,
-    persistedCacheKeys.sellerOrders(userId)
-  )
+  const cached =
+    readCache(sellerOrdersCache, userId) ??
+    normalizeCachedOrderList(
+      readPersistedCache<OrderDetail[]>(persistedCacheKeys.sellerOrders(userId))
+    )
   if (cached) {
+    writeHybridCache(
+      sellerOrdersCache,
+      userId,
+      persistedCacheKeys.sellerOrders(userId),
+      cached
+    )
     return cached
   }
 
@@ -1085,12 +1301,18 @@ export async function loadOrderDetail(orderId: string) {
     return canUseDemoMode ? getOrderByIdDemo(orderId) : null
   }
 
-  const cached = readHybridCache(
-    orderDetailCache,
-    orderId,
-    persistedCacheKeys.orderDetail(orderId)
-  )
+  const cached =
+    readCache(orderDetailCache, orderId) ??
+    normalizeCachedOrder(
+      readPersistedCache<OrderDetail>(persistedCacheKeys.orderDetail(orderId))
+    )
   if (cached) {
+    writeHybridCache(
+      orderDetailCache,
+      orderId,
+      persistedCacheKeys.orderDetail(orderId),
+      cached
+    )
     return cached
   }
 
@@ -1211,8 +1433,8 @@ export async function loadVendorProfile(userId: string) {
     return cached
   }
 
-  const persisted = readPersistedCache<VendorProfile>(
-    persistedCacheKeys.vendorProfile(userId)
+  const persisted = normalizeCachedVendor(
+    readPersistedCache<VendorProfile>(persistedCacheKeys.vendorProfile(userId))
   )
   if (persisted) {
     return cacheVendorProfile(persisted, userId)
@@ -1260,8 +1482,8 @@ export async function loadUserProfile(userId: string) {
     return cached
   }
 
-  const persisted = readPersistedCache<UserProfile>(
-    persistedCacheKeys.userProfile(userId)
+  const persisted = normalizeCachedUser(
+    readPersistedCache<UserProfile>(persistedCacheKeys.userProfile(userId))
   )
   if (persisted) {
     return cacheUserProfile(persisted, userId)
