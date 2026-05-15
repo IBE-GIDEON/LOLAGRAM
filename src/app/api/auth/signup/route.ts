@@ -113,8 +113,13 @@ export async function POST(request: Request) {
   })
 
   if (profileError) {
+    await supabase.auth.admin.deleteUser(data.user.id).catch(() => undefined)
+
     return NextResponse.json(
-      { error: profileError.message },
+      {
+        error:
+          "Account profile could not be saved. Check that this email or phone is not already used, then try again."
+      },
       { status: 500 }
     )
   }

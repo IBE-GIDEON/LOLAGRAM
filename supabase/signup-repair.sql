@@ -1,6 +1,10 @@
 -- LOLAGRAM signup repair
 -- Run this once in Supabase SQL Editor if signup shows:
 -- "Database error creating new user"
+--
+-- Important: LOLAGRAM creates public.users profiles inside /api/auth/signup.
+-- The old Supabase Auth trigger can block auth signups before the app route can
+-- save the profile, so this patch disables that trigger.
 
 create extension if not exists "pgcrypto";
 
@@ -43,7 +47,8 @@ where au.id = u.id
     or btrim(u.full_name) = ''
   );
 
--- Make future auth signups safe: never insert blank unique email/phone values.
+-- Keep the function available for old/manual maintenance, but do not attach it
+-- to auth.users. The app signup API is now the source of truth for profiles.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -104,9 +109,6 @@ end;
 $$;
 
 drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-after insert on auth.users
-for each row execute procedure public.handle_new_user();
 
 select id, email, phone, full_name, created_at
 from public.users
