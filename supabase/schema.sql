@@ -1,8 +1,28 @@
 create extension if not exists "pgcrypto";
 
-create type public.account_type as enum ('buyer', 'seller', 'both');
-create type public.vendor_category as enum ('cosmetics', 'wigs', 'jewellery', 'watches', 'fashion', 'other');
-create type public.order_status as enum ('pending', 'confirmed', 'dispatched', 'delivered', 'cancelled');
+do $$
+begin
+  create type public.account_type as enum ('buyer', 'seller', 'both');
+exception
+  when duplicate_object then null;
+end;
+$$;
+
+do $$
+begin
+  create type public.vendor_category as enum ('cosmetics', 'wigs', 'jewellery', 'watches', 'fashion', 'other');
+exception
+  when duplicate_object then null;
+end;
+$$;
+
+do $$
+begin
+  create type public.order_status as enum ('pending', 'confirmed', 'dispatched', 'delivered', 'cancelled');
+exception
+  when duplicate_object then null;
+end;
+$$;
 
 create table if not exists public.users (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -18,10 +38,34 @@ alter table public.users
 add column if not exists email text;
 
 update public.users u
-set email = au.email
+set
+  email = coalesce(
+    nullif(btrim(u.email), ''),
+    nullif(btrim(au.email), ''),
+    concat(u.id::text, '@missing.lolagram.local')
+  ),
+  phone = coalesce(
+    nullif(btrim(u.phone), ''),
+    nullif(btrim(au.raw_user_meta_data ->> 'phone'), ''),
+    nullif(btrim(au.phone), ''),
+    concat('missing-', u.id::text)
+  ),
+  full_name = coalesce(
+    nullif(btrim(u.full_name), ''),
+    nullif(btrim(au.raw_user_meta_data ->> 'full_name'), ''),
+    nullif(split_part(coalesce(au.email, ''), '@', 1), ''),
+    'LOLAGRAM User'
+  )
 from auth.users au
 where au.id = u.id
-  and (u.email is null or btrim(u.email) = '');
+  and (
+    u.email is null
+    or btrim(u.email) = ''
+    or u.phone is null
+    or btrim(u.phone) = ''
+    or u.full_name is null
+    or btrim(u.full_name) = ''
+  );
 
 create unique index if not exists users_email_key
 on public.users(email);
@@ -148,16 +192,55 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  profile_email text;
+  profile_phone text;
+  profile_name text;
+  profile_account_type public.account_type;
 begin
+  profile_email := coalesce(
+    nullif(btrim(new.email), ''),
+    nullif(btrim(new.raw_user_meta_data ->> 'email'), ''),
+    concat(new.id::text, '@missing.lolagram.local')
+  );
+
+  profile_phone := coalesce(
+    nullif(btrim(new.raw_user_meta_data ->> 'phone'), ''),
+    nullif(btrim(new.phone), ''),
+    concat('missing-', new.id::text)
+  );
+
+  profile_name := coalesce(
+    nullif(btrim(new.raw_user_meta_data ->> 'full_name'), ''),
+    nullif(split_part(profile_email, '@', 1), ''),
+    'LOLAGRAM User'
+  );
+
+  begin
+    profile_account_type := coalesce(
+      (new.raw_user_meta_data ->> 'account_type')::public.account_type,
+      'buyer'
+    );
+  exception
+    when invalid_text_representation then
+      profile_account_type := 'buyer';
+  end;
+
   insert into public.users (id, email, phone, full_name, account_type)
   values (
     new.id,
-    coalesce(new.email, ''),
-    coalesce(new.raw_user_meta_data ->> 'phone', new.phone, ''),
-    coalesce(new.raw_user_meta_data ->> 'full_name', 'New LOLAGRAM User'),
-    coalesce((new.raw_user_meta_data ->> 'account_type')::public.account_type, 'buyer')
+    profile_email,
+    profile_phone,
+    profile_name,
+    profile_account_type
   )
-  on conflict (id) do nothing;
+  on conflict (id) do update
+  set
+    email = excluded.email,
+    phone = excluded.phone,
+    full_name = excluded.full_name,
+    account_type = excluded.account_type;
+
   return new;
 end;
 $$;
