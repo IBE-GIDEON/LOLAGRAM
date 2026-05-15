@@ -7,6 +7,16 @@ import { THEME_KEY } from "@/lib/constants"
 
 import "@/app/globals.css"
 
+const supabaseOrigin = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? (() => {
+      try {
+        return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin
+      } catch {
+        return null
+      }
+    })()
+  : null
+
 const inter = Inter({
   subsets: ["latin"],
   display: "swap"
@@ -69,6 +79,14 @@ export default function RootLayout({
 
   return (
     <html lang="en" className={inter.className} suppressHydrationWarning>
+      <head>
+        {supabaseOrigin ? (
+          <>
+            <link rel="preconnect" href={supabaseOrigin} />
+            <link rel="dns-prefetch" href={supabaseOrigin} />
+          </>
+        ) : null}
+      </head>
       <body>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <AppProviders>

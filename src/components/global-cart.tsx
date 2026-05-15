@@ -8,6 +8,7 @@ import { FiShoppingBag, FiTrash2 } from "react-icons/fi"
 
 import { useAuth } from "@/components/providers/auth-provider"
 import { useCart } from "@/components/providers/cart-provider"
+import { RemoteImage } from "@/components/remote-image"
 import { BottomSheet, Button, Card } from "@/components/ui"
 import { PAYMENT_METHOD_META } from "@/lib/constants"
 import { formatCurrency } from "@/lib/format"
@@ -142,18 +143,16 @@ export function GlobalCart() {
 
           {items.map((item) => {
             const product = productMap.get(item.productId)
+            const primaryImage = product ? getPrimaryProductImage(product) : null
             return (
               <Card key={item.productId} className="p-4">
                 <div className="flex items-start gap-3">
-                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-canvas">
-                    {product && getPrimaryProductImage(product) ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={getPrimaryProductImage(product)}
-                        alt={item.name}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : null}
+                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-canvas">
+                    <RemoteImage
+                      src={primaryImage}
+                      alt={item.name}
+                      sizes="64px"
+                    />
                   </div>
 
                   <div className="min-w-0 flex-1">

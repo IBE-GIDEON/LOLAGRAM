@@ -332,7 +332,7 @@ function getOrderPlacementError() {
   return "Order placement needs live Supabase configuration before launch."
 }
 
-const CACHE_TTL_MS = 20_000
+const CACHE_TTL_MS = 120_000
 
 type CacheEntry<T> = {
   value: T
@@ -350,6 +350,10 @@ const sellerProductsCache = new Map<string, CacheEntry<ReturnType<typeof mapProd
 const storeAnalyticsCache = new Map<string, CacheEntry<StoreAnalytics>>()
 const vendorProfileCache = new Map<string, CacheEntry<VendorProfile | null>>()
 const userProfileCache = new Map<string, CacheEntry<UserProfile | null>>()
+
+// Prevents duplicate in-flight requests for the same key
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const inFlight = new Map<string, Promise<any>>()
 const HIDDEN_ORDERS_KEY = "lolagram-hidden-orders"
 const PERSISTED_CACHE_KEY = "lolagram-persisted-cache-v1"
 const PERSISTED_CACHE_TTL_MS = 10 * 60 * 1000
@@ -521,6 +525,14 @@ function writeHybridCache<T>(
 ): T {
   writeCache(cache, key, value)
   return writePersistedCache(persistedKey, value, ttlMs)
+}
+
+function deduplicatedFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+  const existing = inFlight.get(key)
+  if (existing) return existing as Promise<T>
+  const promise = fetcher().finally(() => inFlight.delete(key))
+  inFlight.set(key, promise)
+  return promise
 }
 
 type HiddenOrdersStore = {
@@ -913,36 +925,38 @@ export async function loadVendors(query = ""): Promise<VendorSnapshot[]> {
     return cached
   }
 
-  const supabase = getSupabaseBrowserClient()
-  if (!supabase) return canUseDemoMode ? getVendorSnapshots(query) : []
+  return deduplicatedFetch(`vendors:${cacheKey}`, async () => {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) return canUseDemoMode ? getVendorSnapshots(query) : []
 
-  let request = supabase
-    .from("vendor_profiles")
-    .select("*")
-    .eq("is_active", true)
-    .order("created_at", { ascending: false })
+    let request = supabase
+      .from("vendor_profiles")
+      .select("*")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
 
-  if (query.trim()) {
-    request = request.textSearch("search_text", query.trim(), {
-      type: "websearch"
-    })
-  }
+    if (query.trim()) {
+      request = request.textSearch("search_text", query.trim(), {
+        type: "websearch"
+      })
+    }
 
-  const { data, error } = await request.limit(60)
-  if (error || !data) {
-    return canUseDemoMode ? getVendorSnapshots(query) : []
-  }
+    const { data, error } = await request.limit(60)
+    if (error || !data) {
+      return canUseDemoMode ? getVendorSnapshots(query) : []
+    }
 
-  return writeHybridCache(
-    vendorListCache,
-    cacheKey,
-    persistedCacheKeys.vendors(cacheKey),
-    data.map((row) => ({
-      ...mapVendor(row),
-      reviewCount: 0,
-      productCount: 0
-    }))
-  )
+    return writeHybridCache(
+      vendorListCache,
+      cacheKey,
+      persistedCacheKeys.vendors(cacheKey),
+      data.map((row) => ({
+        ...mapVendor(row),
+        reviewCount: 0,
+        productCount: 0
+      }))
+    )
+  })
 }
 
 export async function loadMarketplaceSearch(
@@ -971,6 +985,8 @@ export async function loadMarketplaceSearch(
   if (cached) {
     return cached
   }
+
+  return deduplicatedFetch(`marketplace-search:${cacheKey}`, async () => {
 
   const vendorRequest = normalized
     ? supabase
@@ -1112,6 +1128,7 @@ export async function loadMarketplaceSearch(
       vendors
     }
   )
+  })
 }
 
 export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]> {
@@ -1131,70 +1148,95 @@ export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]
     return cached
   }
 
-  const supabase = getSupabaseBrowserClient()
-  if (!supabase) return canUseDemoMode ? getProductFeed(query) : []
+  return deduplicatedFetch(`product-feed:${cacheKey}`, async () => {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) return canUseDemoMode ? getProductFeed(query) : []
 
-  if (normalized) {
-    const results = await loadMarketplaceSearch(query)
+    if (normalized) {
+      const results = await loadMarketplaceSearch(query)
+      return writeHybridCache(
+        productFeedCache,
+        cacheKey,
+        persistedCacheKeys.productFeed(cacheKey),
+        results.products
+      )
+    }
+
+    // Single query with embedded vendor join — one round-trip instead of two
+    const { data: rows, error } = await supabase
+      .from("products")
+      .select("*, vendor_profiles!inner(*)")
+      .eq("vendor_profiles.is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(48)
+
+    if (error || !rows) {
+      // Fallback to the two-query approach when the join is unavailable
+      const { data: productRows, error: productError } = await supabase
+        .from("products")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(48)
+
+      if (productError || !productRows) {
+        return canUseDemoMode ? getProductFeed(query) : []
+      }
+
+      const vendorIds = [...new Set(productRows.map((product) => String(product.vendor_id)))]
+
+      const { data: vendorRows, error: vendorError } = await supabase
+        .from("vendor_profiles")
+        .select("*")
+        .in("id", vendorIds)
+        .eq("is_active", true)
+
+      if (vendorError || !vendorRows) {
+        return canUseDemoMode ? getProductFeed(query) : []
+      }
+
+      const vendorSnapshotMap = new Map(
+        vendorRows.map((row) => {
+          const vendor = mapVendor(row)
+          return [vendor.id, { ...vendor, reviewCount: 0, productCount: 0 } as VendorSnapshot]
+        })
+      )
+
+      return writeHybridCache(
+        productFeedCache,
+        cacheKey,
+        persistedCacheKeys.productFeed(cacheKey),
+        productRows
+          .map((row): ProductSearchResult | null => {
+            const vendor = vendorSnapshotMap.get(String(row.vendor_id))
+            if (!vendor) return null
+            return { ...mapProduct(row), vendor }
+          })
+          .filter((item): item is ProductSearchResult => Boolean(item))
+      )
+    }
+
+    const vendorSnapshotMap = new Map(
+      rows
+        .filter((row) => row.vendor_profiles && typeof row.vendor_profiles === "object" && !Array.isArray(row.vendor_profiles))
+        .map((row) => {
+          const vendor = mapVendor(row.vendor_profiles as Record<string, unknown>)
+          return [vendor.id, { ...vendor, reviewCount: 0, productCount: 0 } as VendorSnapshot]
+        })
+    )
+
     return writeHybridCache(
       productFeedCache,
       cacheKey,
       persistedCacheKeys.productFeed(cacheKey),
-      results.products
+      rows
+        .map((row): ProductSearchResult | null => {
+          const vendor = vendorSnapshotMap.get(String(row.vendor_id))
+          if (!vendor) return null
+          return { ...mapProduct(row), vendor }
+        })
+        .filter((item): item is ProductSearchResult => Boolean(item))
     )
-  }
-
-  const { data: productRows, error: productError } = await supabase
-    .from("products")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(48)
-
-  if (productError || !productRows) {
-    return canUseDemoMode ? getProductFeed(query) : []
-  }
-
-  const vendorIds = [...new Set(productRows.map((product) => String(product.vendor_id)))]
-
-  const { data: vendorRows, error: vendorError } = await supabase
-    .from("vendor_profiles")
-    .select("*")
-    .in("id", vendorIds)
-    .eq("is_active", true)
-
-  if (vendorError || !vendorRows) {
-    return canUseDemoMode ? getProductFeed(query) : []
-  }
-
-  const vendorSnapshotMap = new Map(
-    vendorRows.map((row) => {
-      const vendor = mapVendor(row)
-      const snapshot: VendorSnapshot = {
-        ...vendor,
-        reviewCount: 0,
-        productCount: 0
-      }
-
-      return [vendor.id, snapshot]
-    })
-  )
-
-  return writeHybridCache(
-    productFeedCache,
-    cacheKey,
-    persistedCacheKeys.productFeed(cacheKey),
-    productRows
-    .map((row): ProductSearchResult | null => {
-      const vendor = vendorSnapshotMap.get(String(row.vendor_id))
-      if (!vendor) return null
-
-      return {
-        ...mapProduct(row),
-        vendor
-      }
-    })
-    .filter((item): item is ProductSearchResult => Boolean(item))
-  )
+  })
 }
 
 export async function loadVendorDetail(vendorId: string): Promise<VendorDetail | null> {
@@ -1217,54 +1259,56 @@ export async function loadVendorDetail(vendorId: string): Promise<VendorDetail |
     return cached
   }
 
-  const supabase = getSupabaseBrowserClient()
-  if (!supabase) return canUseDemoMode ? getVendorDetailDemo(vendorId) : null
+  return deduplicatedFetch(`vendor-detail:${vendorId}`, async () => {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) return canUseDemoMode ? getVendorDetailDemo(vendorId) : null
 
-  const [{ data: vendor }, { data: products }, { data: reviews, count: reviewCount }] =
-    await Promise.all([
-    supabase.from("vendor_profiles").select("*").eq("id", vendorId).maybeSingle(),
-    supabase
-      .from("products")
-      .select("*")
-      .eq("vendor_id", vendorId)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("reviews")
-      .select("*", { count: "exact" })
-      .eq("vendor_id", vendorId)
-      .order("created_at", { ascending: false })
-      .limit(5)
-  ])
+    const [{ data: vendor }, { data: products }, { data: reviews, count: reviewCount }] =
+      await Promise.all([
+      supabase.from("vendor_profiles").select("*").eq("id", vendorId).maybeSingle(),
+      supabase
+        .from("products")
+        .select("*")
+        .eq("vendor_id", vendorId)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("reviews")
+        .select("*", { count: "exact" })
+        .eq("vendor_id", vendorId)
+        .order("created_at", { ascending: false })
+        .limit(5)
+    ])
 
-  if (!vendor) return null
+    if (!vendor) return null
 
-  const mappedVendor = mapVendor(vendor)
-  cacheVendorProfile(mappedVendor, mappedVendor.userId)
+    const mappedVendor = mapVendor(vendor)
+    cacheVendorProfile(mappedVendor, mappedVendor.userId)
 
-  return writeHybridCache(
-    vendorDetailCache,
-    vendorId,
-    persistedCacheKeys.vendorDetail(vendorId),
-    {
-      vendor: mappedVendor,
-      products: products?.map((product) => mapProduct(product)) ?? [],
-      reviews:
-        reviews?.map((review) => ({
-          id: String(review.id),
-          orderId: String(review.order_id),
-          buyerId: String(review.buyer_id),
-          vendorId: String(review.vendor_id),
-          rating: Number(review.rating),
-          comment: String(review.comment ?? ""),
-          createdAt: String(review.created_at ?? new Date().toISOString()),
-          buyerName: getReviewerDisplayName(
-            review.buyer_name ? String(review.buyer_name) : undefined
-          )
-        })) ?? [],
-      averageRating: mappedVendor.rating,
-      reviewCount: reviewCount ?? reviews?.length ?? 0
-    }
-  )
+    return writeHybridCache(
+      vendorDetailCache,
+      vendorId,
+      persistedCacheKeys.vendorDetail(vendorId),
+      {
+        vendor: mappedVendor,
+        products: products?.map((product) => mapProduct(product)) ?? [],
+        reviews:
+          reviews?.map((review) => ({
+            id: String(review.id),
+            orderId: String(review.order_id),
+            buyerId: String(review.buyer_id),
+            vendorId: String(review.vendor_id),
+            rating: Number(review.rating),
+            comment: String(review.comment ?? ""),
+            createdAt: String(review.created_at ?? new Date().toISOString()),
+            buyerName: getReviewerDisplayName(
+              review.buyer_name ? String(review.buyer_name) : undefined
+            )
+          })) ?? [],
+        averageRating: mappedVendor.rating,
+        reviewCount: reviewCount ?? reviews?.length ?? 0
+      }
+    )
+  })
 }
 
 export async function loadBuyerOrders(
@@ -1290,49 +1334,51 @@ export async function loadBuyerOrders(
     return cached
   }
 
-  const supabase = getSupabaseBrowserClient()
-  if (!supabase) return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
+  return deduplicatedFetch(`buyer-orders:${userId}`, async () => {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
 
-  let response = await supabase
-    .from("orders")
-    .select("*, vendor_profiles(*)")
-    .eq("buyer_id", userId)
-    .order("created_at", { ascending: false })
-
-  if (response.error) {
-    logMarketplaceError("buyer-orders-joined-query", response.error)
-    response = await supabase
+    let response = await supabase
       .from("orders")
-      .select("*")
+      .select("*, vendor_profiles(*)")
       .eq("buyer_id", userId)
       .order("created_at", { ascending: false })
-  }
 
-  if (response.error || !response.data) {
     if (response.error) {
-      logMarketplaceError("buyer-orders-query", response.error)
+      logMarketplaceError("buyer-orders-joined-query", response.error)
+      response = await supabase
+        .from("orders")
+        .select("*")
+        .eq("buyer_id", userId)
+        .order("created_at", { ascending: false })
     }
-    return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
-  }
 
-  const hiddenOrderIds = getHiddenOrderIds("buyer", userId)
-  const visibleRows = response.data.filter(
-    (order) =>
-      !order.buyer_hidden_at &&
-      !hiddenOrderIds.has(String(order.id))
-  )
-  const orders = await Promise.all(
-    visibleRows.map((order) =>
-      mapOrderWithVendorFallback(supabase, order as Record<string, unknown>)
+    if (response.error || !response.data) {
+      if (response.error) {
+        logMarketplaceError("buyer-orders-query", response.error)
+      }
+      return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
+    }
+
+    const hiddenOrderIds = getHiddenOrderIds("buyer", userId)
+    const visibleRows = response.data.filter(
+      (order) =>
+        !order.buyer_hidden_at &&
+        !hiddenOrderIds.has(String(order.id))
     )
-  )
+    const orders = await Promise.all(
+      visibleRows.map((order) =>
+        mapOrderWithVendorFallback(supabase, order as Record<string, unknown>)
+      )
+    )
 
-  return writeHybridCache(
-    buyerOrdersCache,
-    userId,
-    persistedCacheKeys.buyerOrders(userId),
-    orders
-  )
+    return writeHybridCache(
+      buyerOrdersCache,
+      userId,
+      persistedCacheKeys.buyerOrders(userId),
+      orders
+    )
+  })
 }
 
 export async function loadSellerOrders(
@@ -1358,39 +1404,41 @@ export async function loadSellerOrders(
     return cached
   }
 
-  const vendor = await loadVendorProfile(userId)
-  if (!vendor) return []
+  return deduplicatedFetch(`seller-orders:${userId}`, async () => {
+    const vendor = await loadVendorProfile(userId)
+    if (!vendor) return []
 
-  const supabase = getSupabaseBrowserClient()
-  if (!supabase) return canUseDemoMode ? getSellerOrdersDemo(userId) : []
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) return canUseDemoMode ? getSellerOrdersDemo(userId) : []
 
-  const { data, error } = await supabase
-    .from("orders")
-    .select("*")
-    .eq("vendor_id", vendor.id)
-    .order("created_at", { ascending: false })
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("vendor_id", vendor.id)
+      .order("created_at", { ascending: false })
 
-  if (error || !data) {
-    if (error) {
-      logMarketplaceError("seller-orders-query", error)
+    if (error || !data) {
+      if (error) {
+        logMarketplaceError("seller-orders-query", error)
+      }
+      return canUseDemoMode ? getSellerOrdersDemo(userId) : []
     }
-    return canUseDemoMode ? getSellerOrdersDemo(userId) : []
-  }
 
-  const hiddenOrderIds = getHiddenOrderIds("seller", userId)
+    const hiddenOrderIds = getHiddenOrderIds("seller", userId)
 
-  return writeHybridCache(
-    sellerOrdersCache,
-    userId,
-    persistedCacheKeys.sellerOrders(userId),
-    data
-      .filter(
-        (order) =>
-          !order.seller_hidden_at &&
-          !hiddenOrderIds.has(String(order.id))
-      )
-      .map((order) => mapOrder(order, vendor))
-  )
+    return writeHybridCache(
+      sellerOrdersCache,
+      userId,
+      persistedCacheKeys.sellerOrders(userId),
+      data
+        .filter(
+          (order) =>
+            !order.seller_hidden_at &&
+            !hiddenOrderIds.has(String(order.id))
+        )
+        .map((order) => mapOrder(order, vendor))
+    )
+  })
 }
 
 export async function loadOrderDetail(
@@ -1470,25 +1518,27 @@ export async function loadSellerProducts(userId: string) {
     return cached
   }
 
-  const vendor = await loadVendorProfile(userId)
-  if (!vendor) return []
+  return deduplicatedFetch(`seller-products:${userId}`, async () => {
+    const vendor = await loadVendorProfile(userId)
+    if (!vendor) return []
 
-  const supabase = getSupabaseBrowserClient()
-  if (!supabase) return canUseDemoMode ? getSellerProductsDemo(userId) : []
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("vendor_id", vendor.id)
-    .order("created_at", { ascending: false })
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) return canUseDemoMode ? getSellerProductsDemo(userId) : []
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .eq("vendor_id", vendor.id)
+      .order("created_at", { ascending: false })
 
-  if (error || !data) return canUseDemoMode ? getSellerProductsDemo(userId) : []
+    if (error || !data) return canUseDemoMode ? getSellerProductsDemo(userId) : []
 
-  return writeHybridCache(
-    sellerProductsCache,
-    userId,
-    persistedCacheKeys.sellerProducts(userId),
-    data.map((product) => mapProduct(product))
-  )
+    return writeHybridCache(
+      sellerProductsCache,
+      userId,
+      persistedCacheKeys.sellerProducts(userId),
+      data.map((product) => mapProduct(product))
+    )
+  })
 }
 
 export async function loadStoreAnalytics(userId: string): Promise<StoreAnalytics> {
@@ -1507,41 +1557,43 @@ export async function loadStoreAnalytics(userId: string): Promise<StoreAnalytics
     return cached
   }
 
-  const vendor = await loadVendorProfile(userId)
-  if (!vendor) {
-    return { totalOrders: 0, totalRevenue: 0, averageRating: 0 }
-  }
-
-  const supabase = getSupabaseBrowserClient()
-  if (!supabase) {
-    return canUseDemoMode
-      ? getStoreAnalyticsDemo(userId)
-      : { totalOrders: 0, totalRevenue: 0, averageRating: 0 }
-  }
-
-  const { data, error } = await supabase
-    .from("orders")
-    .select("id, total_amount, status")
-    .eq("vendor_id", vendor.id)
-
-  if (error || !data) {
-    return canUseDemoMode
-      ? getStoreAnalyticsDemo(userId)
-      : { totalOrders: 0, totalRevenue: 0, averageRating: vendor.rating }
-  }
-
-  return writeHybridCache(
-    storeAnalyticsCache,
-    userId,
-    persistedCacheKeys.storeAnalytics(userId),
-    {
-      totalOrders: data.length,
-      totalRevenue: data
-        .filter((order) => String(order.status) !== "cancelled")
-        .reduce((sum, order) => sum + Number(order.total_amount ?? 0), 0),
-      averageRating: vendor.rating
+  return deduplicatedFetch(`store-analytics:${userId}`, async () => {
+    const vendor = await loadVendorProfile(userId)
+    if (!vendor) {
+      return { totalOrders: 0, totalRevenue: 0, averageRating: 0 }
     }
-  )
+
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) {
+      return canUseDemoMode
+        ? getStoreAnalyticsDemo(userId)
+        : { totalOrders: 0, totalRevenue: 0, averageRating: 0 }
+    }
+
+    const { data, error } = await supabase
+      .from("orders")
+      .select("id, total_amount, status")
+      .eq("vendor_id", vendor.id)
+
+    if (error || !data) {
+      return canUseDemoMode
+        ? getStoreAnalyticsDemo(userId)
+        : { totalOrders: 0, totalRevenue: 0, averageRating: vendor.rating }
+    }
+
+    return writeHybridCache(
+      storeAnalyticsCache,
+      userId,
+      persistedCacheKeys.storeAnalytics(userId),
+      {
+        totalOrders: data.length,
+        totalRevenue: data
+          .filter((order) => String(order.status) !== "cancelled")
+          .reduce((sum, order) => sum + Number(order.total_amount ?? 0), 0),
+        averageRating: vendor.rating
+      }
+    )
+  })
 }
 
 export async function loadVendorProfile(userId: string) {
@@ -1561,18 +1613,20 @@ export async function loadVendorProfile(userId: string) {
     return cacheVendorProfile(persisted, userId)
   }
 
-  const supabase = getSupabaseBrowserClient()
-  if (!supabase) return canUseDemoMode ? getVendorByUserId(userId) : null
-  const { data, error } = await supabase
-    .from("vendor_profiles")
-    .select("*")
-    .eq("user_id", userId)
-    .maybeSingle()
+  return deduplicatedFetch(`vendor-profile:${userId}`, async () => {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) return canUseDemoMode ? getVendorByUserId(userId) : null
+    const { data, error } = await supabase
+      .from("vendor_profiles")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle()
 
-  if (error || !data) {
-    return cacheVendorProfile(canUseDemoMode ? getVendorByUserId(userId) : null, userId)
-  }
-  return cacheVendorProfile(mapVendor(data), userId)
+    if (error || !data) {
+      return cacheVendorProfile(canUseDemoMode ? getVendorByUserId(userId) : null, userId)
+    }
+    return cacheVendorProfile(mapVendor(data), userId)
+  })
 }
 
 export async function findOrCreateDemoUser(values: SignUpFormValues) {
@@ -1610,18 +1664,20 @@ export async function loadUserProfile(userId: string) {
     return cacheUserProfile(persisted, userId)
   }
 
-  const supabase = getSupabaseBrowserClient()
-  if (!supabase) return canUseDemoMode ? getDemoUserById(userId) : null
-  const { data, error } = await supabase
-    .from("users")
-    .select("*")
-    .eq("id", userId)
-    .maybeSingle()
+  return deduplicatedFetch(`user-profile:${userId}`, async () => {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) return canUseDemoMode ? getDemoUserById(userId) : null
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", userId)
+      .maybeSingle()
 
-  if (error || !data) {
-    return cacheUserProfile(canUseDemoMode ? getDemoUserById(userId) : null, userId)
-  }
-  return cacheUserProfile(mapUser(data), userId)
+    if (error || !data) {
+      return cacheUserProfile(canUseDemoMode ? getDemoUserById(userId) : null, userId)
+    }
+    return cacheUserProfile(mapUser(data), userId)
+  })
 }
 
 export async function saveUserProfile(input: UserProfile) {

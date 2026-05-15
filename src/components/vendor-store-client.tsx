@@ -12,6 +12,7 @@ import {
   formatCurrency,
   formatDate
 } from "@/lib/format"
+import { RemoteImage } from "@/components/remote-image"
 import { getPrimaryProductImage } from "@/lib/product-images"
 import { loadVendorDetail, peekCachedVendorDetail } from "@/lib/marketplace"
 import { type Product, type VendorDetail } from "@/lib/types"
@@ -142,21 +143,20 @@ export function VendorStoreClient({
         <div ref={productRef}>
           <SectionHeading title="Products" />
           <div className="grid grid-cols-2 gap-3">
-            {data.products.map((product) => (
+            {data.products.map((product) => {
+              const primaryImage = getPrimaryProductImage(product)
+              return (
               <button
                 key={product.id}
                 className="overflow-hidden rounded-[22px] bg-surface text-left shadow-soft transition active:scale-[0.99]"
                 onClick={() => setSelectedProduct(product)}
               >
-                <div className="aspect-square overflow-hidden bg-canvas">
-                  {getPrimaryProductImage(product) ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={getPrimaryProductImage(product)}
-                      alt={product.name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : null}
+                <div className="relative aspect-square overflow-hidden bg-canvas">
+                  <RemoteImage
+                    src={primaryImage}
+                    alt={product.name}
+                    sizes="(max-width: 430px) 50vw, 215px"
+                  />
                 </div>
                 <div className="space-y-2 p-3">
                   <p className="line-clamp-2 text-sm font-semibold text-ink">
@@ -181,7 +181,8 @@ export function VendorStoreClient({
                   ) : null}
                 </div>
               </button>
-            ))}
+              )
+            })}
           </div>
         </div>
 

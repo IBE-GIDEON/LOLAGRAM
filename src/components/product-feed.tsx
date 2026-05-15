@@ -1,8 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import { type ReactNode, useRef } from "react"
+import { type ReactNode, useCallback, useRef } from "react"
 
+import { RemoteImage } from "@/components/remote-image"
 import { Badge } from "@/components/ui"
 import { formatCategory, formatCurrency } from "@/lib/format"
 import { getPrimaryProductImage } from "@/lib/product-images"
@@ -31,23 +32,20 @@ export function ProductFeed({
   className?: string
 }) {
   const parentRef = useRef<HTMLDivElement | null>(null)
+  const rafRef = useRef<number | null>(null)
 
-  const handleScroll = () => {
-    if (!parentRef.current) {
-      return
-    }
-
-    const { scrollTop, scrollHeight, clientHeight } = parentRef.current
-    onScrollPositionChange?.(scrollTop)
-
-    if (!onReachEnd || !hasMore) {
-      return
-    }
-
-    if (scrollHeight - scrollTop - clientHeight < 180) {
-      onReachEnd()
-    }
-  }
+  const handleScroll = useCallback(() => {
+    if (rafRef.current !== null) return
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null
+      if (!parentRef.current) return
+      const { scrollTop, scrollHeight, clientHeight } = parentRef.current
+      onScrollPositionChange?.(scrollTop)
+      if (onReachEnd && hasMore && scrollHeight - scrollTop - clientHeight < 180) {
+        onReachEnd()
+      }
+    })
+  }, [hasMore, onReachEnd, onScrollPositionChange])
 
   return (
     <div
@@ -103,11 +101,10 @@ function ProductFeedCard({ product }: { product: ProductSearchResult }) {
     >
       <div className="relative aspect-square overflow-hidden bg-canvas">
         {primaryImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <RemoteImage
             src={primaryImage}
             alt={product.name}
-            className="h-full w-full object-cover"
+            sizes="(max-width: 430px) 50vw, 215px"
           />
         ) : (
           <div className="flex h-full items-center justify-center bg-canvas text-xs font-medium text-muted">

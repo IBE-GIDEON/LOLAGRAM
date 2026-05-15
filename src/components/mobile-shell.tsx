@@ -1,8 +1,14 @@
+import dynamic from "next/dynamic"
 import type { PropsWithChildren } from "react"
 
 import { BottomNav } from "@/components/bottom-nav"
-import { GlobalCart } from "@/components/global-cart"
 import { OfflineBanner } from "@/components/offline-banner"
+
+// Loaded only when a user has items in their cart — keeps the initial bundle lean
+const GlobalCart = dynamic(
+  () => import("@/components/global-cart").then((m) => m.GlobalCart),
+  { ssr: false }
+)
 
 export function MobileShell({ children }: PropsWithChildren) {
   return (

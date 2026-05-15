@@ -5,6 +5,7 @@ import toast from "react-hot-toast"
 import { FiTrash2 } from "react-icons/fi"
 
 import { useAuth } from "@/components/providers/auth-provider"
+import { RemoteImage } from "@/components/remote-image"
 import { BottomSheet, Button, Card, Input, SectionHeading, Textarea } from "@/components/ui"
 import { formatCurrency } from "@/lib/format"
 import { uploadImages } from "@/lib/image"
@@ -130,21 +131,20 @@ export function ProductManagementClient() {
       />
 
       <div className="grid grid-cols-2 gap-3">
-        {products.map((product) => (
+        {products.map((product) => {
+          const primaryImage = getPrimaryProductImage(product)
+          return (
           <button
             key={product.id}
             className="overflow-hidden rounded-[22px] bg-surface text-left shadow-soft"
             onClick={() => openProductEditor(product)}
           >
-            <div className="relative aspect-square bg-canvas">
-              {getPrimaryProductImage(product) ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={getPrimaryProductImage(product)}
-                  alt={product.name}
-                  className="h-full w-full object-cover"
-                />
-              ) : null}
+            <div className="relative aspect-square overflow-hidden bg-canvas">
+              <RemoteImage
+                src={primaryImage}
+                alt={product.name}
+                sizes="(max-width: 430px) 50vw, 215px"
+              />
               {product.photoUrls.length > 1 ? (
                 <span className="absolute right-3 top-3 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-semibold text-white">
                   {product.photoUrls.length} photos
@@ -167,7 +167,8 @@ export function ProductManagementClient() {
               </span>
             </div>
           </button>
-        ))}
+          )
+        })}
       </div>
 
       <BottomSheet open={open} onClose={() => setOpen(false)} title={title}>

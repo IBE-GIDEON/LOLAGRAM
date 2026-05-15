@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { type ReactNode, useMemo, useRef } from "react"
+import { type ReactNode, useCallback, useMemo, useRef } from "react"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { FiChevronRight, FiMapPin } from "react-icons/fi"
 
@@ -34,6 +34,7 @@ export function VendorList({
   className?: string
 }) {
   const parentRef = useRef<HTMLDivElement | null>(null)
+  const rafRef = useRef<number | null>(null)
   const shouldVirtualize = vendors.length > 50
 
   const rowHeight = searchMode ? 78 : 86
@@ -47,22 +48,18 @@ export function VendorList({
 
   const virtualItems = virtualizer.getVirtualItems()
 
-  const handleScroll = () => {
-    if (!parentRef.current) {
-      return
-    }
-
-    const { scrollTop, scrollHeight, clientHeight } = parentRef.current
-    onScrollPositionChange?.(scrollTop)
-
-    if (!onReachEnd || !hasMore) {
-      return
-    }
-
-    if (scrollHeight - scrollTop - clientHeight < 120) {
-      onReachEnd()
-    }
-  }
+  const handleScroll = useCallback(() => {
+    if (rafRef.current !== null) return
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null
+      if (!parentRef.current) return
+      const { scrollTop, scrollHeight, clientHeight } = parentRef.current
+      onScrollPositionChange?.(scrollTop)
+      if (onReachEnd && hasMore && scrollHeight - scrollTop - clientHeight < 120) {
+        onReachEnd()
+      }
+    })
+  }, [hasMore, onReachEnd, onScrollPositionChange])
 
   const renderedVendors = useMemo(() => {
     if (!shouldVirtualize) {
