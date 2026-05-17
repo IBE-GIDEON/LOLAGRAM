@@ -1469,39 +1469,52 @@ export async function loadOrderDetail(
   const supabase = getSupabaseBrowserClient()
   if (!supabase) return canUseDemoMode ? getOrderByIdDemo(orderId) : null
 
-  let response = await supabase
-    .from("orders")
-    .select("*, vendor_profiles(*)")
-    .eq("id", orderId)
-    .maybeSingle()
+  // Verify the user is authenticated before querying.  Without a valid session
+  // auth.uid() is NULL inside Postgres, so RLS returns zero rows and
+  // .maybeSingle() gives data:null — indistinguishable from "not found".
+  // Throwing here lets the caller show a meaningful "sign in" prompt instead.
+  const {
+    data: { session }
+  } = await supabase.auth.getSession()
+  if (!session) {
+    throw new Error("Sign in to view this order.")
+  }
 
-  if (response.error) {
-    logMarketplaceError("order-detail-joined-query", response.error)
-    response = await supabase
+  return deduplicatedFetch(`order-detail:${orderId}`, async () => {
+    let response = await supabase
       .from("orders")
-      .select("*")
+      .select("*, vendor_profiles(*)")
       .eq("id", orderId)
       .maybeSingle()
-  }
 
-  if (response.error || !response.data) {
     if (response.error) {
-      logMarketplaceError("order-detail-query", response.error)
+      logMarketplaceError("order-detail-joined-query", response.error)
+      response = await supabase
+        .from("orders")
+        .select("*")
+        .eq("id", orderId)
+        .maybeSingle()
     }
-    return canUseDemoMode ? getOrderByIdDemo(orderId) : null
-  }
 
-  const order = await mapOrderWithVendorFallback(
-    supabase,
-    response.data as Record<string, unknown>
-  )
+    if (response.error || !response.data) {
+      if (response.error) {
+        logMarketplaceError("order-detail-query", response.error)
+      }
+      return canUseDemoMode ? getOrderByIdDemo(orderId) : null
+    }
 
-  return writeHybridCache(
-    orderDetailCache,
-    orderId,
-    persistedCacheKeys.orderDetail(orderId),
-    order
-  )
+    const order = await mapOrderWithVendorFallback(
+      supabase,
+      response.data as Record<string, unknown>
+    )
+
+    return writeHybridCache(
+      orderDetailCache,
+      orderId,
+      persistedCacheKeys.orderDetail(orderId),
+      order
+    )
+  })
 }
 
 export async function loadSellerProducts(userId: string) {

@@ -31,7 +31,7 @@ import {
 const statusSteps: OrderStatus[] = ["pending", "confirmed", "dispatched", "delivered"]
 
 export function OrderDetailClient({ orderId }: { orderId: string }) {
-  const { profile, vendorProfile } = useAuth()
+  const { profile, vendorProfile, loading: authLoading } = useAuth()
   const router = useRouter()
   const [order, setOrder] = useState<OrderDetail | null>(null)
   const [vendorData, setVendorData] = useState<VendorDetail | null>(null)
@@ -42,9 +42,21 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
   const [orderError, setOrderError] = useState<string | null>(null)
 
   useEffect(() => {
+    // Don't attempt the query until the auth provider has finished bootstrapping.
+    // Without this guard, the Supabase query runs with auth.uid() = null, which
+    // causes RLS to return zero rows → "Order could not open" error on every
+    // direct URL open or hard-refresh of an order detail page.
+    if (authLoading) return
+
     let ignore = false
 
     async function hydrateOrder() {
+      if (!profile) {
+        setOrderError("Sign in to view this order.")
+        setLoadingOrder(false)
+        return
+      }
+
       setLoadingOrder(true)
       setOrderError(null)
 
@@ -94,7 +106,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
     return () => {
       ignore = true
     }
-  }, [orderId, profile?.id])
+  }, [orderId, profile?.id, authLoading])
 
   const isSellerViewer = Boolean(profile && vendorProfile && order?.vendorId === vendorProfile.id)
   const isBuyerViewer = Boolean(profile && order?.buyerId === profile.id)
@@ -113,7 +125,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
     Boolean(archiveActor) &&
     (order?.status === "delivered" || order?.status === "cancelled")
 
-  if (loadingOrder && !order) {
+  if (authLoading || (loadingOrder && !order)) {
     return <div className="p-4 text-sm text-muted">Loading order...</div>
   }
 
