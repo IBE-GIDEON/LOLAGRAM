@@ -1311,6 +1311,20 @@ export async function loadVendorDetail(vendorId: string): Promise<VendorDetail |
   })
 }
 
+// ---------------------------------------------------------------------------
+// ORDER LOADING — rebuilt for simplicity and reliability
+//
+// Design decisions:
+//   • No joined queries (vendor_profiles(*)) — avoids PostgREST schema-cache
+//     errors that silently return null instead of the order data.
+//   • Vendor profiles are fetched in a single batch query (list) or one
+//     separate query (detail) after the order rows arrive.
+//   • No deduplicatedFetch wrapper — order pages are low-traffic and the
+//     added complexity was causing timing issues.
+//   • A short in-memory cache (CACHE_TTL_MS) is kept so rapid re-renders
+//     don't hammer the DB, but it is always bypassed when fresh:true.
+// ---------------------------------------------------------------------------
+
 export async function loadBuyerOrders(
   userId: string,
   options: { fresh?: boolean } = {}
@@ -1319,66 +1333,64 @@ export async function loadBuyerOrders(
     return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
   }
 
-  const cached =
-    options.fresh
-      ? null
-      : readCache(buyerOrdersCache, userId) ??
-        readPersistedOrderList(persistedCacheKeys.buyerOrders(userId))
-  if (cached !== null) {
-    writeHybridCache(
-      buyerOrdersCache,
-      userId,
-      persistedCacheKeys.buyerOrders(userId),
-      cached
-    )
-    return cached
+  // Return in-memory or persisted cache when not forcing a refresh.
+  if (!options.fresh) {
+    const cached =
+      readCache(buyerOrdersCache, userId) ??
+      readPersistedOrderList(persistedCacheKeys.buyerOrders(userId))
+    if (cached !== null) {
+      writeCache(buyerOrdersCache, userId, cached)
+      return cached
+    }
   }
 
-  return deduplicatedFetch(`buyer-orders:${userId}`, async () => {
-    const supabase = getSupabaseBrowserClient()
-    if (!supabase) return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
+  const supabase = getSupabaseBrowserClient()
+  if (!supabase) return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
 
-    let response = await supabase
-      .from("orders")
-      .select("*, vendor_profiles(*)")
-      .eq("buyer_id", userId)
-      .order("created_at", { ascending: false })
+  // 1. Fetch all visible orders for this buyer (DB filters hidden rows too).
+  const { data: rows, error: ordersError } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("buyer_id", userId)
+    .is("buyer_hidden_at", null)
+    .order("created_at", { ascending: false })
 
-    if (response.error) {
-      logMarketplaceError("buyer-orders-joined-query", response.error)
-      response = await supabase
-        .from("orders")
-        .select("*")
-        .eq("buyer_id", userId)
-        .order("created_at", { ascending: false })
-    }
+  if (ordersError) {
+    logMarketplaceError("buyer-orders", ordersError)
+    // Return stale cache on network error rather than an empty list.
+    return readCache(buyerOrdersCache, userId) ?? []
+  }
 
-    if (response.error || !response.data) {
-      if (response.error) {
-        logMarketplaceError("buyer-orders-query", response.error)
-      }
-      return canUseDemoMode ? getBuyerOrdersDemo(userId) : []
-    }
+  if (!rows || rows.length === 0) {
+    const empty: OrderDetail[] = []
+    writeHybridCache(buyerOrdersCache, userId, persistedCacheKeys.buyerOrders(userId), empty)
+    return empty
+  }
 
-    const hiddenOrderIds = getHiddenOrderIds("buyer", userId)
-    const visibleRows = response.data.filter(
-      (order) =>
-        !order.buyer_hidden_at &&
-        !hiddenOrderIds.has(String(order.id))
-    )
-    const orders = await Promise.all(
-      visibleRows.map((order) =>
-        mapOrderWithVendorFallback(supabase, order as Record<string, unknown>)
-      )
-    )
+  // 2. Fetch every unique vendor in one round-trip.
+  const vendorIds = [...new Set(rows.map((r) => String(r.vendor_id)))]
+  const { data: vendorRows } = await supabase
+    .from("vendor_profiles")
+    .select("*")
+    .in("id", vendorIds)
 
-    return writeHybridCache(
-      buyerOrdersCache,
-      userId,
-      persistedCacheKeys.buyerOrders(userId),
-      orders
-    )
-  })
+  const vendorById = new Map<string, VendorProfile>()
+  for (const v of vendorRows ?? []) {
+    vendorById.set(String(v.id), mapVendor(v))
+  }
+
+  // 3. Filter locally-hidden orders and map.
+  const hiddenIds = getHiddenOrderIds("buyer", userId)
+  const orders = rows
+    .filter((r) => !hiddenIds.has(String(r.id)))
+    .map((r) => mapOrder(r, vendorById.get(String(r.vendor_id))))
+
+  return writeHybridCache(
+    buyerOrdersCache,
+    userId,
+    persistedCacheKeys.buyerOrders(userId),
+    orders
+  )
 }
 
 export async function loadSellerOrders(
@@ -1389,132 +1401,123 @@ export async function loadSellerOrders(
     return canUseDemoMode ? getSellerOrdersDemo(userId) : []
   }
 
-  const cached =
-    options.fresh
-      ? null
-      : readCache(sellerOrdersCache, userId) ??
-        readPersistedOrderList(persistedCacheKeys.sellerOrders(userId))
-  if (cached !== null) {
-    writeHybridCache(
-      sellerOrdersCache,
-      userId,
-      persistedCacheKeys.sellerOrders(userId),
-      cached
-    )
-    return cached
+  if (!options.fresh) {
+    const cached =
+      readCache(sellerOrdersCache, userId) ??
+      readPersistedOrderList(persistedCacheKeys.sellerOrders(userId))
+    if (cached !== null) {
+      writeCache(sellerOrdersCache, userId, cached)
+      return cached
+    }
   }
 
-  return deduplicatedFetch(`seller-orders:${userId}`, async () => {
-    const vendor = await loadVendorProfile(userId)
-    if (!vendor) return []
+  const supabase = getSupabaseBrowserClient()
+  if (!supabase) return canUseDemoMode ? getSellerOrdersDemo(userId) : []
 
-    const supabase = getSupabaseBrowserClient()
-    if (!supabase) return canUseDemoMode ? getSellerOrdersDemo(userId) : []
+  // 1. Resolve this user's vendor profile (needed for vendor_id filter).
+  const { data: vendorRow, error: vendorError } = await supabase
+    .from("vendor_profiles")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle()
 
-    const { data, error } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("vendor_id", vendor.id)
-      .order("created_at", { ascending: false })
+  if (vendorError) {
+    logMarketplaceError("seller-orders-vendor", vendorError)
+    return readCache(sellerOrdersCache, userId) ?? []
+  }
 
-    if (error || !data) {
-      if (error) {
-        logMarketplaceError("seller-orders-query", error)
-      }
-      return canUseDemoMode ? getSellerOrdersDemo(userId) : []
-    }
+  if (!vendorRow) return []
 
-    const hiddenOrderIds = getHiddenOrderIds("seller", userId)
+  const vendor = mapVendor(vendorRow)
 
-    return writeHybridCache(
-      sellerOrdersCache,
-      userId,
-      persistedCacheKeys.sellerOrders(userId),
-      data
-        .filter(
-          (order) =>
-            !order.seller_hidden_at &&
-            !hiddenOrderIds.has(String(order.id))
-        )
-        .map((order) => mapOrder(order, vendor))
-    )
-  })
+  // 2. Fetch all visible orders for this vendor store.
+  const { data: rows, error: ordersError } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("vendor_id", vendorRow.id)
+    .is("seller_hidden_at", null)
+    .order("created_at", { ascending: false })
+
+  if (ordersError) {
+    logMarketplaceError("seller-orders", ordersError)
+    return readCache(sellerOrdersCache, userId) ?? []
+  }
+
+  if (!rows || rows.length === 0) {
+    const empty: OrderDetail[] = []
+    writeHybridCache(sellerOrdersCache, userId, persistedCacheKeys.sellerOrders(userId), empty)
+    return empty
+  }
+
+  const hiddenIds = getHiddenOrderIds("seller", userId)
+  const orders = rows
+    .filter((r) => !hiddenIds.has(String(r.id)))
+    .map((r) => mapOrder(r, vendor))
+
+  return writeHybridCache(
+    sellerOrdersCache,
+    userId,
+    persistedCacheKeys.sellerOrders(userId),
+    orders
+  )
 }
 
 export async function loadOrderDetail(
   orderId: string,
   options: { fresh?: boolean } = {}
-) {
+): Promise<OrderDetail | null> {
   if (!hasSupabase) {
     return canUseDemoMode ? getOrderByIdDemo(orderId) : null
   }
 
-  const cached =
-    options.fresh
-      ? null
-      : readCache(orderDetailCache, orderId) ??
-        normalizeCachedOrder(
-          readPersistedCache<OrderDetail>(persistedCacheKeys.orderDetail(orderId))
-        )
-  if (cached !== null) {
-    writeHybridCache(
-      orderDetailCache,
-      orderId,
-      persistedCacheKeys.orderDetail(orderId),
-      cached
-    )
-    return cached
+  if (!options.fresh) {
+    const cached =
+      readCache(orderDetailCache, orderId) ??
+      normalizeCachedOrder(
+        readPersistedCache<OrderDetail>(persistedCacheKeys.orderDetail(orderId))
+      )
+    if (cached !== null) {
+      writeCache(orderDetailCache, orderId, cached)
+      return cached
+    }
   }
 
   const supabase = getSupabaseBrowserClient()
   if (!supabase) return canUseDemoMode ? getOrderByIdDemo(orderId) : null
 
-  // Verify the user is authenticated before querying.  Without a valid session
-  // auth.uid() is NULL inside Postgres, so RLS returns zero rows and
-  // .maybeSingle() gives data:null — indistinguishable from "not found".
-  // Throwing here lets the caller show a meaningful "sign in" prompt instead.
-  const {
-    data: { session }
-  } = await supabase.auth.getSession()
-  if (!session) {
-    throw new Error("Sign in to view this order.")
+  // 1. Fetch the order row — simple SELECT, no joins.
+  const { data: orderRow, error: orderError } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("id", orderId)
+    .maybeSingle()
+
+  if (orderError) {
+    logMarketplaceError("order-detail", orderError)
+    // Surface the error so the UI can show a retry instead of "not found".
+    throw new Error(orderError.message)
   }
 
-  return deduplicatedFetch(`order-detail:${orderId}`, async () => {
-    let response = await supabase
-      .from("orders")
-      .select("*, vendor_profiles(*)")
-      .eq("id", orderId)
-      .maybeSingle()
+  if (!orderRow) {
+    // Genuinely not found or RLS blocked — return null (not an exception).
+    return null
+  }
 
-    if (response.error) {
-      logMarketplaceError("order-detail-joined-query", response.error)
-      response = await supabase
-        .from("orders")
-        .select("*")
-        .eq("id", orderId)
-        .maybeSingle()
-    }
+  // 2. Fetch the vendor profile in a separate query.
+  const { data: vendorRow } = await supabase
+    .from("vendor_profiles")
+    .select("*")
+    .eq("id", orderRow.vendor_id)
+    .maybeSingle()
 
-    if (response.error || !response.data) {
-      if (response.error) {
-        logMarketplaceError("order-detail-query", response.error)
-      }
-      return canUseDemoMode ? getOrderByIdDemo(orderId) : null
-    }
+  const order = mapOrder(orderRow, vendorRow ? mapVendor(vendorRow) : undefined)
 
-    const order = await mapOrderWithVendorFallback(
-      supabase,
-      response.data as Record<string, unknown>
-    )
-
-    return writeHybridCache(
-      orderDetailCache,
-      orderId,
-      persistedCacheKeys.orderDetail(orderId),
-      order
-    )
-  })
+  return writeHybridCache(
+    orderDetailCache,
+    orderId,
+    persistedCacheKeys.orderDetail(orderId),
+    order
+  )
 }
 
 export async function loadSellerProducts(userId: string) {

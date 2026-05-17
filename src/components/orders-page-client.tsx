@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import toast from "react-hot-toast"
 
 import { useAuth } from "@/components/providers/auth-provider"
@@ -12,94 +12,95 @@ import {
   getPaymentStatusMeta
 } from "@/lib/constants"
 import { formatCurrency, formatDate } from "@/lib/format"
-import {
-  archiveCompletedOrder,
-  loadBuyerOrders,
-  loadSellerOrders,
-  peekCachedBuyerOrders,
-  peekCachedSellerOrders
-} from "@/lib/marketplace"
+import { archiveCompletedOrder, loadBuyerOrders, loadSellerOrders } from "@/lib/marketplace"
 import { type OrderDetail } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
-type OrdersMode = "purchases" | "store"
+type OrderTab = "purchases" | "store"
 
+// ---------------------------------------------------------------------------
+// Skeleton card shown while orders are loading
+// ---------------------------------------------------------------------------
+function OrderSkeleton() {
+  return (
+    <div className="space-y-3">
+      {[1, 2, 3, 4].map((i) => (
+        <div
+          key={i}
+          className="h-28 animate-pulse rounded-[26px] bg-surface shadow-soft"
+        />
+      ))}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 export function OrdersPageClient() {
-  const { loading, profile, vendorProfile } = useAuth()
-  const [mode, setMode] = useState<OrdersMode>("purchases")
-  const [orders, setOrders] = useState<OrderDetail[]>(() =>
-    profile ? peekCachedBuyerOrders(profile.id) : []
-  )
-  const [fetching, setFetching] = useState(
-    () => loading || (profile ? peekCachedBuyerOrders(profile.id).length === 0 : true)
-  )
-  const [archivingOrderId, setArchivingOrderId] = useState<string | null>(null)
+  const { loading: authLoading, profile, vendorProfile } = useAuth()
+  const [tab, setTab] = useState<OrderTab>("purchases")
+  const [orders, setOrders] = useState<OrderDetail[]>([])
+  const [fetching, setFetching] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [archivingId, setArchivingId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!profile) {
-      return
-    }
+  // ------------------------------------------------------------------
+  // Load orders whenever auth settles, the tab changes, or the user
+  // profile becomes available for the first time.
+  // ------------------------------------------------------------------
+  const fetchOrders = useCallback(
+    async (signal?: { cancelled: boolean }) => {
+      if (!profile) return
 
-    const cachedOrders =
-      mode === "store" && vendorProfile
-        ? peekCachedSellerOrders(profile.id)
-        : peekCachedBuyerOrders(profile.id)
+      setFetching(true)
+      setLoadError(null)
 
-    if (cachedOrders.length > 0) {
-      setOrders(cachedOrders)
-      setFetching(false)
-    }
-  }, [mode, profile, vendorProfile])
+      try {
+        const result =
+          tab === "store" && vendorProfile
+            ? await loadSellerOrders(profile.id, { fresh: true })
+            : await loadBuyerOrders(profile.id, { fresh: true })
 
-  useEffect(() => {
-    if (!profile) {
-      setFetching(false)
-      return
-    }
-
-    let ignore = false
-    setFetching(true)
-    setLoadError(null)
-    const request =
-      mode === "store" && vendorProfile
-        ? loadSellerOrders(profile.id, { fresh: true })
-        : loadBuyerOrders(profile.id, { fresh: true })
-
-    request
-      .then((nextOrders) => {
-        if (ignore) return
-        setOrders(nextOrders)
-      })
-      .catch((error) => {
-        if (ignore) return
-        console.error("Could not load orders", error)
-        setOrders([])
+        if (signal?.cancelled) return
+        setOrders(result)
+      } catch (err) {
+        if (signal?.cancelled) return
+        console.error("[orders-page] load failed", err)
         setLoadError(
-          error instanceof Error ? error.message : "Could not load orders right now."
+          err instanceof Error ? err.message : "Could not load orders. Try again."
         )
-      })
-      .finally(() => {
-        if (!ignore) {
-          setFetching(false)
-        }
-      })
+      } finally {
+        if (!signal?.cancelled) setFetching(false)
+      }
+    },
+    [profile, vendorProfile, tab]
+  )
 
-    if (vendorProfile) {
-      void (mode === "store"
-        ? loadBuyerOrders(profile.id, { fresh: true })
-        : loadSellerOrders(profile.id, { fresh: true })).catch((error) =>
-        console.error("Could not prefetch alternate order mode", error)
-      )
+  useEffect(() => {
+    if (authLoading) return
+    if (!profile) {
+      setFetching(false)
+      return
     }
 
+    const signal = { cancelled: false }
+    void fetchOrders(signal)
     return () => {
-      ignore = true
+      signal.cancelled = true
     }
-  }, [mode, profile, vendorProfile])
+  }, [authLoading, fetchOrders, profile])
 
-  if (loading) {
-    return <div className="p-4 text-sm text-muted">Loading orders...</div>
+  // ------------------------------------------------------------------
+  // Auth / loading guards
+  // ------------------------------------------------------------------
+  if (authLoading) {
+    return (
+      <div className="space-y-4 p-4 pb-safe-nav">
+        <SectionHeading title="Orders" />
+        <OrderSkeleton />
+      </div>
+    )
   }
 
   if (!profile) {
@@ -122,79 +123,74 @@ export function OrdersPageClient() {
     )
   }
 
+  // ------------------------------------------------------------------
+  // Render
+  // ------------------------------------------------------------------
   return (
     <div className="space-y-4 p-4 pb-safe-nav">
       <SectionHeading title="Orders" />
 
+      {/* Tab switcher — only shown to sellers */}
       {vendorProfile ? (
         <div className="grid grid-cols-2 rounded-full border border-border/70 bg-surface p-1 shadow-soft">
-          <button
-            className={cn(
-              "rounded-full px-4 py-3 text-sm font-semibold transition",
-              mode === "purchases" ? "bg-chrome text-white" : "text-muted"
-            )}
-            onClick={() => setMode("purchases")}
-          >
-            My Purchases
-          </button>
-          <button
-            className={cn(
-              "rounded-full px-4 py-3 text-sm font-semibold transition",
-              mode === "store" ? "bg-chrome text-white" : "text-muted"
-            )}
-            onClick={() => setMode("store")}
-          >
-            My Store Orders
-          </button>
+          {(["purchases", "store"] as const).map((t) => (
+            <button
+              key={t}
+              className={cn(
+                "rounded-full px-4 py-3 text-sm font-semibold transition",
+                tab === t ? "bg-chrome text-white" : "text-muted"
+              )}
+              onClick={() => setTab(t)}
+            >
+              {t === "purchases" ? "My Purchases" : "My Store Orders"}
+            </button>
+          ))}
         </div>
       ) : null}
 
+      {/* Body */}
       {fetching ? (
-        <div className="space-y-3">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div
-              key={index}
-              className="h-24 animate-pulse rounded-[26px] bg-surface shadow-soft"
-            />
-          ))}
-        </div>
+        <OrderSkeleton />
       ) : loadError ? (
         <Card className="p-5">
-          <p className="text-lg font-semibold text-ink">Orders could not load</p>
+          <p className="text-lg font-semibold text-ink">Orders unavailable</p>
           <p className="mt-2 text-sm leading-6 text-muted">{loadError}</p>
-          <Button className="mt-4 w-full" onClick={() => window.location.reload()}>
-            Refresh orders
+          <Button className="mt-4 w-full" onClick={() => void fetchOrders()}>
+            Retry
           </Button>
         </Card>
       ) : orders.length === 0 ? (
         <Card className="p-5">
           <p className="text-lg font-semibold text-ink">No orders yet</p>
           <p className="mt-2 text-sm text-muted">
-            {mode === "store"
-              ? "Incoming store orders will appear here as soon as buyers place orders."
-              : "Your first order will show up here with payment details and a live status timeline."}
+            {tab === "store"
+              ? "Incoming store orders will appear here as soon as buyers place them."
+              : "Your purchases will show up here with payment details and a live status update."}
           </p>
         </Card>
       ) : (
         <div className="space-y-3">
           {orders.map((order) => {
+            const statusMeta = getOrderStatusMeta(order.status)
             const paymentMethodMeta = getPaymentMethodMeta(order.paymentMethod)
             const paymentStatusMeta = getPaymentStatusMeta(
               order.paymentStatus,
               order.paymentMethod
             )
-            const orderStatusMeta = getOrderStatusMeta(order.status)
+            const title =
+              tab === "store"
+                ? order.buyer?.fullName ?? "Customer order"
+                : order.vendor?.storeName ?? "Store order"
+            const isCompletedOrder =
+              order.status === "delivered" || order.status === "cancelled"
 
             return (
               <Card key={order.id} className="p-4 transition hover:bg-canvas">
+                {/* Tappable header — navigates to detail */}
                 <Link href={`/orders/${order.id}`} className="block">
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-ink">
-                        {mode === "store"
-                          ? order.buyer?.fullName ?? "Customer order"
-                          : order.vendor?.storeName ?? "Vendor order"}
-                      </p>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-ink">{title}</p>
                       <p className="mt-1 text-sm text-muted">{formatDate(order.createdAt)}</p>
                       <p className="mt-2 text-xs leading-5 text-muted">
                         {paymentMethodMeta.label} · {paymentStatusMeta.label}
@@ -203,64 +199,64 @@ export function OrdersPageClient() {
                         {formatCurrency(order.totalAmount)}
                       </p>
                     </div>
-                    <Badge className={orderStatusMeta.className}>
-                      {orderStatusMeta.label}
+                    <Badge className={cn("shrink-0", statusMeta.className)}>
+                      {statusMeta.label}
                     </Badge>
                   </div>
                 </Link>
 
+                {/* Action row */}
                 <div className="mt-4 flex gap-2">
                   <Link
                     href={`/orders/${order.id}`}
-                    className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-surface px-4 py-3 text-sm font-semibold text-ink transition hover:bg-canvas"
+                    className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-chrome px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90"
                   >
                     Open order
                   </Link>
 
-                  {(order.status === "delivered" || order.status === "cancelled") && profile ? (
+                  {isCompletedOrder ? (
                     <Button
                       variant="outline"
                       className="flex-1"
-                      disabled={archivingOrderId === order.id}
+                      disabled={archivingId === order.id}
                       onClick={async () => {
-                        const actor = mode === "store" ? "seller" : "buyer"
+                        const actor = tab === "store" ? "seller" : "buyer"
                         const confirmed = window.confirm(
-                          mode === "store"
+                          tab === "store"
                             ? "Remove this order from your store history only?"
                             : "Remove this order from your purchase history only?"
                         )
-
                         if (!confirmed) return
 
-                        setArchivingOrderId(order.id)
+                        setArchivingId(order.id)
                         try {
                           const result = await archiveCompletedOrder(
                             order.id,
                             actor,
                             profile.id
                           )
-                          setOrders((current) =>
-                            current.filter((currentOrder) => currentOrder.id !== order.id)
+                          setOrders((prev) =>
+                            prev.filter((o) => o.id !== order.id)
                           )
                           toast.success(
                             result.localOnly
-                              ? "Removed from this device only for now."
-                              : mode === "store"
-                                ? "Removed from your store history."
-                                : "Removed from your purchase history."
+                              ? "Removed from this device."
+                              : tab === "store"
+                                ? "Removed from store history."
+                                : "Removed from purchase history."
                           )
-                        } catch (error) {
+                        } catch (err) {
                           toast.error(
-                            error instanceof Error
-                              ? error.message
-                              : "Could not remove this order from history."
+                            err instanceof Error
+                              ? err.message
+                              : "Could not remove this order."
                           )
                         } finally {
-                          setArchivingOrderId(null)
+                          setArchivingId(null)
                         }
                       }}
                     >
-                      {mode === "store" ? "Remove store copy" : "Remove purchase copy"}
+                      Remove
                     </Button>
                   ) : null}
                 </div>

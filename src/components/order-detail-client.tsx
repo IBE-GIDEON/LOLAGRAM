@@ -1,9 +1,9 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import toast from "react-hot-toast"
-import { FiMessageCircle } from "react-icons/fi"
+import { FiMessageCircle, FiRefreshCw } from "react-icons/fi"
 
 import { useAuth } from "@/components/providers/auth-provider"
 import { Badge, Button, Card, SectionHeading } from "@/components/ui"
@@ -28,228 +28,288 @@ import {
   type VendorDetail
 } from "@/lib/types"
 
-const statusSteps: OrderStatus[] = ["pending", "confirmed", "dispatched", "delivered"]
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+const STATUS_STEPS: OrderStatus[] = ["pending", "confirmed", "dispatched", "delivered"]
 
+// ---------------------------------------------------------------------------
+// Small sub-components
+// ---------------------------------------------------------------------------
+function LoadingState() {
+  return (
+    <div className="space-y-4 p-4 pb-safe-nav">
+      <SectionHeading title="Order detail" />
+      <div className="h-48 animate-pulse rounded-[26px] bg-surface shadow-soft" />
+      <div className="h-28 animate-pulse rounded-[26px] bg-surface shadow-soft" />
+    </div>
+  )
+}
+
+function ErrorState({
+  message,
+  onRetry,
+  onBack
+}: {
+  message: string
+  onRetry?: () => void
+  onBack: () => void
+}) {
+  return (
+    <div className="space-y-4 p-4 pb-safe-nav">
+      <SectionHeading title="Order detail" />
+      <Card className="space-y-4 p-5">
+        <div>
+          <p className="text-lg font-semibold text-ink">Order could not open</p>
+          <p className="mt-2 text-sm leading-6 text-muted">{message}</p>
+        </div>
+        <div className="flex flex-col gap-3">
+          {onRetry ? (
+            <Button className="w-full" onClick={onRetry}>
+              <FiRefreshCw className="mr-2 h-4 w-4" />
+              Try again
+            </Button>
+          ) : null}
+          <Button variant="outline" className="w-full" onClick={onBack}>
+            Back to orders
+          </Button>
+        </div>
+      </Card>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 export function OrderDetailClient({ orderId }: { orderId: string }) {
-  const { profile, vendorProfile, loading: authLoading } = useAuth()
+  const { loading: authLoading, profile, vendorProfile } = useAuth()
   const router = useRouter()
+
   const [order, setOrder] = useState<OrderDetail | null>(null)
   const [vendorData, setVendorData] = useState<VendorDetail | null>(null)
-  const [reviewComment, setReviewComment] = useState("")
-  const [reviewRating, setReviewRating] = useState(5)
+  const [fetching, setFetching] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [loadingOrder, setLoadingOrder] = useState(true)
-  const [orderError, setOrderError] = useState<string | null>(null)
+  const [reviewRating, setReviewRating] = useState(5)
+  const [reviewComment, setReviewComment] = useState("")
 
-  useEffect(() => {
-    // Don't attempt the query until the auth provider has finished bootstrapping.
-    // Without this guard, the Supabase query runs with auth.uid() = null, which
-    // causes RLS to return zero rows → "Order could not open" error on every
-    // direct URL open or hard-refresh of an order detail page.
-    if (authLoading) return
+  // ------------------------------------------------------------------
+  // Load the order — only fires once auth has settled
+  // ------------------------------------------------------------------
+  const loadOrder = useCallback(
+    async (signal?: { cancelled: boolean }) => {
+      if (!profile) return
 
-    let ignore = false
-
-    async function hydrateOrder() {
-      if (!profile) {
-        setOrderError("Sign in to view this order.")
-        setLoadingOrder(false)
-        return
-      }
-
-      setLoadingOrder(true)
-      setOrderError(null)
+      setFetching(true)
+      setLoadError(null)
 
       try {
         const nextOrder = await loadOrderDetail(orderId, { fresh: true })
-        if (ignore) return
+        if (signal?.cancelled) return
+
+        if (!nextOrder) {
+          setLoadError(
+            "This order was not found, or your account does not have access to it."
+          )
+          setFetching(false)
+          return
+        }
 
         setOrder(nextOrder)
 
-        if (!nextOrder) {
-          setVendorData(null)
-          setOrderError(
-            "This order was not found, or this account does not have access to it."
-          )
-          return
+        // Fetch vendor detail only when the current user is the buyer
+        // (needed to show payment bank details etc.)
+        if (nextOrder.vendorId && profile.id === nextOrder.buyerId) {
+          const detail = await loadVendorDetail(nextOrder.vendorId)
+          if (!signal?.cancelled) setVendorData(detail)
         }
-
-        if (!nextOrder.vendorId || profile?.id !== nextOrder.buyerId) {
-          setVendorData(null)
-          return
-        }
-
-        const nextVendorData = await loadVendorDetail(nextOrder.vendorId)
-        if (!ignore) {
-          setVendorData(nextVendorData)
-        }
-      } catch (error) {
-        if (!ignore) {
-          console.error("Could not load order detail", error)
-          setOrder(null)
-          setVendorData(null)
-          setOrderError(
-            error instanceof Error
-              ? error.message
-              : "This order could not load right now."
-          )
-        }
+      } catch (err) {
+        if (signal?.cancelled) return
+        console.error("[order-detail] load failed", err)
+        setLoadError(
+          err instanceof Error
+            ? err.message
+            : "Something went wrong loading this order."
+        )
       } finally {
-        if (!ignore) {
-          setLoadingOrder(false)
-        }
+        if (!signal?.cancelled) setFetching(false)
       }
-    }
+    },
+    [orderId, profile]
+  )
 
-    void hydrateOrder()
+  useEffect(() => {
+    // Wait for auth bootstrap to complete before touching the DB.
+    if (authLoading) return
 
+    const signal = { cancelled: false }
+    void loadOrder(signal)
     return () => {
-      ignore = true
+      signal.cancelled = true
     }
-  }, [orderId, profile?.id, authLoading])
+  }, [authLoading, loadOrder])
 
-  const isSellerViewer = Boolean(profile && vendorProfile && order?.vendorId === vendorProfile.id)
-  const isBuyerViewer = Boolean(profile && order?.buyerId === profile.id)
-  const orderItems = Array.isArray(order?.items) ? order.items : []
-  const vendorReviews = Array.isArray(vendorData?.reviews) ? vendorData.reviews : []
-  const canReview =
-    isBuyerViewer &&
-    order?.status === "delivered" &&
-    !vendorReviews.some((review) => review.orderId === order?.id)
-  const archiveActor: OrderArchiveActor | null = isSellerViewer
+  // ------------------------------------------------------------------
+  // Derived state
+  // ------------------------------------------------------------------
+  const isSeller = Boolean(
+    profile && vendorProfile && order?.vendorId === vendorProfile.id
+  )
+  const isBuyer = Boolean(profile && order?.buyerId === profile.id)
+  const archiveActor: OrderArchiveActor | null = isSeller
     ? "seller"
-    : isBuyerViewer
+    : isBuyer
       ? "buyer"
       : null
   const canArchive =
     Boolean(archiveActor) &&
     (order?.status === "delivered" || order?.status === "cancelled")
 
-  if (authLoading || (loadingOrder && !order)) {
-    return <div className="p-4 text-sm text-muted">Loading order...</div>
-  }
+  const vendorReviews = Array.isArray(vendorData?.reviews) ? vendorData.reviews : []
+  const canReview =
+    isBuyer &&
+    order?.status === "delivered" &&
+    !vendorReviews.some((r) => r.orderId === order?.id)
 
-  if (!order) {
-    return (
-      <div className="space-y-4 p-4 pb-safe-nav">
-        <SectionHeading title="Order detail" />
-        <Card className="space-y-4 p-5">
-          <div>
-            <p className="text-lg font-semibold text-ink">Order could not open</p>
-            <p className="mt-2 text-sm leading-6 text-muted">
-              {orderError ??
-                "This order is not available on this account. Go back to orders and try again."}
-            </p>
-          </div>
-          <div className="flex flex-col gap-3">
-            <Button onClick={() => window.location.reload()}>Reload order</Button>
-            <Button variant="outline" onClick={() => router.push("/orders")}>
-              Back to orders
-            </Button>
-          </div>
-        </Card>
-      </div>
-    )
-  }
-
-  const activeVendor = vendorData?.vendor ?? order.vendor
-  const vendorName = activeVendor?.storeName ?? "Vendor"
-  const whatsappNumber = activeVendor?.whatsappNumber
-  const orderCounterpartyTitle = isSellerViewer ? "Store order" : vendorName
-  const orderCounterpartyMeta = isSellerViewer
-    ? "Confirm, collect payment if needed, then dispatch and deliver."
-    : "Track seller updates and payment instructions in one place."
-  const paymentMethodMeta = getPaymentMethodMeta(order.paymentMethod)
-  const paymentStatusMeta = getPaymentStatusMeta(
-    order.paymentStatus,
-    order.paymentMethod
-  )
-  const orderStatusMeta = getOrderStatusMeta(order.status)
-  const vendorTransferReady = Boolean(
-    activeVendor?.bankName && activeVendor?.accountName && activeVendor?.accountNumber
-  )
-
-  const sellerCanConfirm = isSellerViewer && order.status === "pending"
-  const sellerCanReject = isSellerViewer && order.status === "pending"
-  const sellerCanMarkPaid =
-    isSellerViewer &&
-    order.paymentMethod === "vendor_transfer" &&
-    order.status === "confirmed" &&
-    order.paymentStatus !== "paid_to_vendor"
-  const sellerCanDispatch =
-    isSellerViewer &&
-    order.status === "confirmed" &&
-    (order.paymentMethod === "pay_on_delivery" || order.paymentStatus === "paid_to_vendor")
-  const sellerCanDeliver = isSellerViewer && order.status === "dispatched"
-
-  const applyOrderUpdate = async (
+  // ------------------------------------------------------------------
+  // Order action helper
+  // ------------------------------------------------------------------
+  const applyUpdate = async (
     updates: { status?: OrderStatus; paymentStatus?: PaymentStatus },
-    successMessage: string
+    successMsg: string
   ) => {
-    const previousOrder = order
+    if (!order) return
+    const prev = order
     setBusy(true)
-    setOrder((current) => (current ? { ...current, ...updates } : current))
-
+    setOrder((cur) => (cur ? { ...cur, ...updates } : cur))
     try {
       await updateOrderStatus(order.id, updates)
-      toast.success(successMessage)
-    } catch (error) {
-      setOrder(previousOrder)
+      toast.success(successMsg)
+    } catch (err) {
+      setOrder(prev)
       toast.error(
-        error instanceof Error ? error.message : "Could not update this order."
+        err instanceof Error ? err.message : "Could not update this order."
       )
     } finally {
       setBusy(false)
     }
   }
 
-  const sellerProgressMessage = useMemo(() => {
-    if (!isSellerViewer) {
-      return null
-    }
-
-    if (order.status === "cancelled") {
-      return "This order is cancelled."
-    }
-
-    if (order.status === "delivered") {
-      return "This order is already delivered."
-    }
-
+  // ------------------------------------------------------------------
+  // Seller progress hint
+  // ------------------------------------------------------------------
+  const sellerHint = useMemo(() => {
+    if (!isSeller || !order) return null
+    if (order.status === "cancelled") return "This order was cancelled."
+    if (order.status === "delivered") return "This order is already delivered."
     if (order.paymentMethod === "vendor_transfer" && order.status === "confirmed") {
       return order.paymentStatus === "paid_to_vendor"
-        ? "Direct payment is confirmed. You can dispatch the order now."
-        : "Wait for the buyer to pay you directly, then mark payment received."
+        ? "Direct payment confirmed — you can dispatch the order now."
+        : "Waiting for the buyer to pay you directly. Mark payment received when done."
     }
+    if (order.status === "dispatched") return "Order is already on its way to the buyer."
+    return "Only your store can move this order forward. Buyers see the updates in real time."
+  }, [isSeller, order])
 
-    if (order.status === "dispatched") {
-      return "The order is already on the way to the buyer."
-    }
+  // ------------------------------------------------------------------
+  // Guard states
+  // ------------------------------------------------------------------
+  if (authLoading || (fetching && !order)) {
+    return <LoadingState />
+  }
 
-    return "Only your store can move this order forward. Buyers just see the updates."
-  }, [isSellerViewer, order])
+  if (!profile) {
+    return (
+      <ErrorState
+        message="Sign in to view this order."
+        onBack={() => router.push("/orders")}
+      />
+    )
+  }
 
+  if (loadError) {
+    return (
+      <ErrorState
+        message={loadError}
+        onRetry={() => void loadOrder()}
+        onBack={() => router.push("/orders")}
+      />
+    )
+  }
+
+  if (!order) {
+    return (
+      <ErrorState
+        message="This order is not available on this account."
+        onRetry={() => void loadOrder()}
+        onBack={() => router.push("/orders")}
+      />
+    )
+  }
+
+  // ------------------------------------------------------------------
+  // Computed display values (safe — all normalize functions have fallbacks)
+  // ------------------------------------------------------------------
+  const activeVendor = vendorData?.vendor ?? order.vendor
+  const vendorName = activeVendor?.storeName ?? "Vendor"
+  const whatsappNumber = activeVendor?.whatsappNumber
+  const paymentMethodMeta = getPaymentMethodMeta(order.paymentMethod)
+  const paymentStatusMeta = getPaymentStatusMeta(order.paymentStatus, order.paymentMethod)
+  const orderStatusMeta = getOrderStatusMeta(order.status)
+  const orderItems = Array.isArray(order.items) ? order.items : []
+  const vendorTransferReady = Boolean(
+    activeVendor?.bankName && activeVendor?.accountName && activeVendor?.accountNumber
+  )
+
+  // Seller action gates
+  const sellerCanConfirm = isSeller && order.status === "pending"
+  const sellerCanReject = isSeller && order.status === "pending"
+  const sellerCanMarkPaid =
+    isSeller &&
+    order.paymentMethod === "vendor_transfer" &&
+    order.status === "confirmed" &&
+    order.paymentStatus !== "paid_to_vendor"
+  const sellerCanDispatch =
+    isSeller &&
+    order.status === "confirmed" &&
+    (order.paymentMethod === "pay_on_delivery" ||
+      order.paymentStatus === "paid_to_vendor")
+  const sellerCanDeliver = isSeller && order.status === "dispatched"
+
+  // ------------------------------------------------------------------
+  // Full render
+  // ------------------------------------------------------------------
   return (
     <div className="space-y-4 p-4 pb-safe-nav">
       <SectionHeading title="Order detail" />
 
+      {/* ---- Order summary card ---- */}
       <Card className="p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-lg font-semibold text-ink">{orderCounterpartyTitle}</p>
-            <p className="mt-1 text-sm text-muted">{orderCounterpartyMeta}</p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-lg font-semibold text-ink">
+              {isSeller ? "Store order" : vendorName}
+            </p>
+            <p className="mt-1 text-sm text-muted">
+              {isSeller
+                ? "Confirm, collect payment if needed, then dispatch and deliver."
+                : "Track seller updates and payment instructions in one place."}
+            </p>
             <p className="mt-2 text-xs uppercase tracking-[0.16em] text-muted">
               {formatDateTime(order.createdAt)}
             </p>
           </div>
-          <Badge className={orderStatusMeta.className}>
-            {orderStatusMeta.label}
-          </Badge>
+          <Badge className={orderStatusMeta.className}>{orderStatusMeta.label}</Badge>
         </div>
 
+        {/* Items */}
         <div className="mt-5 space-y-3">
           {orderItems.map((item) => (
-            <div key={item.productId} className="flex items-center justify-between text-sm">
+            <div
+              key={item.productId}
+              className="flex items-center justify-between text-sm"
+            >
               <div>
                 <p className="font-medium text-ink">{item.name}</p>
                 <p className="text-muted">Qty {item.quantity}</p>
@@ -261,17 +321,26 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
           ))}
         </div>
 
-        <div className="mt-5 rounded-2xl bg-canvas p-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-muted">Delivery Address</p>
-          <p className="mt-2 text-sm leading-6 text-ink">{order.deliveryAddress}</p>
-        </div>
+        {/* Delivery address */}
+        {order.deliveryAddress ? (
+          <div className="mt-5 rounded-2xl bg-canvas p-4">
+            <p className="text-xs uppercase tracking-[0.18em] text-muted">
+              Delivery address
+            </p>
+            <p className="mt-2 text-sm leading-6 text-ink">{order.deliveryAddress}</p>
+          </div>
+        ) : null}
 
+        {/* Total */}
         <div className="mt-5 flex items-center justify-between">
           <p className="text-sm text-muted">Total</p>
-          <p className="text-xl font-bold text-brand">{formatCurrency(order.totalAmount)}</p>
+          <p className="text-xl font-bold text-brand">
+            {formatCurrency(order.totalAmount)}
+          </p>
         </div>
 
-        {isBuyerViewer && whatsappNumber ? (
+        {/* WhatsApp link for buyer */}
+        {isBuyer && whatsappNumber ? (
           <a
             href={`https://wa.me/${whatsappNumber}`}
             target="_blank"
@@ -284,6 +353,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
         ) : null}
       </Card>
 
+      {/* ---- Payment card ---- */}
       <Card className="p-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge className="bg-canvas text-ink">{paymentMethodMeta.label}</Badge>
@@ -291,47 +361,47 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
         </div>
         <p className="mt-3 text-sm leading-6 text-muted">{paymentStatusMeta.helper}</p>
 
-        {isBuyerViewer ? (
-          <div className="mt-4 rounded-2xl bg-canvas p-4">
-            {order.paymentMethod === "pay_on_delivery" ? (
-              <p className="text-sm leading-6 text-ink">
-                This seller will collect cash or transfer when the order arrives.
-                Inspect it first before paying.
-              </p>
-            ) : order.paymentStatus === "awaiting_seller_confirmation" ? (
-              <p className="text-sm leading-6 text-ink">
-                Wait for the seller to confirm this order first. Once they do,
-                their direct payment details will show here.
-              </p>
-            ) : vendorTransferReady ? (
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted">Bank</span>
-                  <span className="font-semibold text-ink">{activeVendor?.bankName}</span>
+        <div className="mt-4 rounded-2xl bg-canvas p-4">
+          {isBuyer ? (
+            <>
+              {order.paymentMethod === "pay_on_delivery" ? (
+                <p className="text-sm leading-6 text-ink">
+                  This seller will collect cash or transfer when the order arrives.
+                  Inspect it first before paying.
+                </p>
+              ) : order.paymentStatus === "awaiting_seller_confirmation" ? (
+                <p className="text-sm leading-6 text-ink">
+                  Wait for the seller to confirm first. Their payment details will
+                  appear here once they do.
+                </p>
+              ) : vendorTransferReady ? (
+                <div className="space-y-2 text-sm">
+                  {[
+                    ["Bank", activeVendor?.bankName],
+                    ["Account name", activeVendor?.accountName],
+                    ["Account number", activeVendor?.accountNumber]
+                  ].map(([label, value]) =>
+                    value ? (
+                      <div key={label} className="flex items-center justify-between gap-3">
+                        <span className="text-muted">{label}</span>
+                        <span className="font-semibold text-ink">{value}</span>
+                      </div>
+                    ) : null
+                  )}
+                  {activeVendor?.paymentNote ? (
+                    <p className="mt-3 rounded-2xl bg-surface px-4 py-3 text-sm leading-6 text-muted">
+                      {activeVendor.paymentNote}
+                    </p>
+                  ) : null}
                 </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted">Account name</span>
-                  <span className="font-semibold text-ink">{activeVendor?.accountName}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted">Account number</span>
-                  <span className="font-semibold text-ink">{activeVendor?.accountNumber}</span>
-                </div>
-                {activeVendor?.paymentNote ? (
-                  <p className="mt-3 rounded-2xl bg-surface px-4 py-3 text-sm leading-6 text-muted">
-                    {activeVendor.paymentNote}
-                  </p>
-                ) : null}
-              </div>
-            ) : (
-              <p className="text-sm leading-6 text-ink">
-                This seller has not added bank details yet. Use WhatsApp to agree on
-                how you will complete direct payment.
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="mt-4 rounded-2xl bg-canvas p-4">
+              ) : (
+                <p className="text-sm leading-6 text-ink">
+                  This seller has not added bank details yet. Use WhatsApp to agree
+                  on how to complete direct payment.
+                </p>
+              )}
+            </>
+          ) : (
             <p className="text-sm leading-6 text-ink">
               {order.paymentMethod === "pay_on_delivery"
                 ? "The buyer will pay when the order arrives."
@@ -341,26 +411,28 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
                     ? "Confirm this order first so the buyer can see your direct payment instructions."
                     : "Wait for the buyer's transfer, then mark payment received."}
             </p>
-          </div>
-        )}
+          )}
+        </div>
       </Card>
 
-      {isBuyerViewer ? (
+      {/* ---- Status timeline (buyers only) ---- */}
+      {isBuyer ? (
         <Card className="p-4">
           <p className="text-sm font-semibold text-ink">Status timeline</p>
           <p className="mt-2 text-sm leading-6 text-muted">
-            Your seller updates this timeline as the order moves forward.
+            Your seller updates this as the order moves forward.
           </p>
           <div className="mt-4 space-y-3">
-            {statusSteps.map((status, index) => {
-              const reached = statusSteps.indexOf(order.status) >= index
+            {STATUS_STEPS.map((step, idx) => {
+              const currentIdx = STATUS_STEPS.indexOf(order.status)
+              const reached = currentIdx >= idx
               return (
-                <div key={status} className="flex items-center gap-3">
+                <div key={step} className="flex items-center gap-3">
                   <div
                     className={`h-3 w-3 rounded-full ${reached ? "bg-brand" : "bg-border"}`}
                   />
                   <p className={reached ? "font-medium text-ink" : "text-muted"}>
-                    {getOrderStatusMeta(status).label}
+                    {getOrderStatusMeta(step).label}
                   </p>
                 </div>
               )
@@ -369,17 +441,20 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
         </Card>
       ) : null}
 
-      {isSellerViewer ? (
+      {/* ---- Seller action card ---- */}
+      {isSeller ? (
         <Card className="p-4">
           <p className="text-sm font-semibold text-ink">Fulfil this order</p>
-          <p className="mt-2 text-sm leading-6 text-muted">{sellerProgressMessage}</p>
+          {sellerHint ? (
+            <p className="mt-2 text-sm leading-6 text-muted">{sellerHint}</p>
+          ) : null}
 
           <div className="mt-4 flex flex-wrap gap-3">
             {sellerCanConfirm ? (
               <Button
                 disabled={busy}
                 onClick={() =>
-                  applyOrderUpdate(
+                  applyUpdate(
                     {
                       status: "confirmed",
                       paymentStatus:
@@ -400,11 +475,9 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
             {sellerCanReject ? (
               <Button
                 variant="outline"
-                className="border-rose-200 text-rose-700 hover:border-rose-300 hover:text-rose-800"
+                className="border-rose-200 text-rose-700 hover:border-rose-300"
                 disabled={busy}
-                onClick={() =>
-                  applyOrderUpdate({ status: "cancelled" }, "Order cancelled.")
-                }
+                onClick={() => applyUpdate({ status: "cancelled" }, "Order cancelled.")}
               >
                 Reject Order
               </Button>
@@ -415,7 +488,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
                 variant="outline"
                 disabled={busy}
                 onClick={() =>
-                  applyOrderUpdate(
+                  applyUpdate(
                     { paymentStatus: "paid_to_vendor" },
                     "Direct payment marked as received."
                   )
@@ -429,7 +502,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
               <Button
                 disabled={busy}
                 onClick={() =>
-                  applyOrderUpdate({ status: "dispatched" }, "Order marked dispatched.")
+                  applyUpdate({ status: "dispatched" }, "Order marked dispatched.")
                 }
               >
                 Mark Dispatched
@@ -440,7 +513,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
               <Button
                 disabled={busy}
                 onClick={() =>
-                  applyOrderUpdate({ status: "delivered" }, "Order marked delivered.")
+                  applyUpdate({ status: "delivered" }, "Order marked delivered.")
                 }
               >
                 Mark Delivered
@@ -450,19 +523,20 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
         </Card>
       ) : null}
 
-      {isBuyerViewer && canReview ? (
+      {/* ---- Review card (buyers, delivered orders only) ---- */}
+      {isBuyer && canReview ? (
         <Card className="p-4">
           <p className="text-sm font-semibold text-ink">Leave a review</p>
           <div className="mt-4 flex gap-2">
-            {Array.from({ length: 5 }).map((_, index) => (
+            {[1, 2, 3, 4, 5].map((star) => (
               <button
-                key={index}
-                className={`rounded-full px-3 py-2 text-sm ${
-                  reviewRating >= index + 1 ? "bg-chrome text-white" : "bg-canvas text-muted"
+                key={star}
+                className={`rounded-full px-3 py-2 text-sm font-semibold transition ${
+                  reviewRating >= star ? "bg-chrome text-white" : "bg-canvas text-muted"
                 }`}
-                onClick={() => setReviewRating(index + 1)}
+                onClick={() => setReviewRating(star)}
               >
-                {index + 1}
+                {star}
               </button>
             ))}
           </div>
@@ -470,10 +544,11 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
             className="mt-4 min-h-[110px] w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-ink outline-none focus:border-brand/40"
             placeholder="Tell other buyers how it went"
             value={reviewComment}
-            onChange={(event) => setReviewComment(event.target.value)}
+            onChange={(e) => setReviewComment(e.target.value)}
           />
           <Button
             className="mt-4 w-full"
+            disabled={busy}
             onClick={async () => {
               if (!profile) return
               setBusy(true)
@@ -486,101 +561,55 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
                   comment: reviewComment,
                   buyerName: profile.fullName
                 })
-
-                const nextReview = {
-                  id: `review-${order.id}`,
-                  orderId: order.id,
-                  buyerId: profile.id,
-                  vendorId: order.vendorId,
-                  rating: reviewRating,
-                  comment: reviewComment,
-                  createdAt: new Date().toISOString(),
-                  buyerName: profile.fullName.split(/\s+/)[0] ?? profile.fullName
-                }
-
-                setVendorData((current) => {
-                  if (!current) {
-                    const nextAverage = reviewRating
-                    const baseVendor = order.vendor
-                    if (!baseVendor) return current
-
-                    return {
-                      vendor: {
-                        ...baseVendor,
-                        rating: nextAverage
-                      },
-                      products: [],
-                      reviews: [nextReview],
-                      reviewCount: 1,
-                      averageRating: nextAverage
-                    }
-                  }
-
-                  const currentReviews = Array.isArray(current.reviews)
-                    ? current.reviews
-                    : []
-                  const nextCount = current.reviewCount + 1
-                  const nextAverage =
-                    (current.averageRating * current.reviewCount + reviewRating) / nextCount
-
-                  return {
-                    ...current,
-                    vendor: {
-                      ...current.vendor,
-                      rating: nextAverage
-                    },
-                    reviews: [nextReview, ...currentReviews].slice(0, 5),
-                    reviewCount: nextCount,
-                    averageRating: nextAverage
-                  }
-                })
-
+                toast.success("Thanks for the review!")
                 setReviewComment("")
-                toast.success("Thanks for the review.")
-              } catch (error) {
-                toast.error(error instanceof Error ? error.message : "Could not save review.")
+              } catch (err) {
+                toast.error(
+                  err instanceof Error ? err.message : "Could not save review."
+                )
               } finally {
                 setBusy(false)
               }
             }}
-            disabled={busy}
           >
             Submit Review
           </Button>
         </Card>
       ) : null}
 
+      {/* ---- Archive card ---- */}
       {canArchive && profile ? (
         <Card className="p-4">
           <p className="text-sm font-semibold text-ink">History</p>
           <p className="mt-2 text-sm leading-6 text-muted">
-            {isSellerViewer
-              ? "Remove this finished order from your store history only. The buyer keeps their own copy."
-              : "Remove this finished order from your purchase history only. The seller keeps their own copy."}
+            {isSeller
+              ? "Remove this order from your store history. The buyer keeps their own copy."
+              : "Remove this order from your purchase history. The seller keeps their own copy."}
           </p>
           <Button
             variant="outline"
             className="mt-4 w-full"
             disabled={busy}
             onClick={async () => {
-              const confirmed = window.confirm("Remove this completed order from your history?")
-              if (!confirmed) return
-
+              const ok = window.confirm("Remove this completed order from your history?")
+              if (!ok) return
               setBusy(true)
               try {
-                const result = await archiveCompletedOrder(order.id, archiveActor!, profile.id)
+                const result = await archiveCompletedOrder(
+                  order.id,
+                  archiveActor!,
+                  profile.id
+                )
                 toast.success(
                   result.localOnly
-                    ? "Order removed from this device history."
-                    : "Order removed from your history."
+                    ? "Removed from this device."
+                    : "Removed from your history."
                 )
                 router.push("/orders")
                 router.refresh()
-              } catch (error) {
+              } catch (err) {
                 toast.error(
-                  error instanceof Error
-                    ? error.message
-                    : "Could not remove this order from history."
+                  err instanceof Error ? err.message : "Could not remove this order."
                 )
               } finally {
                 setBusy(false)
