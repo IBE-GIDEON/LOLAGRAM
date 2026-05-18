@@ -24,11 +24,15 @@ const inter = Inter({
 
 const ICON_VERSION = "20260514-pwa"
 
+const APP_TITLE = "LOLAGRAM — Your Local Marketplace"
+const APP_DESCRIPTION =
+  "Discover local vendors, shop products, and track your orders — all in one place. Nigeria's WhatsApp-style marketplace."
+
 export const metadata: Metadata = {
   title: "LOLAGRAM",
-  description:
-    "Mobile-first Nigerian marketplace for buyers and sellers with a WhatsApp-style vendor list.",
+  description: APP_DESCRIPTION,
   applicationName: "LOLAGRAM",
+  keywords: ["marketplace", "Nigeria", "vendors", "shop", "buy", "sell", "local"],
   icons: {
     icon: [
       { url: `/favicon.ico?v=${ICON_VERSION}`, sizes: "any" },
@@ -48,6 +52,26 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "default",
     title: "LOLAGRAM"
+  },
+  openGraph: {
+    type: "website",
+    siteName: "LOLAGRAM",
+    title: APP_TITLE,
+    description: APP_DESCRIPTION,
+    images: [
+      {
+        url: "/pwa/icon-512.png",
+        width: 512,
+        height: 512,
+        alt: "LOLAGRAM logo"
+      }
+    ]
+  },
+  twitter: {
+    card: "summary",
+    title: APP_TITLE,
+    description: APP_DESCRIPTION,
+    images: ["/pwa/icon-512.png"]
   }
 }
 

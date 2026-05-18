@@ -132,10 +132,17 @@ export function OrdersPageClient() {
 
       {/* Tab switcher — only shown to sellers */}
       {vendorProfile ? (
-        <div className="grid grid-cols-2 rounded-full border border-border/70 bg-surface p-1 shadow-soft">
+        <div
+          role="tablist"
+          aria-label="Order view"
+          className="grid grid-cols-2 rounded-full border border-border/70 bg-surface p-1 shadow-soft"
+        >
           {(["purchases", "store"] as const).map((t) => (
             <button
               key={t}
+              role="tab"
+              aria-selected={tab === t}
+              aria-label={t === "purchases" ? "My Purchases" : "My Store Orders"}
               className={cn(
                 "rounded-full px-4 py-3 text-sm font-semibold transition",
                 tab === t ? "bg-chrome text-white" : "text-muted"
@@ -209,6 +216,7 @@ export function OrdersPageClient() {
                 <div className="mt-4 flex gap-2">
                   <Link
                     href={`/orders/${order.id}`}
+                    aria-label={`Open order from ${title}`}
                     className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-chrome px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90"
                   >
                     Open order
@@ -218,6 +226,7 @@ export function OrdersPageClient() {
                     <Button
                       variant="outline"
                       className="flex-1"
+                      aria-label={`Remove order from ${title} from history`}
                       disabled={archivingId === order.id}
                       onClick={async () => {
                         const actor = tab === "store" ? "seller" : "buyer"

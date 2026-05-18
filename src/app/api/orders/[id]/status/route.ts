@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { sendPushNotification } from "@/lib/push"
+import { verifyAuthToken } from "@/lib/supabase/auth-guard"
 import { getSupabaseAdminClient } from "@/lib/supabase/server"
 import { type OrderStatus, type PaymentStatus } from "@/lib/types"
 
@@ -8,6 +9,12 @@ export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  // Require a valid Supabase session
+  const user = await verifyAuthToken(request)
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   const { status, paymentStatus } = (await request.json()) as {
     status?: OrderStatus
     paymentStatus?: PaymentStatus

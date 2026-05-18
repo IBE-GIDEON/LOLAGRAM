@@ -2,11 +2,24 @@ import { NextResponse } from "next/server"
 
 import { hasSupabaseAdmin } from "@/lib/env"
 import { sendPushNotification } from "@/lib/push"
-import { type CheckoutPayload } from "@/lib/types"
+import { verifyAuthToken } from "@/lib/supabase/auth-guard"
 import { getSupabaseAdminClient } from "@/lib/supabase/server"
+import { type CheckoutPayload } from "@/lib/types"
 
 export async function POST(request: Request) {
+  // Require a valid Supabase session
+  const user = await verifyAuthToken(request)
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   const payload = (await request.json()) as CheckoutPayload
+
+  // Prevent a user from placing orders on behalf of someone else
+  if (payload.buyerId !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+
   const supabase = getSupabaseAdminClient()
 
   if (!hasSupabaseAdmin || !supabase) {

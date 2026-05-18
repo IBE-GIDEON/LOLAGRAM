@@ -17,7 +17,10 @@ export function BottomNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="sticky bottom-0 z-40 shrink-0 border-t border-border bg-surface/95 px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-2 backdrop-blur">
+    <nav
+      aria-label="Main navigation"
+      className="sticky bottom-0 z-40 shrink-0 border-t border-border bg-surface/95 px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-2 backdrop-blur"
+    >
       <div className="grid grid-cols-4 gap-1">
         {items.map((item) => {
           const active =
@@ -30,6 +33,8 @@ export function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
+              aria-label={item.label}
+              aria-current={active ? "page" : undefined}
               className={cn(
                 "flex flex-col items-center justify-center rounded-2xl px-3 py-2 text-[11px] font-medium transition",
                 active
@@ -37,8 +42,8 @@ export function BottomNav() {
                   : "text-muted hover:bg-canvas"
               )}
             >
-              <Icon className="mb-1 text-base" />
-              {item.label}
+              <Icon className="mb-1 text-base" aria-hidden="true" />
+              <span>{item.label}</span>
             </Link>
           )
         })}

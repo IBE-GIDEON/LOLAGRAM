@@ -23,6 +23,7 @@ import {
   upsertDemoUser
 } from "@/lib/demo-store"
 import { canUseDemoMode, hasSupabase } from "@/lib/env"
+import { fetchWithRetry } from "@/lib/fetch-utils"
 import {
   normalizeProductPhotoUrls,
   serializeLegacyPhotoUrl
@@ -1892,6 +1893,16 @@ export async function deleteProduct(productId: string) {
   return true
 }
 
+/** Returns the current session's access token, or null if not signed in. */
+async function getAccessToken(): Promise<string | null> {
+  const supabase = getSupabaseBrowserClient()
+  if (!supabase) return null
+  const {
+    data: { session }
+  } = await supabase.auth.getSession()
+  return session?.access_token ?? null
+}
+
 export async function placeOrder(
   payload: CheckoutPayload
 ): Promise<PlaceOrderResponse> {
@@ -1921,11 +1932,19 @@ export async function placeOrder(
     throw new Error(getOrderPlacementError())
   }
 
-  const response = await fetch("/api/orders", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  })
+  const token = await getAccessToken()
+  const response = await fetchWithRetry(
+    "/api/orders",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(payload)
+    },
+    { timeout: 15_000, retries: 1 }
+  )
 
   if (!response.ok) {
     const data = (await response.json().catch(() => null)) as
@@ -1949,11 +1968,19 @@ export async function updateOrderStatus(
     throw new Error(getLaunchConfigError("Order status updates"))
   }
 
-  const response = await fetch(`/api/orders/${orderId}/status`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(updates)
-  })
+  const token = await getAccessToken()
+  const response = await fetchWithRetry(
+    `/api/orders/${orderId}/status`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(updates)
+    },
+    { timeout: 12_000, retries: 1 }
+  )
 
   if (!response.ok) {
     throw new Error("Unable to update order status")

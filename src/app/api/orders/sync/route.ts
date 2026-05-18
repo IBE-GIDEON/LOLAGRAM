@@ -1,11 +1,24 @@
 import { NextResponse } from "next/server"
 
 import { hasSupabaseAdmin } from "@/lib/env"
-import { type CheckoutPayload } from "@/lib/types"
+import { verifyAuthToken } from "@/lib/supabase/auth-guard"
 import { getSupabaseAdminClient } from "@/lib/supabase/server"
+import { type CheckoutPayload } from "@/lib/types"
 
 export async function POST(request: Request) {
+  // Require a valid Supabase session for offline order sync
+  const user = await verifyAuthToken(request)
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   const payload = (await request.json()) as CheckoutPayload
+
+  // Prevent replaying another user's offline order
+  if (payload.buyerId !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+
   const supabase = getSupabaseAdminClient()
 
   if (!hasSupabaseAdmin || !supabase) {
