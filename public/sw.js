@@ -12,8 +12,14 @@ self.addEventListener("install", (event) => {
         "/orders",
         "/profile",
         "/search",
+        "/vendor",
+        "/order-confirmation",
+        "/onboarding/seller",
+        "/seller/products",
         "/pwa/icon-192.png",
-        "/pwa/icon-512.png"
+        "/pwa/icon-512.png",
+        "/favicon.ico",
+        "/manifest.webmanifest"
       ])
     )
   )

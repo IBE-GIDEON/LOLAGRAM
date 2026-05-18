@@ -134,12 +134,25 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.className} suppressHydrationWarning>
       <head>
+        {/* Google Fonts — Inter is loaded from here via next/font */}
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+
+        {/* Supabase API origin */}
         {supabaseOrigin ? (
           <>
             <link rel="preconnect" href={supabaseOrigin} />
             <link rel="dns-prefetch" href={supabaseOrigin} />
           </>
         ) : null}
+
+        {/* Preload the splash / PWA icon so it's ready before JS hydrates */}
+        <link
+          rel="preload"
+          href="/favicon.ico"
+          as="image"
+          type="image/x-icon"
+        />
       </head>
       <body>
         {/* ── Splash screen ─────────────────────────────────────────────────── */}

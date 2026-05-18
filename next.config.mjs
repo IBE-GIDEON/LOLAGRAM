@@ -52,7 +52,17 @@ const nextConfig = {
         ]
       },
       {
-        // PWA icons and other public static files
+        // PWA icons (192 / 512 used by manifest + splash screen)
+        source: "/pwa/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=604800, stale-while-revalidate=2592000"
+          }
+        ]
+      },
+      {
+        // Favicon and other public icon files
         source: "/icons/:path*",
         headers: [
           {

@@ -2,9 +2,14 @@ import dynamic from "next/dynamic"
 import type { PropsWithChildren } from "react"
 
 import { BottomNav } from "@/components/bottom-nav"
-import { OfflineBanner } from "@/components/offline-banner"
 
-// Loaded only when a user has items in their cart — keeps the initial bundle lean
+// OfflineBanner: only visible when device is offline — skip from initial bundle
+const OfflineBanner = dynamic(
+  () => import("@/components/offline-banner").then((m) => m.OfflineBanner),
+  { ssr: false, loading: () => null }
+)
+
+// GlobalCart: only when a user has items in their cart
 const GlobalCart = dynamic(
   () => import("@/components/global-cart").then((m) => m.GlobalCart),
   { ssr: false }
