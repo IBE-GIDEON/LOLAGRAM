@@ -22,13 +22,8 @@ export async function PATCH(
   const supabase = getSupabaseAdminClient()
   const updates: Record<string, string> = {}
 
-  if (status) {
-    updates.status = status
-  }
-
-  if (paymentStatus) {
-    updates.payment_status = paymentStatus
-  }
+  if (status) updates.status = status
+  if (paymentStatus) updates.payment_status = paymentStatus
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ ok: true })
@@ -37,6 +32,36 @@ export async function PATCH(
   if (!supabase) {
     return NextResponse.json({ ok: true, status, paymentStatus })
   }
+
+  // ── Ownership check ────────────────────────────────────────────────────────
+  // Verify the caller is either the buyer or the seller of this order before
+  // allowing any status mutation. Uses the admin client to bypass RLS so the
+  // check always runs regardless of the session's RLS context.
+  const { data: existing } = await supabase
+    .from("orders")
+    .select("buyer_id, vendor_id")
+    .eq("id", params.id)
+    .maybeSingle()
+
+  if (!existing) {
+    return NextResponse.json({ error: "Order not found" }, { status: 404 })
+  }
+
+  const isBuyer = existing.buyer_id === user.id
+
+  // Resolve vendor owner — needed to confirm the caller is the seller
+  const { data: vendorOwner } = await supabase
+    .from("vendor_profiles")
+    .select("user_id")
+    .eq("id", String(existing.vendor_id))
+    .maybeSingle()
+
+  const isSeller = vendorOwner?.user_id === user.id
+
+  if (!isBuyer && !isSeller) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+  // ──────────────────────────────────────────────────────────────────────────
 
   const { data: order, error } = await supabase
     .from("orders")

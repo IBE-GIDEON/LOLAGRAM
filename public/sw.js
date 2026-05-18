@@ -146,9 +146,10 @@ async function networkFirst(request) {
 async function trimCache(cacheName, maxItems) {
   const cache = await caches.open(cacheName)
   const keys = await cache.keys()
-  if (keys.length <= maxItems) return
-  await cache.delete(keys[0])
-  await trimCache(cacheName, maxItems)
+  const excess = keys.length - maxItems
+  if (excess <= 0) return
+  // Delete oldest entries in one pass — avoids recursive call-stack growth
+  await Promise.all(keys.slice(0, excess).map((key) => cache.delete(key)))
 }
 
 function openOrdersDb() {
