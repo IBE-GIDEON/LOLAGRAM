@@ -153,11 +153,14 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
   // ------------------------------------------------------------------
   // Derived state
   // ------------------------------------------------------------------
-  // isBuyer is checked first — if the current user placed this order,
-  // they always see the buyer view even if they also own a vendor profile.
-  const isBuyer = Boolean(profile && order?.buyerId === profile.id)
+  // Each side is fully independent.
+  // If somehow the same user is both the buyer and the seller of this order,
+  // the seller view takes priority — sellers manage from their store side.
   const isSeller = Boolean(
-    !isBuyer && profile && vendorProfile && order?.vendorId === vendorProfile.id
+    profile && vendorProfile && order?.vendorId === vendorProfile.id
+  )
+  const isBuyer = Boolean(
+    profile && order?.buyerId === profile.id && !isSeller
   )
   const archiveActor: OrderArchiveActor | null = isSeller
     ? "seller"
