@@ -18,20 +18,27 @@ export default function OrdersError({
 
   const refreshOrders = () => {
     try {
-      const rawStore = window.localStorage.getItem("lolagram-persisted-cache-v1")
-      const store = rawStore ? (JSON.parse(rawStore) as Record<string, unknown>) : {}
+      const cacheKeys = [
+        "lolagram-persisted-cache-v1",
+        "lolagram-persisted-cache-v2"
+      ]
 
-      for (const key of Object.keys(store)) {
-        if (
-          key.startsWith("buyer-orders:") ||
-          key.startsWith("seller-orders:") ||
-          key.startsWith("order-detail:")
-        ) {
-          delete store[key]
+      for (const cacheKey of cacheKeys) {
+        const rawStore = window.localStorage.getItem(cacheKey)
+        const store = rawStore ? (JSON.parse(rawStore) as Record<string, unknown>) : {}
+
+        for (const key of Object.keys(store)) {
+          if (
+            key.startsWith("buyer-orders:") ||
+            key.startsWith("seller-orders:") ||
+            key.startsWith("order-detail:")
+          ) {
+            delete store[key]
+          }
         }
-      }
 
-      window.localStorage.setItem("lolagram-persisted-cache-v1", JSON.stringify(store))
+        window.localStorage.setItem(cacheKey, JSON.stringify(store))
+      }
     } catch {
       // If local storage is unavailable, retrying the route is still safe.
     }

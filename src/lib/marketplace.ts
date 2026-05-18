@@ -95,21 +95,49 @@ function mapProduct(row: Record<string, unknown>) {
   const photoUrls = normalizeProductPhotoUrls(
     Array.isArray(row.photo_urls)
       ? row.photo_urls.map((value) => String(value))
+      : Array.isArray(row.photoUrls)
+        ? row.photoUrls.map((value) => String(value))
       : undefined,
-    row.photo_url ? String(row.photo_url) : undefined
+    row.photo_url
+      ? String(row.photo_url)
+      : row.photoUrl
+        ? String(row.photoUrl)
+        : undefined
   )
 
   return {
     id: String(row.id),
-    vendorId: String(row.vendor_id),
+    vendorId: String(row.vendor_id ?? row.vendorId ?? ""),
     name: String(row.name),
     description: String(row.description ?? ""),
     price: Number(row.price ?? 0),
     photoUrl: photoUrls[0],
     photoUrls,
-    inStock: Boolean(row.in_stock),
-    createdAt: String(row.created_at ?? new Date().toISOString())
+    inStock: normalizeBoolean(row.in_stock ?? row.inStock, true),
+    createdAt: String(row.created_at ?? row.createdAt ?? new Date().toISOString())
   }
+}
+
+function normalizeBoolean(value: unknown, fallback = false) {
+  if (typeof value === "boolean") {
+    return value
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase()
+    if (["true", "t", "1", "yes", "y"].includes(normalized)) {
+      return true
+    }
+    if (["false", "f", "0", "no", "n"].includes(normalized)) {
+      return false
+    }
+  }
+
+  if (typeof value === "number") {
+    return value !== 0
+  }
+
+  return fallback
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -356,7 +384,7 @@ const userProfileCache = new Map<string, CacheEntry<UserProfile | null>>()
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const inFlight = new Map<string, Promise<any>>()
 const HIDDEN_ORDERS_KEY = "lolagram-hidden-orders"
-const PERSISTED_CACHE_KEY = "lolagram-persisted-cache-v1"
+const PERSISTED_CACHE_KEY = "lolagram-persisted-cache-v2"
 const PERSISTED_CACHE_TTL_MS = 10 * 60 * 1000
 
 type PersistedCacheEntry = {
