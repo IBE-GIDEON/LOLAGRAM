@@ -105,7 +105,7 @@ function ProductFeedCard({ product }: { product: ProductSearchResult }) {
             src={primaryImage}
             alt={product.name}
             sizes="(max-width: 430px) 50vw, 215px"
-            className={product.inStock ? "" : "opacity-40"}
+            className={product.inStock ? undefined : "opacity-40"}
           />
         ) : (
           <div className="flex h-full items-center justify-center bg-canvas text-xs font-medium text-muted">

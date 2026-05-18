@@ -157,7 +157,7 @@ export function VendorStoreClient({
                       src={primaryImage}
                       alt={product.name}
                       sizes="(max-width: 430px) 50vw, 215px"
-                      className={product.inStock ? "" : "opacity-40"}
+                      className={product.inStock ? undefined : "opacity-40"}
                     />
 
                     {/* Out of stock — centred overlay */}
