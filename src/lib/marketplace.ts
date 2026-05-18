@@ -1240,6 +1240,41 @@ export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]
   })
 }
 
+/**
+ * After loadVendorDetail resolves with fresh DB data, push the current
+ * inStock values back into the product-feed caches (both in-memory and
+ * persisted localStorage). This prevents the home feed from showing a
+ * stale "In Stock" badge for a product the seller already marked as
+ * "Out of Stock".
+ *
+ * Runs only when values actually changed — zero overhead on a cache hit.
+ */
+function syncProductStockToFeedCache(
+  freshProducts: Array<{ id: string; inStock: boolean }>
+): void {
+  if (freshProducts.length === 0) return
+  const stockById = new Map(freshProducts.map((p) => [p.id, p.inStock]))
+
+  for (const [key, entry] of productFeedCache) {
+    if (!entry.value?.length) continue
+
+    let changed = false
+    const next = entry.value.map((p) => {
+      const freshStock = stockById.get(p.id)
+      if (freshStock === undefined || freshStock === p.inStock) return p
+      changed = true
+      return { ...p, inStock: freshStock }
+    })
+
+    if (changed) {
+      productFeedCache.set(key, { value: next, expiresAt: entry.expiresAt })
+      // Keep persisted (localStorage) cache in sync too so fresh page
+      // loads after a vendor visit also show the correct stock status.
+      writePersistedCache(persistedCacheKeys.productFeed(key), next)
+    }
+  }
+}
+
 export async function loadVendorDetail(vendorId: string): Promise<VendorDetail | null> {
   if (!hasSupabase) {
     return canUseDemoMode ? getVendorDetailDemo(vendorId) : null
@@ -1285,13 +1320,19 @@ export async function loadVendorDetail(vendorId: string): Promise<VendorDetail |
     const mappedVendor = mapVendor(vendor)
     cacheVendorProfile(mappedVendor, mappedVendor.userId)
 
+    const mappedProducts = products?.map((product) => mapProduct(product)) ?? []
+
+    // Propagate fresh stock status back to the product-feed cache so the
+    // home page never shows a stale In Stock / Out of Stock badge.
+    syncProductStockToFeedCache(mappedProducts)
+
     return writeHybridCache(
       vendorDetailCache,
       vendorId,
       persistedCacheKeys.vendorDetail(vendorId),
       {
         vendor: mappedVendor,
-        products: products?.map((product) => mapProduct(product)) ?? [],
+        products: mappedProducts,
         reviews:
           reviews?.map((review) => ({
             id: String(review.id),
