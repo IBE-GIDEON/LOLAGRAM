@@ -1511,7 +1511,17 @@ export async function loadOrderDetail(
     .eq("id", orderRow.vendor_id)
     .maybeSingle()
 
+  // 3. Fetch the buyer's profile (phone + name) so the seller can chat them.
+  const { data: buyerRow } = await supabase
+    .from("users")
+    .select("id, full_name, phone, profile_photo_url, email, account_type, created_at")
+    .eq("id", orderRow.buyer_id)
+    .maybeSingle()
+
   const order = mapOrder(orderRow, vendorRow ? mapVendor(vendorRow) : undefined)
+  if (buyerRow) {
+    order.buyer = mapUser(buyerRow as Record<string, unknown>)
+  }
 
   return writeHybridCache(
     orderDetailCache,

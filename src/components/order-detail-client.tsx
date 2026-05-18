@@ -339,7 +339,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
           </p>
         </div>
 
-        {/* WhatsApp link for buyer */}
+        {/* WhatsApp: buyer chats seller */}
         {isBuyer && whatsappNumber ? (
           <a
             href={`https://wa.me/${whatsappNumber}`}
@@ -349,6 +349,19 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
           >
             <FiMessageCircle />
             Chat Seller on WhatsApp
+          </a>
+        ) : null}
+
+        {/* WhatsApp: seller chats buyer */}
+        {isSeller && order.buyer?.phone ? (
+          <a
+            href={`https://wa.me/${order.buyer.phone}`}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full border border-whatsapp/25 bg-surface px-4 py-3 text-sm font-semibold text-whatsapp"
+          >
+            <FiMessageCircle />
+            Chat Buyer on WhatsApp
           </a>
         ) : null}
       </Card>
@@ -438,6 +451,30 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
               )
             })}
           </div>
+        </Card>
+      ) : null}
+
+      {/* ---- Buyer cancel card (pending orders only) ---- */}
+      {isBuyer && order.status === "pending" ? (
+        <Card className="p-4">
+          <p className="text-sm font-semibold text-ink">Cancel this order</p>
+          <p className="mt-2 text-sm leading-6 text-muted">
+            The seller has not confirmed yet. You can decline now — they will be notified.
+          </p>
+          <Button
+            variant="outline"
+            className="mt-4 w-full border-rose-200 text-rose-700 hover:border-rose-300"
+            disabled={busy}
+            onClick={() => {
+              const ok = window.confirm(
+                "Are you sure you want to decline this order?"
+              )
+              if (!ok) return
+              void applyUpdate({ status: "cancelled" }, "Order declined.")
+            }}
+          >
+            Decline Order
+          </Button>
         </Card>
       ) : null}
 

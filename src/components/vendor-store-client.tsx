@@ -131,7 +131,7 @@ export function VendorStoreClient({
                   className="inline-flex items-center justify-center gap-2 rounded-full border border-whatsapp/25 bg-surface px-4 py-3 text-sm font-semibold text-whatsapp transition hover:bg-whatsapp/5"
                 >
                   <FiMessageCircle />
-                  Chat on WhatsApp
+                  Chat Seller on WhatsApp
                 </a>
               </div>
             </div>
