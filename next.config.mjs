@@ -4,6 +4,11 @@ const nextConfig = {
 
   compress: true,
 
+  experimental: {
+    // Tree-shake react-icons — only bundles the icons actually imported
+    optimizePackageImports: ["react-icons", "react-icons/fi"]
+  },
+
   images: {
     remotePatterns: [
       {

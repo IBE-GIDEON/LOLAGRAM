@@ -66,14 +66,44 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  // Runs synchronously before first paint — sets dark/light class on <html>
   const themeScript = `
     (function () {
       try {
         var stored = window.localStorage.getItem("${THEME_KEY}");
-        var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
         var isDark = stored ? stored === "dark" : true;
         document.documentElement.classList.toggle("dark", isDark);
-      } catch (error) {}
+      } catch (e) {}
+    })();
+  `
+
+  // Adjusts splash bg for light-mode users, then fades it out on load
+  const splashScript = `
+    (function () {
+      try {
+        var stored = window.localStorage.getItem("${THEME_KEY}");
+        var isDark = stored ? stored === "dark" : true;
+        var splash = document.getElementById("lolagram-splash");
+        if (splash && !isDark) {
+          splash.style.background = "#EAEFEB";
+          var title = document.getElementById("lolagram-splash-title");
+          if (title) title.style.color = "#111B21";
+        }
+        function removeSplash() {
+          var s = document.getElementById("lolagram-splash");
+          if (!s) return;
+          s.style.transition = "opacity 0.35s ease";
+          s.style.opacity = "0";
+          setTimeout(function () { if (s.parentNode) s.parentNode.removeChild(s); }, 400);
+        }
+        if (document.readyState === "complete") {
+          setTimeout(removeSplash, 250);
+        } else {
+          window.addEventListener("load", function () {
+            setTimeout(removeSplash, 250);
+          }, { once: true });
+        }
+      } catch (e) {}
     })();
   `
 
@@ -88,7 +118,81 @@ export default function RootLayout({
         ) : null}
       </head>
       <body>
+        {/* ── Splash screen ─────────────────────────────────────────────────── */}
+        {/* Rendered server-side so it appears immediately on every cold launch. */}
+        {/* The splashScript below adjusts bg for light-mode then fades it out. */}
+        <div
+          id="lolagram-splash"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#08131A",
+            pointerEvents: "none"
+          }}
+        >
+          {/* App icon */}
+          <div
+            style={{
+              width: 96,
+              height: 96,
+              borderRadius: 24,
+              background: "#25D366",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: 22,
+              boxShadow: "0 8px 32px rgba(37,211,102,0.35)"
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/pwa/icon-192.png"
+              alt=""
+              width={70}
+              height={70}
+              style={{ borderRadius: 16, display: "block" }}
+            />
+          </div>
+
+          {/* App name */}
+          <p
+            id="lolagram-splash-title"
+            style={{
+              fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+              fontSize: 28,
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              color: "#E8EDF0",
+              margin: 0,
+              lineHeight: 1
+            }}
+          >
+            LOLAGRAM
+          </p>
+
+          {/* Tagline */}
+          <p
+            style={{
+              fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+              fontSize: 13,
+              color: "#8696A0",
+              margin: "10px 0 0",
+              letterSpacing: "0.02em"
+            }}
+          >
+            Your local marketplace
+          </p>
+        </div>
+
+        {/* Synchronous scripts — run before React hydrates */}
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: splashScript }} />
+
         <AppProviders>
           <MobileShell>{children}</MobileShell>
         </AppProviders>

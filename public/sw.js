@@ -1,4 +1,4 @@
-const STATIC_CACHE = "lolagram-static-v1"
+const STATIC_CACHE = "lolagram-static-v2"
 const VENDOR_CACHE = "lolagram-vendors-v1"
 const IMAGE_CACHE = "lolagram-images-v1"
 const ORDER_DB = "lolagram-offline"
@@ -7,14 +7,33 @@ const ORDER_STORE = "order-intents"
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE).then((cache) =>
-      cache.addAll(["/", "/orders", "/profile", "/search"])
+      cache.addAll([
+        "/",
+        "/orders",
+        "/profile",
+        "/search",
+        "/pwa/icon-192.png",
+        "/pwa/icon-512.png"
+      ])
     )
   )
   self.skipWaiting()
 })
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim())
+  // Delete any caches from previous versions
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((k) => k.startsWith("lolagram-static-") && k !== STATIC_CACHE)
+            .map((k) => caches.delete(k))
+        )
+      )
+      .then(() => self.clients.claim())
+  )
 })
 
 self.addEventListener("fetch", (event) => {
