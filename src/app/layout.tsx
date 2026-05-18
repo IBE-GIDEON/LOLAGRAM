@@ -151,7 +151,7 @@ export default function RootLayout({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/pwa/icon-192.png"
+              src="/favicon.ico"
               alt=""
               width={70}
               height={70}
