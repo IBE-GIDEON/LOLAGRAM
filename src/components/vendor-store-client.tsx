@@ -146,41 +146,53 @@ export function VendorStoreClient({
             {data.products.map((product) => {
               const primaryImage = getPrimaryProductImage(product)
               return (
-              <button
-                key={product.id}
-                className="overflow-hidden rounded-[22px] bg-surface text-left shadow-soft transition active:scale-[0.99]"
-                onClick={() => setSelectedProduct(product)}
-              >
-                <div className="relative aspect-square overflow-hidden bg-canvas">
-                  <RemoteImage
-                    src={primaryImage}
-                    alt={product.name}
-                    sizes="(max-width: 430px) 50vw, 215px"
-                  />
-                </div>
-                <div className="space-y-2 p-3">
-                  <p className="line-clamp-2 text-sm font-semibold text-ink">
-                    {product.name}
-                  </p>
-                  <p className="text-base font-bold text-brand">
-                    {formatCurrency(product.price)}
-                  </p>
-                  <span
-                    className={`inline-flex rounded-full px-2 py-1 text-[11px] font-medium ${
-                      product.inStock
-                        ? "bg-emerald-100 text-success"
-                        : "bg-rose-100 text-rose-700"
-                    }`}
-                  >
-                    {product.inStock ? "In Stock" : "Out of Stock"}
-                  </span>
-                  {product.photoUrls.length > 1 ? (
-                    <p className="text-[11px] font-medium text-muted">
-                      {product.photoUrls.length} photos
+                <button
+                  key={product.id}
+                  className="overflow-hidden rounded-[22px] bg-surface text-left shadow-soft transition active:scale-[0.99]"
+                  onClick={() => setSelectedProduct(product)}
+                >
+                  {/* Image + stock overlay */}
+                  <div className="relative aspect-square overflow-hidden bg-canvas">
+                    <RemoteImage
+                      src={primaryImage}
+                      alt={product.name}
+                      sizes="(max-width: 430px) 50vw, 215px"
+                      className={product.inStock ? "" : "opacity-40"}
+                    />
+
+                    {/* Out of stock — centred overlay */}
+                    {!product.inStock ? (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="rounded-full bg-black/75 px-3 py-1.5 text-[11px] font-semibold tracking-wide text-white">
+                          Out of Stock
+                        </span>
+                      </div>
+                    ) : (
+                      /* In stock — small dot badge top-left */
+                      <span className="absolute left-2.5 top-2.5 flex items-center gap-1 rounded-full bg-black/50 px-2 py-1 text-[10px] font-semibold text-white">
+                        <span className="h-1.5 w-1.5 rounded-full bg-brand" />
+                        In Stock
+                      </span>
+                    )}
+
+                    {/* Photo count — bottom right */}
+                    {product.photoUrls.length > 1 ? (
+                      <span className="absolute bottom-2.5 right-2.5 rounded-full bg-black/60 px-2 py-1 text-[10px] font-semibold text-white">
+                        +{product.photoUrls.length - 1}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {/* Card body — name + price only, always same height */}
+                  <div className="p-3">
+                    <p className="line-clamp-2 text-sm font-semibold leading-5 text-ink">
+                      {product.name}
                     </p>
-                  ) : null}
-                </div>
-              </button>
+                    <p className="mt-1.5 text-base font-bold text-brand">
+                      {formatCurrency(product.price)}
+                    </p>
+                  </div>
+                </button>
               )
             })}
           </div>

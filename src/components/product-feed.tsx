@@ -105,6 +105,7 @@ function ProductFeedCard({ product }: { product: ProductSearchResult }) {
             src={primaryImage}
             alt={product.name}
             sizes="(max-width: 430px) 50vw, 215px"
+            className={product.inStock ? "" : "opacity-40"}
           />
         ) : (
           <div className="flex h-full items-center justify-center bg-canvas text-xs font-medium text-muted">
@@ -112,18 +113,24 @@ function ProductFeedCard({ product }: { product: ProductSearchResult }) {
           </div>
         )}
 
-        <span
-          className={cn(
-            "absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-sm",
-            product.inStock
-              ? "bg-white/92 text-success dark:bg-black/70"
-              : "bg-black/78 text-white dark:bg-black/82"
-          )}
-        >
-          {product.inStock ? "In stock" : "Out of stock"}
-        </span>
+        {/* Out of stock — centred overlay */}
+        {!product.inStock ? (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="rounded-full bg-black/75 px-3 py-1.5 text-[11px] font-semibold tracking-wide text-white">
+              Out of Stock
+            </span>
+          </div>
+        ) : (
+          /* In stock — small dot badge top-left */
+          <span className="absolute left-2.5 top-2.5 flex items-center gap-1 rounded-full bg-black/50 px-2 py-1 text-[10px] font-semibold text-white">
+            <span className="h-1.5 w-1.5 rounded-full bg-brand" />
+            In Stock
+          </span>
+        )}
+
+        {/* Photo count — bottom right */}
         {product.photoUrls.length > 1 ? (
-          <span className="absolute bottom-3 right-3 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-semibold text-white">
+          <span className="absolute bottom-2.5 right-2.5 rounded-full bg-black/60 px-2 py-1 text-[10px] font-semibold text-white">
             +{product.photoUrls.length - 1}
           </span>
         ) : null}
