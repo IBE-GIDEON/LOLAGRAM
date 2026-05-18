@@ -86,6 +86,12 @@ export interface Order {
   createdAt: string
 }
 
+export interface OrderUpdatePayload {
+  status?: OrderStatus
+  paymentStatus?: PaymentStatus
+  deliveryAddress?: string
+}
+
 export interface Review {
   id: string
   orderId: string

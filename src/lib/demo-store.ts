@@ -9,8 +9,7 @@ import {
   type MarketplaceSearchResults,
   type Order,
   type OrderDetail,
-  type OrderStatus,
-  type PaymentStatus,
+  type OrderUpdatePayload,
   type Product,
   type ProductInput,
   type ProductSearchResult,
@@ -401,7 +400,7 @@ export function createOrderDemo(order: Omit<Order, "id" | "createdAt">): Order {
 
 export function updateOrderStatusDemo(
   orderId: string,
-  updates: { status?: OrderStatus; paymentStatus?: PaymentStatus }
+  updates: OrderUpdatePayload
 ) {
   return withState((state) => {
     const order = state.orders.find((item) => item.id === orderId)
@@ -415,6 +414,10 @@ export function updateOrderStatusDemo(
 
     if (updates.paymentStatus) {
       order.paymentStatus = updates.paymentStatus
+    }
+
+    if (updates.deliveryAddress) {
+      order.deliveryAddress = updates.deliveryAddress
     }
 
     if (updates.status === "delivered") {

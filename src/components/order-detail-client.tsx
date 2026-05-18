@@ -6,7 +6,7 @@ import toast from "react-hot-toast"
 import { FiMessageCircle, FiRefreshCw } from "react-icons/fi"
 
 import { useAuth } from "@/components/providers/auth-provider"
-import { Badge, Button, Card, SectionHeading } from "@/components/ui"
+import { Badge, Button, Card, SectionHeading, Textarea } from "@/components/ui"
 import {
   getOrderStatusMeta,
   getPaymentMethodMeta,
@@ -93,6 +93,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
   const [busy, setBusy] = useState(false)
   const [reviewRating, setReviewRating] = useState(5)
   const [reviewComment, setReviewComment] = useState("")
+  const [deliveryDraft, setDeliveryDraft] = useState("")
 
   // ------------------------------------------------------------------
   // Load the order — only fires once auth has settled
@@ -150,6 +151,10 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
     }
   }, [authLoading, loadOrder])
 
+  useEffect(() => {
+    setDeliveryDraft(order?.deliveryAddress ?? "")
+  }, [order?.deliveryAddress])
+
   // ------------------------------------------------------------------
   // Derived state
   // ------------------------------------------------------------------
@@ -181,7 +186,11 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
   // Order action helper
   // ------------------------------------------------------------------
   const applyUpdate = async (
-    updates: { status?: OrderStatus; paymentStatus?: PaymentStatus },
+    updates: {
+      status?: OrderStatus
+      paymentStatus?: PaymentStatus
+      deliveryAddress?: string
+    },
     successMsg: string
   ) => {
     if (!order) return
@@ -207,13 +216,15 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
   const sellerHint = useMemo(() => {
     if (!isSeller || !order) return null
     if (order.status === "cancelled") return "This order was cancelled."
-    if (order.status === "delivered") return "This order is already delivered."
+    if (order.status === "delivered") return "The buyer has confirmed this delivery."
     if (order.paymentMethod === "vendor_transfer" && order.status === "confirmed") {
       return order.paymentStatus === "paid_to_vendor"
         ? "Direct payment confirmed — you can dispatch the order now."
         : "Waiting for the buyer to pay you directly. Mark payment received when done."
     }
-    if (order.status === "dispatched") return "Order is already on its way to the buyer."
+    if (order.status === "dispatched") {
+      return "Order is on its way. The buyer will confirm delivery after receiving it."
+    }
     return "Only your store can move this order forward. Buyers see the updates in real time."
   }, [isSeller, order])
 
@@ -280,7 +291,9 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
     order.status === "confirmed" &&
     (order.paymentMethod === "pay_on_delivery" ||
       order.paymentStatus === "paid_to_vendor")
-  const sellerCanDeliver = isSeller && order.status === "dispatched"
+  const buyerCanEditDelivery =
+    isBuyer && (order.status === "pending" || order.status === "confirmed")
+  const buyerCanConfirmDelivery = isBuyer && order.status === "dispatched"
 
   // ------------------------------------------------------------------
   // Full render
@@ -298,7 +311,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
             </p>
             <p className="mt-1 text-sm text-muted">
               {isSeller
-                ? "Confirm, collect payment if needed, then dispatch and deliver."
+                ? "Confirm, collect payment if needed, then dispatch. The buyer closes delivery."
                 : "Track seller updates and payment instructions in one place."}
             </p>
             <p className="mt-2 text-xs uppercase tracking-[0.16em] text-muted">
@@ -326,13 +339,47 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
           ))}
         </div>
 
-        {/* Delivery address */}
-        {order.deliveryAddress ? (
+        {/* Drop-off location */}
+        {buyerCanEditDelivery || order.deliveryAddress ? (
           <div className="mt-5 rounded-2xl bg-canvas p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-muted">
-              Delivery address
+              Drop-off location
             </p>
-            <p className="mt-2 text-sm leading-6 text-ink">{order.deliveryAddress}</p>
+            {buyerCanEditDelivery ? (
+              <div className="mt-3 space-y-3">
+                <Textarea
+                  value={deliveryDraft}
+                  onChange={(event) => setDeliveryDraft(event.target.value)}
+                  placeholder="Where should the seller deliver this order?"
+                  className="min-h-[96px] bg-surface"
+                />
+                <p className="text-xs leading-5 text-muted">
+                  You can edit this before the seller dispatches the order.
+                </p>
+                <Button
+                  variant="secondary"
+                  className="w-full"
+                  disabled={busy || deliveryDraft.trim() === order.deliveryAddress.trim()}
+                  onClick={() => {
+                    const nextAddress = deliveryDraft.trim()
+                    if (!nextAddress) {
+                      toast.error("Add a drop-off location first.")
+                      return
+                    }
+                    void applyUpdate(
+                      { deliveryAddress: nextAddress },
+                      "Drop-off location updated."
+                    )
+                  }}
+                >
+                  Save Location
+                </Button>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm leading-6 text-ink">
+                {order.deliveryAddress || "No drop-off location added."}
+              </p>
+            )}
           </div>
         ) : null}
 
@@ -483,6 +530,27 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
         </Card>
       ) : null}
 
+      {/* ---- Buyer delivery confirmation ---- */}
+      {buyerCanConfirmDelivery ? (
+        <Card className="p-4">
+          <p className="text-sm font-semibold text-ink">Confirm delivery</p>
+          <p className="mt-2 text-sm leading-6 text-muted">
+            Only tap this after you have received the product and the order is okay.
+          </p>
+          <Button
+            className="mt-4 w-full"
+            disabled={busy}
+            onClick={() => {
+              const ok = window.confirm("Confirm that you have received this order?")
+              if (!ok) return
+              void applyUpdate({ status: "delivered" }, "Delivery confirmed.")
+            }}
+          >
+            I Have Received It
+          </Button>
+        </Card>
+      ) : null}
+
       {/* ---- Seller action card ---- */}
       {isSeller ? (
         <Card className="p-4">
@@ -551,16 +619,6 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
               </Button>
             ) : null}
 
-            {sellerCanDeliver ? (
-              <Button
-                disabled={busy}
-                onClick={() =>
-                  applyUpdate({ status: "delivered" }, "Order marked delivered.")
-                }
-              >
-                Mark Delivered
-              </Button>
-            ) : null}
           </div>
         </Card>
       ) : null}

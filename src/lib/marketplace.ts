@@ -40,6 +40,7 @@ import {
   type OrderArchiveActor,
   type MarketplaceSearchResults,
   type OrderDetail,
+  type OrderUpdatePayload,
   type OrderStatus,
   type PaymentMethod,
   type PaymentStatus,
@@ -2038,7 +2039,7 @@ export async function placeOrder(
 
 export async function updateOrderStatus(
   orderId: string,
-  updates: { status?: OrderStatus; paymentStatus?: PaymentStatus }
+  updates: OrderUpdatePayload
 ) {
   if (!hasSupabase) {
     if (canUseDemoMode) {
@@ -2062,13 +2063,17 @@ export async function updateOrderStatus(
   )
 
   if (!response.ok) {
-    throw new Error("Unable to update order status")
+    const data = (await response.json().catch(() => null)) as
+      | { error?: string }
+      | null
+    throw new Error(data?.error ?? "Unable to update order")
   }
 
   updateCachedOrderCollections(orderId, (order) => ({
     ...order,
     ...(updates.status ? { status: updates.status } : {}),
-    ...(updates.paymentStatus ? { paymentStatus: updates.paymentStatus } : {})
+    ...(updates.paymentStatus ? { paymentStatus: updates.paymentStatus } : {}),
+    ...(updates.deliveryAddress ? { deliveryAddress: updates.deliveryAddress } : {})
   }))
 
   return response.json()
