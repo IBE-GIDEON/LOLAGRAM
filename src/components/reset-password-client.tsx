@@ -27,7 +27,7 @@ export function ResetPasswordClient() {
           <p className="text-lg font-semibold text-ink">Choose a new password</p>
           <p className="mt-2 text-sm leading-6 text-muted">
             Open this page from the password reset email we sent you, then set a
-            fresh password for your LOLAGRAM account.
+            fresh password for your GLOWGRAM account.
           </p>
         </div>
 

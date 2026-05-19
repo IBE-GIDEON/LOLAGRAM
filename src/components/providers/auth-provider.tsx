@@ -151,7 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fullName: String(
           user.user_metadata?.full_name ??
             user.email?.split("@")[0] ??
-            "LOLAGRAM User"
+            "GLOWGRAM User"
         ),
         profilePhotoUrl:
           typeof user.user_metadata?.profile_photo_url === "string"

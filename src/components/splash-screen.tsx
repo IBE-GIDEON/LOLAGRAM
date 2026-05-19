@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 
-const SESSION_KEY = "lolagram-splash"
+const SESSION_KEY = "glowgram-splash"
 
 /**
  * Splash screen shown only on a genuine cold start (fresh page load).
@@ -102,7 +102,7 @@ export function SplashScreen() {
           lineHeight: 1
         }}
       >
-        LOLAGRAM
+        GLOWGRAM
       </p>
 
       {/* Tagline */}

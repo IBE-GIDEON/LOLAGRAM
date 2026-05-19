@@ -45,7 +45,7 @@ export async function POST(request: Request) {
 
   const transaction = await initializePaystackTransaction({
     amount: payload.totalAmount,
-    email: `buyer-${payload.buyerId.slice(0, 8)}@lolagram.app`,
+    email: `buyer-${payload.buyerId.slice(0, 8)}@glowgram.app`,
     reference,
     callbackUrl: `${env.appUrl}/order-confirmation/${order.id}`,
     metadata: {

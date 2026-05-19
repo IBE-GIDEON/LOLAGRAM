@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="GLOWGRAM is a Nigerian marketplace PWA where buyers discover products and vendors, then order directly from trusted sellers."
+    />
+    <meta name="theme-color" content="#050606" />
+    <title>GLOWGRAM - Shop Nigerian vendors faster</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/@sneas/telephone@1.1.1/iphone-16-max.js"
+    ></script>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-glow" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="GLOWGRAM">
+        <img src="./icon-192.png" alt="" />
+        <span>GLOWGRAM</span>
+      </a>
+      <a class="topbar-link" href="https://glowgram.vercel.app/">Open app</a>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="label">Nigerian marketplace PWA</p>
+          <h1>Find products first. Meet the vendor after.</h1>
+          <p class="intro">
+            GLOWGRAM helps buyers search bags, wigs, cosmetics, watches,
+            jewellery, and fashion without guessing which vendor sells what.
+            Sellers get a simple store, product grid, and order flow in one app.
+          </p>
+
+          <div class="actions">
+            <button class="primary-btn" id="downloadButton" type="button">
+              Download app
+            </button>
+            <button class="ghost-btn" id="guideButton" type="button">
+              Install guide
+            </button>
+          </div>
+
+          <div class="proof">
+            <span>WhatsApp-style vendors</span>
+            <span>Pay on delivery</span>
+            <span>Buyer confirms delivery</span>
+          </div>
+        </div>
+
+        <div class="phone-wrap" aria-label="GLOWGRAM iPhone preview">
+          <div class="device-stage">
+            <iphone-16-max class="iphone-device" mode="dark">
+              <div class="screen app-preview">
+                <div class="screen-head">
+                  <h2>Glowgram</h2>
+                  <span class="avatar"></span>
+                </div>
+                <div class="search">Search bags, wigs, watches...</div>
+                <div class="tabs">
+                  <span class="active">General</span>
+                  <span>Find Vendors</span>
+                </div>
+                <div class="grid">
+                  <article>
+                    <div class="photo photo-one"></div>
+                    <strong>Leather Bag</strong>
+                    <small>Jaza Store</small>
+                    <b>NGN 18,500</b>
+                  </article>
+                  <article>
+                    <div class="photo photo-two"></div>
+                    <strong>Gold Watch</strong>
+                    <small>Chibu Luxury</small>
+                    <b>NGN 32,000</b>
+                  </article>
+                </div>
+                <div class="vendor">
+                  <span class="vendor-avatar"></span>
+                  <div>
+                    <strong>Nkechi Wears</strong>
+                    <small>Fashion - Lagos</small>
+                  </div>
+                  <em>4.8</em>
+                </div>
+                <div class="order-card">
+                  <small>Order update</small>
+                  <strong>Seller dispatched. Buyer confirms delivery.</strong>
+                </div>
+                <nav class="mock-nav" aria-label="App preview navigation">
+                  <span class="active">Home</span>
+                  <span>Search</span>
+                  <span>Orders</span>
+                  <span>Profile</span>
+                </nav>
+              </div>
+            </iphone-16-max>
+          </div>
+        </div>
+      </section>
+
+      <section class="cards">
+        <article>
+          <span class="number">01</span>
+          <h3>Buyers search products</h3>
+          <p>
+            New users do not need to know vendor names. They search for what
+            they want and open the store behind the product.
+          </p>
+        </article>
+        <article>
+          <span class="number">02</span>
+          <h3>Sellers manage orders</h3>
+          <p>
+            Vendors confirm, collect direct payment if needed, dispatch, and
+            chat with buyers from their store order page.
+          </p>
+        </article>
+        <article>
+          <span class="number">03</span>
+          <h3>Delivery closes cleanly</h3>
+          <p>
+            The seller cannot mark an order delivered. The buyer confirms only
+            after receiving the product.
+          </p>
+        </article>
+      </section>
+
+      <section class="download">
+        <div class="download-copy">
+          <p class="label">Installable mobile web app</p>
+          <h2>Start using GLOWGRAM on your phone.</h2>
+          <p>
+            Open the live app, add it to your home screen, and onboard vendors
+            without waiting for an app store release.
+          </p>
+          <div class="install-steps" aria-label="Install steps">
+            <span>1. Open the app link</span>
+            <span>2. Add to Home Screen</span>
+          </div>
+        </div>
+        <div class="download-action">
+          <span>Works on Android and iPhone browsers</span>
+          <button class="primary-btn" id="downloadButtonBottom" type="button">
+            Download GLOWGRAM
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>GLOWGRAM</span>
+      <a href="https://glowgram.vercel.app/">glowgram.vercel.app</a>
+    </footer>
+
+    <dialog class="install-dialog" id="installDialog">
+      <button class="close-dialog" id="closeDialog" aria-label="Close">x</button>
+      <p class="label">Install guide</p>
+      <h2>Add GLOWGRAM to your phone</h2>
+      <ol>
+        <li>Tap Download app to open the live GLOWGRAM app.</li>
+        <li>On Android Chrome, tap the browser menu and choose Install app.</li>
+        <li>On iPhone Safari, tap Share, then Add to Home Screen.</li>
+      </ol>
+      <a class="dialog-link" href="https://glowgram.vercel.app/">
+        Open app now
+      </a>
+    </dialog>
+
+    <script src="./script.js"></script>
+  </body>
+</html>

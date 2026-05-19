@@ -19,8 +19,8 @@ export default function OrdersError({
   const refreshOrders = () => {
     try {
       const cacheKeys = [
-        "lolagram-persisted-cache-v1",
-        "lolagram-persisted-cache-v2"
+        "glowgram-persisted-cache-v1",
+        "glowgram-persisted-cache-v2"
       ]
 
       for (const cacheKey of cacheKeys) {

@@ -5,6 +5,9 @@ import { openDB } from "idb"
 import { OFFLINE_DB_NAME, OFFLINE_ORDER_STORE } from "@/lib/constants"
 import { type CheckoutPayload } from "@/lib/types"
 
+/** Maximum number of offline order intents to keep queued. */
+const MAX_QUEUE_SIZE = 50
+
 async function getDb() {
   return openDB(OFFLINE_DB_NAME, 1, {
     upgrade(db) {
@@ -20,6 +23,15 @@ async function getDb() {
 
 export async function queueOfflineOrder(payload: CheckoutPayload) {
   const db = await getDb()
+
+  // Guard against unbounded queue growth (e.g. repeated offline attempts).
+  const existing = await db.count(OFFLINE_ORDER_STORE)
+  if (existing >= MAX_QUEUE_SIZE) {
+    throw new Error(
+      "You have too many pending orders queued offline. Connect to the internet to sync them first."
+    )
+  }
+
   await db.add(OFFLINE_ORDER_STORE, {
     payload,
     createdAt: new Date().toISOString()
@@ -37,7 +49,7 @@ export async function queueOfflineOrder(payload: CheckoutPayload) {
       }
     }
 
-    await syncRegistration.sync?.register("lolagram-order-sync")
+    await syncRegistration.sync?.register("glowgram-order-sync")
   }
 }
 

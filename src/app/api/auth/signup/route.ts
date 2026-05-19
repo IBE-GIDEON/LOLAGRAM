@@ -67,14 +67,14 @@ export async function POST(request: Request) {
 
   if (existingEmail) {
     return NextResponse.json(
-      { error: "This email already has a LOLAGRAM account. Sign in instead." },
+      { error: "This email already has a GLOWGRAM account. Sign in instead." },
       { status: 409 }
     )
   }
 
   if (existingPhone) {
     return NextResponse.json(
-      { error: "This phone number already belongs to another LOLAGRAM account." },
+      { error: "This phone number already belongs to another GLOWGRAM account." },
       { status: 409 }
     )
   }
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error: isTriggerFailure
-          ? "Supabase could not create the profile. Run the latest LOLAGRAM signup repair SQL, then try again."
+          ? "Supabase could not create the profile. Run the latest GLOWGRAM signup repair SQL, then try again."
           : message
       },
       { status: 400 }

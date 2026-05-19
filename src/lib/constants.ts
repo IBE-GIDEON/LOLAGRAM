@@ -18,16 +18,16 @@ export const BRAND = {
   warning: "#9B7D0A"
 } as const
 
-export const APP_NAME = "LOLAGRAM"
+export const APP_NAME = "GLOWGRAM"
 export const DEMO_OTP = "123456"
-export const DEMO_STATE_KEY = "lolagram-demo-state"
-export const DEMO_USER_KEY = "lolagram-demo-user"
-export const AUTH_SNAPSHOT_KEY = "lolagram-auth-snapshot"
-export const VIEW_MODE_KEY = "lolagram-view-mode"
-export const CART_KEY = "lolagram-cart"
-export const OFFLINE_DB_NAME = "lolagram-offline"
+export const DEMO_STATE_KEY = "glowgram-demo-state"
+export const DEMO_USER_KEY = "glowgram-demo-user"
+export const AUTH_SNAPSHOT_KEY = "glowgram-auth-snapshot"
+export const VIEW_MODE_KEY = "glowgram-view-mode"
+export const CART_KEY = "glowgram-cart"
+export const OFFLINE_DB_NAME = "glowgram-offline"
 export const OFFLINE_ORDER_STORE = "order-intents"
-export const THEME_KEY = "lolagram-theme"
+export const THEME_KEY = "glowgram-theme"
 
 export const CATEGORY_OPTIONS: Array<{
   label: string

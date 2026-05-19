@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   if (vendorUserId) {
     await sendPushNotification({
       userId: vendorUserId,
-      title: "New Order on LOLAGRAM",
+      title: "New Order on GLOWGRAM",
       body: "A buyer just ordered from your store.",
       url: `/orders/${order.id}`
     })

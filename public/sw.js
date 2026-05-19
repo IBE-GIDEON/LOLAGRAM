@@ -1,7 +1,7 @@
-const STATIC_CACHE = "lolagram-static-v2"
-const VENDOR_CACHE = "lolagram-vendors-v1"
-const IMAGE_CACHE = "lolagram-images-v1"
-const ORDER_DB = "lolagram-offline"
+const STATIC_CACHE = "glowgram-static-v2"
+const VENDOR_CACHE = "glowgram-vendors-v1"
+const IMAGE_CACHE = "glowgram-images-v1"
+const ORDER_DB = "glowgram-offline"
 const ORDER_STORE = "order-intents"
 
 self.addEventListener("install", (event) => {
@@ -34,7 +34,7 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((k) => k.startsWith("lolagram-static-") && k !== STATIC_CACHE)
+            .filter((k) => k.startsWith("glowgram-static-") && k !== STATIC_CACHE)
             .map((k) => caches.delete(k))
         )
       )
@@ -69,16 +69,16 @@ self.addEventListener("fetch", (event) => {
 })
 
 self.addEventListener("sync", (event) => {
-  if (event.tag === "lolagram-order-sync") {
+  if (event.tag === "glowgram-order-sync") {
     event.waitUntil(flushOrders())
   }
 })
 
 self.addEventListener("push", (event) => {
   const payload = readPushPayload(event)
-  const title = payload.title || "LOLAGRAM"
+  const title = payload.title || "GLOWGRAM"
   const options = {
-    body: payload.body || "You have a new update on LOLAGRAM.",
+    body: payload.body || "You have a new update on GLOWGRAM.",
     icon: "/pwa/icon-192.png",
     badge: "/pwa/icon-192.png",
     data: {

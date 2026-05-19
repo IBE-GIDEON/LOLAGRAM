@@ -4,8 +4,8 @@ const ICON_VERSION = "20260514-pwa"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "LOLAGRAM",
-    short_name: "LOLAGRAM",
+    name: "GLOWGRAM",
+    short_name: "GLOWGRAM",
     description: "Your local Nigerian marketplace",
     theme_color: "#25D366",
     background_color: "#08131A",

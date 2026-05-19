@@ -81,7 +81,7 @@ export function HomePageClient({
     setVisibleCount(INITIAL_PRODUCT_BATCH)
   }, [activeTab, deferredQuery])
 
-  const pageTitle = searchOnly ? "Search" : "Lolagram"
+  const pageTitle = searchOnly ? "Search" : "Glowgram"
   const displayedProducts = useMemo(
     () => products.slice(0, visibleCount),
     [products, visibleCount]
@@ -121,7 +121,7 @@ export function HomePageClient({
             showCompactHeader ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
           )}
         >
-          Lolagram
+          Glowgram
         </span>
       </div>
     </div>

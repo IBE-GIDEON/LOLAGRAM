@@ -1,6 +1,6 @@
-# LOLAGRAM Production Launch
+# GLOWGRAM Production Launch
 
-Use this checklist before moving LOLAGRAM from local/demo testing to real users.
+Use this checklist before moving GLOWGRAM from local/demo testing to real users.
 
 ## 1. Environment Variables
 
@@ -21,7 +21,7 @@ For launch, leave demo mode off. The app now refuses fake orders, fake storage, 
 
 ## 2. Supabase Setup
 
-Run [supabase/schema.sql](/C:/Users/HOME%20PC/Documents/LOLAGRAM/supabase/schema.sql).
+Run [supabase/schema.sql](supabase/schema.sql).
 
 Important launch checks:
 
@@ -77,7 +77,7 @@ Before launch, verify:
 
 - browser asks for notification permission
 - subscriptions save into `push_subscriptions`
-- seller gets `New Order on LOLAGRAM`
+- seller gets `New Order on GLOWGRAM`
 - buyer gets order status updates
 
 ## 6. Product Gallery

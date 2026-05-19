@@ -81,7 +81,7 @@ export async function POST(request: Request) {
 
     void sendPushNotification({
       userId: String(vendor.user_id),
-      title: "New Order on LOLAGRAM",
+      title: "New Order on GLOWGRAM",
       body: `${buyerName} placed Order ${orderRef} in your store.`,
       url: `/orders/${data.id}`
     }).catch(() => null)

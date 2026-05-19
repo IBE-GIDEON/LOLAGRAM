@@ -11,7 +11,7 @@ function ensureWebPush() {
   }
 
   webpush.setVapidDetails(
-    "mailto:hello@lolagram.app",
+    "mailto:hello@glowgram.app",
     env.vapidPublicKey,
     env.vapidPrivateKey
   )

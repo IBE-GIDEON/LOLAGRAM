@@ -42,7 +42,7 @@ set
   email = coalesce(
     nullif(btrim(u.email), ''),
     nullif(btrim(au.email), ''),
-    concat(u.id::text, '@missing.lolagram.local')
+    concat(u.id::text, '@missing.glowgram.local')
   ),
   phone = coalesce(
     nullif(btrim(u.phone), ''),
@@ -54,7 +54,7 @@ set
     nullif(btrim(u.full_name), ''),
     nullif(btrim(au.raw_user_meta_data ->> 'full_name'), ''),
     nullif(split_part(coalesce(au.email, ''), '@', 1), ''),
-    'LOLAGRAM User'
+    'GLOWGRAM User'
   )
 from auth.users au
 where au.id = u.id
@@ -201,7 +201,7 @@ begin
   profile_email := coalesce(
     nullif(btrim(new.email), ''),
     nullif(btrim(new.raw_user_meta_data ->> 'email'), ''),
-    concat(new.id::text, '@missing.lolagram.local')
+    concat(new.id::text, '@missing.glowgram.local')
   );
 
   profile_phone := coalesce(
@@ -213,7 +213,7 @@ begin
   profile_name := coalesce(
     nullif(btrim(new.raw_user_meta_data ->> 'full_name'), ''),
     nullif(split_part(profile_email, '@', 1), ''),
-    'LOLAGRAM User'
+    'GLOWGRAM User'
   );
 
   begin

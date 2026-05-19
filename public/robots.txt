@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Allow: /vendor/
+Allow: /search
+
+Disallow: /api/
+Disallow: /orders/
+Disallow: /profile/
+Disallow: /seller/
+Disallow: /onboarding/
+Disallow: /order-confirmation
+
+Sitemap: https://glowgram.app/sitemap.xml

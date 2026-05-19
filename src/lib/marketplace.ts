@@ -384,8 +384,8 @@ const userProfileCache = new Map<string, CacheEntry<UserProfile | null>>()
 // Prevents duplicate in-flight requests for the same key
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const inFlight = new Map<string, Promise<any>>()
-const HIDDEN_ORDERS_KEY = "lolagram-hidden-orders"
-const PERSISTED_CACHE_KEY = "lolagram-persisted-cache-v2"
+const HIDDEN_ORDERS_KEY = "glowgram-hidden-orders"
+const PERSISTED_CACHE_KEY = "glowgram-persisted-cache-v2"
 const PERSISTED_CACHE_TTL_MS = 10 * 60 * 1000
 
 type PersistedCacheEntry = {
@@ -633,11 +633,11 @@ function clearOrderCaches() {
 
 function logMarketplaceError(scope: string, error: unknown) {
   if (process.env.NODE_ENV === "production") {
-    console.error(`[lolagram:${scope}]`, error)
+    console.error(`[glowgram:${scope}]`, error)
     return
   }
 
-  console.warn(`[lolagram:${scope}]`, error)
+  console.warn(`[glowgram:${scope}]`, error)
 }
 
 function mapOrder(row: Record<string, unknown>, vendor?: VendorProfile): OrderDetail {
@@ -1059,9 +1059,23 @@ export async function loadMarketplaceSearch(
       : { products: [], vendors: [] }
   }
 
-  const relatedVendorProducts =
+  // Second round — both queries are independent of each other:
+  //   • relatedVendorProducts only needs vendorRows IDs
+  //   • candidateExtraVendorIds is derived from productRows + vendorRows
+  // Fire both simultaneously instead of awaiting them one by one.
+  const knownVendorIdSet = new Set(vendorRows.map((v) => String(v.id)))
+
+  const candidateExtraVendorIds = [
+    ...new Set(
+      productRows
+        .map((p) => String(p.vendor_id))
+        .filter((id) => !knownVendorIdSet.has(id))
+    )
+  ]
+
+  const [relatedVendorProducts, extraVendorRows] = await Promise.all([
     normalized && vendorRows.length > 0
-      ? await supabase
+      ? supabase
           .from("products")
           .select("*")
           .in(
@@ -1070,9 +1084,17 @@ export async function loadMarketplaceSearch(
           )
           .order("created_at", { ascending: false })
           .limit(18)
-      : { data: [], error: null }
+      : Promise.resolve({ data: [] as typeof productRows, error: null }),
+    candidateExtraVendorIds.length > 0
+      ? supabase
+          .from("vendor_profiles")
+          .select("*")
+          .in("id", candidateExtraVendorIds)
+          .eq("is_active", true)
+      : Promise.resolve({ data: [] as typeof vendorRows, error: null })
+  ])
 
-  if (relatedVendorProducts.error) {
+  if (relatedVendorProducts.error || extraVendorRows.error) {
     return canUseDemoMode
       ? getMarketplaceSearchResults(query)
       : { products: [], vendors: [] }
@@ -1084,29 +1106,9 @@ export async function loadMarketplaceSearch(
       index
   )
 
-  const productVendorIds = [
-    ...new Set(mergedProductRows.map((product) => String(product.vendor_id)))
-  ]
-
-  const missingVendorIds = productVendorIds.filter(
-    (vendorId) => !vendorRows.some((vendor) => String(vendor.id) === vendorId)
-  )
-
-  const extraVendorRows =
-    missingVendorIds.length > 0
-      ? await supabase
-          .from("vendor_profiles")
-          .select("*")
-          .in("id", missingVendorIds)
-          .eq("is_active", true)
-      : { data: [], error: null }
-
-  if (extraVendorRows.error) {
-    return canUseDemoMode
-      ? getMarketplaceSearchResults(query)
-      : { products: [], vendors: [] }
-  }
-
+  // Merge known vendor rows with the extra profiles fetched above.
+  // relatedVendorProducts items already belong to vendorRows vendors, so
+  // no additional lookup is needed for them.
   const allVendorRows = [...vendorRows, ...(extraVendorRows.data ?? [])]
   const vendorSnapshotMap = new Map(
     allVendorRows.map((row) => {

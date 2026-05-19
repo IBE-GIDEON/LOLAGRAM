@@ -640,7 +640,14 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
               </button>
             ))}
           </div>
+          <label
+            htmlFor="review-comment"
+            className="sr-only"
+          >
+            Your review
+          </label>
           <textarea
+            id="review-comment"
             className="mt-4 min-h-[110px] w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-ink outline-none focus:border-brand/40"
             placeholder="Tell other buyers how it went"
             value={reviewComment}

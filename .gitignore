@@ -10,3 +10,6 @@ yarn-error.log*
 pnpm-debug.log*
 coverage
 dist
+tsconfig.tsbuildinfo
+.claude/
+supabase/.temp/

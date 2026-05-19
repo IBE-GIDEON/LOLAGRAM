@@ -14,7 +14,7 @@ export async function generateMetadata({
   const supabase = getSupabaseServerClient()
 
   if (!supabase) {
-    return { title: "Store — LOLAGRAM" }
+    return { title: "Store — GLOWGRAM" }
   }
 
   const { data: vendor } = await supabase
@@ -24,24 +24,24 @@ export async function generateMetadata({
     .maybeSingle()
 
   if (!vendor) {
-    return { title: "Store — LOLAGRAM" }
+    return { title: "Store — GLOWGRAM" }
   }
 
-  const title = `${vendor.store_name} — LOLAGRAM`
+  const title = `${vendor.store_name} — GLOWGRAM`
   const description =
     vendor.bio?.trim() ||
-    `Shop ${vendor.store_name} on LOLAGRAM${vendor.city ? ` · ${vendor.city}` : ""}.`
+    `Shop ${vendor.store_name} on GLOWGRAM${vendor.city ? ` · ${vendor.city}` : ""}.`
 
   const ogImage = vendor.store_photo_url
     ? [{ url: vendor.store_photo_url, width: 800, height: 800, alt: vendor.store_name }]
-    : [{ url: "/pwa/icon-512.png", width: 512, height: 512, alt: "LOLAGRAM" }]
+    : [{ url: "/pwa/icon-512.png", width: 512, height: 512, alt: "GLOWGRAM" }]
 
   return {
     title,
     description,
     openGraph: {
       type: "website",
-      siteName: "LOLAGRAM",
+      siteName: "GLOWGRAM",
       title,
       description,
       images: ogImage

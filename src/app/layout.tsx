@@ -18,6 +18,9 @@ const supabaseOrigin = process.env.NEXT_PUBLIC_SUPABASE_URL
     })()
   : null
 
+const APP_URL =
+  process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "https://glowgram.app"
+
 const inter = Inter({
   subsets: ["latin"],
   display: "swap"
@@ -25,14 +28,14 @@ const inter = Inter({
 
 const ICON_VERSION = "20260514-pwa"
 
-const APP_TITLE = "LOLAGRAM — Your Local Marketplace"
+const APP_TITLE = "GLOWGRAM — Your Local Marketplace"
 const APP_DESCRIPTION =
   "Discover local vendors, shop products, and track your orders — all in one place. Nigeria's WhatsApp-style marketplace."
 
 export const metadata: Metadata = {
-  title: "LOLAGRAM",
+  title: "GLOWGRAM",
   description: APP_DESCRIPTION,
-  applicationName: "LOLAGRAM",
+  applicationName: "GLOWGRAM",
   keywords: ["marketplace", "Nigeria", "vendors", "shop", "buy", "sell", "local"],
   icons: {
     icon: [
@@ -52,19 +55,19 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "LOLAGRAM"
+    title: "GLOWGRAM"
   },
   openGraph: {
     type: "website",
-    siteName: "LOLAGRAM",
+    siteName: "GLOWGRAM",
     title: APP_TITLE,
     description: APP_DESCRIPTION,
     images: [
       {
-        url: "/pwa/icon-512.png",
+        url: `${APP_URL}/pwa/icon-512.png`,
         width: 512,
         height: 512,
-        alt: "LOLAGRAM logo"
+        alt: "GLOWGRAM logo"
       }
     ]
   },
@@ -72,7 +75,7 @@ export const metadata: Metadata = {
     card: "summary",
     title: APP_TITLE,
     description: APP_DESCRIPTION,
-    images: ["/pwa/icon-512.png"]
+    images: [`${APP_URL}/pwa/icon-512.png`]
   }
 }
 
