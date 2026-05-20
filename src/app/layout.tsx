@@ -26,7 +26,7 @@ const inter = Inter({
   display: "swap"
 })
 
-const ICON_VERSION = "20260514-pwa"
+const ICON_VERSION = "20260520-glowgram-logo"
 
 const APP_TITLE = "GLOWGRAM — Your Local Marketplace"
 const APP_DESCRIPTION =

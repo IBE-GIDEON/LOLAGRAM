@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next"
 
-const ICON_VERSION = "20260514-pwa"
+const ICON_VERSION = "20260520-glowgram-logo"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {

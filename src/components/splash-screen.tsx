@@ -69,24 +69,24 @@ export function SplashScreen() {
       {/* Icon */}
       <div
         style={{
-          width: 96,
-          height: 96,
-          borderRadius: 24,
-          background: "#25D366",
+          width: 112,
+          height: 112,
+          borderRadius: 28,
+          background: "#FFFFFF",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           marginBottom: 22,
-          boxShadow: "0 8px 32px rgba(37,211,102,0.35)"
+          boxShadow: "0 14px 36px rgba(0,0,0,0.14)"
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/favicon.ico"
+          src="/pwa/icon-192.png"
           alt=""
-          width={70}
-          height={70}
-          style={{ borderRadius: 16, display: "block" }}
+          width={96}
+          height={96}
+          style={{ borderRadius: 22, display: "block" }}
         />
       </div>
 
