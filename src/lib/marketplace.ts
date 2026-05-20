@@ -387,8 +387,8 @@ const inFlight = new Map<string, Promise<any>>()
 const HIDDEN_ORDERS_KEY = "glowgram-hidden-orders"
 const PERSISTED_CACHE_KEY = "glowgram-persisted-cache-v3"
 const PERSISTED_CACHE_TTL_MS = 10 * 60 * 1000
-const MAX_SEARCH_TOKEN_GROUPS = 6
-const MAX_SEARCH_FILTER_VARIANTS = 36
+const MAX_SEARCH_TOKEN_GROUPS = 12
+const MAX_SEARCH_FILTER_VARIANTS = 60
 const SEARCH_STOP_WORDS = new Set([
   "a",
   "an",
@@ -404,24 +404,111 @@ const SEARCH_STOP_WORDS = new Set([
   "with"
 ])
 const SEARCH_ALIASES: Record<string, string[]> = {
+  // bags
   back: ["bag", "bags", "handbag", "handbags"],
   backs: ["bag", "bags", "handbag", "handbags"],
-  bag: ["bags", "handbag", "handbags", "purse", "purses"],
-  bags: ["bag", "handbag", "handbags", "purse", "purses"],
-  dress: ["dresses", "gown", "gowns"],
+  bag: ["bags", "handbag", "handbags", "purse", "purses", "backpack", "tote"],
+  bags: ["bag", "handbag", "handbags", "purse", "purses", "backpack", "tote"],
+  handbag: ["handbags", "bag", "bags", "purse"],
+  purse: ["purses", "bag", "bags", "handbag"],
+  backpack: ["backpacks", "bag", "bags"],
+  // dresses / fashion
+  dress: ["dresses", "gown", "gowns", "outfit", "outfits"],
   dresses: ["dress", "gown", "gowns"],
   gown: ["gowns", "dress", "dresses"],
-  hair: ["wig", "wigs"],
-  jewellery: ["jewelry", "necklace", "necklaces", "bracelet", "bracelets", "earring", "earrings"],
-  jewelry: ["jewellery", "necklace", "necklaces", "bracelet", "bracelets", "earring", "earrings"],
-  lipstick: ["lipsticks", "lip", "lips"],
-  lipsticks: ["lipstick", "lip", "lips"],
-  shoe: ["shoes", "sandal", "sandals", "heel", "heels"],
-  shoes: ["shoe", "sandal", "sandals", "heel", "heels"],
+  // clothing
+  cloth: ["clothes", "clothing", "fabric", "wear", "outfit"],
+  clothes: ["cloth", "clothing", "fabric", "wear", "outfit", "outfits"],
+  clothing: ["clothes", "cloth", "fabric", "wear", "outfit"],
+  shirt: ["shirts", "top", "tops", "blouse", "blouses"],
+  trouser: ["trousers", "pant", "pants", "jean", "jeans", "legging", "leggings"],
+  trousers: ["trouser", "pant", "pants", "jean", "jeans"],
+  jean: ["jeans", "trouser", "trousers", "pant", "pants", "denim"],
+  jeans: ["jean", "trouser", "trousers", "pant", "pants", "denim"],
+  skirt: ["skirts"],
+  blouse: ["blouses", "shirt", "shirts", "top", "tops"],
+  // fabric / ankara
+  fabric: ["fabrics", "cloth", "clothes", "material", "materials", "ankara", "lace"],
+  fabrics: ["fabric", "cloth", "clothes", "material", "ankara", "lace"],
+  ankara: ["fabric", "fabrics", "print", "prints", "cloth", "clothes"],
+  lace: ["laces", "fabric", "fabrics", "material"],
+  // hair / wigs
+  hair: ["wig", "wigs", "weave", "weaves", "extension", "extensions"],
+  wig: ["wigs", "hair", "weave", "weaves"],
+  wigs: ["wig", "hair", "weave", "weaves"],
+  weave: ["weaves", "wig", "wigs", "hair"],
+  // jewellery
+  jewellery: ["jewelry", "necklace", "necklaces", "bracelet", "bracelets", "earring", "earrings", "ring", "rings"],
+  jewelry: ["jewellery", "necklace", "necklaces", "bracelet", "bracelets", "earring", "earrings", "ring", "rings"],
+  necklace: ["necklaces", "chain", "chains", "jewellery", "jewelry", "pendant"],
+  bracelet: ["bracelets", "bangle", "bangles", "jewellery", "jewelry"],
+  earring: ["earrings", "jewellery", "jewelry"],
+  ring: ["rings", "jewellery", "jewelry", "band"],
+  chain: ["chains", "necklace", "necklaces", "jewellery"],
+  // watches
   watch: ["watches"],
   watches: ["watch"],
-  wig: ["wigs", "hair"],
-  wigs: ["wig", "hair"]
+  // shoes / footwear
+  shoe: ["shoes", "sandal", "sandals", "heel", "heels", "sneaker", "sneakers", "slipper", "slippers"],
+  shoes: ["shoe", "sandal", "sandals", "heel", "heels", "sneaker", "sneakers"],
+  sandal: ["sandals", "shoe", "shoes", "slipper", "slippers"],
+  sandals: ["sandal", "shoe", "shoes", "slipper", "slippers"],
+  sneaker: ["sneakers", "shoe", "shoes", "trainer", "trainers"],
+  sneakers: ["sneaker", "shoe", "shoes", "trainer", "trainers"],
+  slipper: ["slippers", "sandal", "sandals", "flip", "shoe"],
+  boot: ["boots", "shoe", "shoes"],
+  boots: ["boot", "shoe", "shoes"],
+  heel: ["heels", "shoe", "shoes", "pump", "pumps"],
+  heels: ["heel", "shoe", "shoes", "pump", "pumps"],
+  // cosmetics / lip
+  lipstick: ["lipsticks", "lip", "lips", "gloss", "liner"],
+  lipsticks: ["lipstick", "lip", "lips"],
+  makeup: ["cosmetic", "cosmetics", "foundation", "concealer", "blush", "mascara"],
+  foundation: ["foundations", "makeup", "cosmetics", "concealer"],
+  // beauty / skincare
+  cream: ["creams", "lotion", "lotions", "moisturizer", "body cream", "skincare", "serum"],
+  creams: ["cream", "lotion", "lotions", "moisturizer", "skincare"],
+  lotion: ["lotions", "cream", "creams", "moisturizer", "oil", "body lotion", "skincare"],
+  lotions: ["lotion", "cream", "creams", "moisturizer", "skincare"],
+  serum: ["serums", "cream", "creams", "treatment", "skincare", "glow"],
+  skincare: ["skin", "cream", "creams", "lotion", "lotions", "serum", "serums", "glow", "face"],
+  glow: ["glowing", "skincare", "cream", "serum", "lotion"],
+  oil: ["oils", "cream", "serum", "hair", "body oil"],
+  // perfume / fragrance
+  perfume: ["perfumes", "fragrance", "fragrances", "cologne", "colognes", "scent", "scents", "spray"],
+  perfumes: ["perfume", "fragrance", "fragrances", "cologne", "scent", "scents"],
+  fragrance: ["fragrances", "perfume", "perfumes", "cologne", "scent", "scents", "spray"],
+  fragrances: ["fragrance", "perfume", "perfumes", "cologne", "scent"],
+  cologne: ["colognes", "perfume", "perfumes", "fragrance", "fragrances"],
+  colognes: ["cologne", "perfume", "perfumes", "fragrance"],
+  scent: ["scents", "perfume", "perfumes", "fragrance", "fragrances", "spray"],
+  spray: ["sprays", "perfume", "perfumes", "fragrance", "cologne", "body spray"],
+  // phones / electronics
+  phone: ["phones", "smartphone", "smartphones", "mobile", "mobiles", "handset"],
+  phones: ["phone", "smartphone", "smartphones", "mobile", "mobiles"],
+  smartphone: ["smartphones", "phone", "phones", "mobile", "mobiles"],
+  smartphones: ["smartphone", "phone", "phones", "mobile"],
+  mobile: ["mobiles", "phone", "phones", "smartphone", "smartphones"],
+  laptop: ["laptops", "computer", "computers", "notebook"],
+  laptops: ["laptop", "computer", "computers", "notebook"],
+  computer: ["computers", "laptop", "laptops", "pc", "desktop"],
+  tablet: ["tablets", "ipad"],
+  headphone: ["headphones", "earphone", "earphones", "earbuds", "headset"],
+  headphones: ["headphone", "earphone", "earphones", "earbuds"],
+  earphone: ["earphones", "headphone", "headphones", "earbuds"],
+  earphones: ["earphone", "headphone", "headphones", "earbuds"],
+  charger: ["chargers", "cable", "cables"],
+  speaker: ["speakers", "sound", "audio"],
+  // food / drinks
+  food: ["foods", "meal", "meals", "snack", "snacks", "dish", "dishes", "eat", "chop"],
+  foods: ["food", "meal", "meals", "snack", "snacks"],
+  snack: ["snacks", "food", "foods", "chop", "bite"],
+  snacks: ["snack", "food", "foods"],
+  meal: ["meals", "food", "foods", "dish", "dishes"],
+  cake: ["cakes", "pastry", "pastries", "bread", "bake"],
+  drink: ["drinks", "juice", "juices", "beverage", "beverages", "soda", "water"],
+  drinks: ["drink", "juice", "juices", "beverage", "beverages"],
+  juice: ["juices", "drink", "drinks", "beverage"],
 }
 
 type PersistedCacheEntry = {
@@ -648,6 +735,8 @@ function getSearchTokenVariants(token: string): string[] {
   return [...variants]
 }
 
+// Builds a Supabase OR filter for vendor/store search using alias-expanded variants.
+// Used only for vendor discovery (store_name, category, city, bio).
 function buildSearchFilter(groups: SearchTokenGroup[], fields: string[]) {
   const variants = [
     ...new Set(groups.flatMap((group) => group.variants))
@@ -655,6 +744,34 @@ function buildSearchFilter(groups: SearchTokenGroup[], fields: string[]) {
 
   return variants
     .flatMap((variant) => fields.map((field) => `${field}.ilike.%${variant}%`))
+    .join(",")
+}
+
+// Builds a Supabase OR filter for product search using ONLY the raw query tokens
+// (plus basic singular/plural forms) against name and description.
+// No alias expansion — any keyword a seller puts in their product name or description
+// is directly searchable. No predefined list needed.
+function buildProductKeywordFilter(groups: SearchTokenGroup[]): string {
+  const rawVariants = [
+    ...new Set(
+      groups.flatMap((g) => {
+        const forms = new Set([g.raw])
+        if (g.raw.endsWith("ies") && g.raw.length > 4) {
+          forms.add(`${g.raw.slice(0, -3)}y`)
+        }
+        if (/(ches|shes|sses|xes|zes)$/u.test(g.raw) && g.raw.length > 4) {
+          forms.add(g.raw.slice(0, -2))
+        }
+        if (g.raw.endsWith("s") && g.raw.length > 3) {
+          forms.add(g.raw.slice(0, -1))
+        }
+        return [...forms]
+      })
+    )
+  ]
+
+  return rawVariants
+    .flatMap((v) => [`name.ilike.%${v}%`, `description.ilike.%${v}%`])
     .join(",")
 }
 
@@ -681,6 +798,9 @@ function getSearchMatchScore(values: unknown[], groups: SearchTokenGroup[]) {
   }, 0)
 }
 
+// Score is based only on product name and description so any product
+// is findable purely through its own content — no category or vendor
+// metadata required to surface it.
 function getProductSearchScore(
   product: ProductSearchResult,
   groups: SearchTokenGroup[]
@@ -691,9 +811,7 @@ function getProductSearchScore(
 
   return (
     getSearchMatchScore([product.name], groups) * 8 +
-    getSearchMatchScore([product.description], groups) * 5 +
-    getSearchMatchScore([product.vendor.category], groups) * 3 +
-    getSearchMatchScore([product.vendor.storeName, product.vendor.city], groups)
+    getSearchMatchScore([product.description], groups) * 5
   )
 }
 
@@ -1158,16 +1276,19 @@ export async function loadMarketplaceSearch(
   }
 
   return deduplicatedFetch(`marketplace-search:${cacheKey}`, async () => {
+  // Vendor search uses alias-expanded variants so category synonyms work
+  // (e.g. "hair" finds "wigs" vendors, "shoe" finds "footwear" vendors).
   const vendorSearchFilter = buildSearchFilter(searchGroups, [
     "store_name",
     "category",
     "city",
     "bio"
   ])
-  const productSearchFilter = buildSearchFilter(searchGroups, [
-    "name",
-    "description"
-  ])
+
+  // Product search uses ONLY the raw keywords the buyer typed, matched
+  // against name and description. No predefined aliases — sellers can list
+  // anything and buyers find it by typing words from the product listing.
+  const productKeywordFilter = buildProductKeywordFilter(searchGroups)
 
   const vendorRequest = normalized
     ? supabase
@@ -1187,9 +1308,9 @@ export async function loadMarketplaceSearch(
     ? supabase
         .from("products")
         .select("*")
-        .or(productSearchFilter)
+        .or(productKeywordFilter)
         .order("created_at", { ascending: false })
-        .limit(60)
+        .limit(80)
     : supabase
         .from("products")
         .select("*")

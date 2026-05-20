@@ -2,10 +2,19 @@ export type AccountType = "buyer" | "seller" | "both"
 
 export type VendorCategory =
   | "cosmetics"
+  | "beauty"
   | "wigs"
   | "jewellery"
   | "watches"
   | "fashion"
+  | "clothing"
+  | "phones"
+  | "electronics"
+  | "food"
+  | "perfume"
+  | "fabric"
+  | "footwear"
+  | "bags"
   | "other"
 
 export type OrderStatus =

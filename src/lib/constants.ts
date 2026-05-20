@@ -33,11 +33,20 @@ export const CATEGORY_OPTIONS: Array<{
   label: string
   value: VendorCategory
 }> = [
+  { label: "Phones", value: "phones" },
+  { label: "Electronics", value: "electronics" },
+  { label: "Clothing", value: "clothing" },
+  { label: "Fashion", value: "fashion" },
+  { label: "Fabric & Materials", value: "fabric" },
+  { label: "Footwear", value: "footwear" },
+  { label: "Bags & Accessories", value: "bags" },
+  { label: "Beauty & Skincare", value: "beauty" },
   { label: "Cosmetics", value: "cosmetics" },
-  { label: "Wigs", value: "wigs" },
+  { label: "Perfume & Fragrance", value: "perfume" },
+  { label: "Wigs & Hair", value: "wigs" },
   { label: "Jewellery", value: "jewellery" },
   { label: "Watches", value: "watches" },
-  { label: "Fashion", value: "fashion" },
+  { label: "Food & Drinks", value: "food" },
   { label: "Other", value: "other" }
 ]
 

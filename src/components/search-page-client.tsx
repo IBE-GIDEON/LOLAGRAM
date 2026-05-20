@@ -21,11 +21,13 @@ import { cn } from "@/lib/utils"
 type SearchMode = "all" | "products" | "stores"
 
 const suggestionTerms = [
-  "bag",
-  "watch",
-  "wig",
-  "lipstick",
+  "phone",
+  "perfume",
   "dress",
+  "cream",
+  "wig",
+  "shoes",
+  "ankara",
   "jewellery"
 ]
 
