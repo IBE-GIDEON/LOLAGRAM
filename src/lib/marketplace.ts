@@ -388,6 +388,7 @@ const HIDDEN_ORDERS_KEY = "glowgram-hidden-orders"
 const PERSISTED_CACHE_KEY = "glowgram-persisted-cache-v3"
 const PERSISTED_CACHE_TTL_MS = 10 * 60 * 1000
 const MAX_SEARCH_TOKEN_GROUPS = 6
+const MAX_SEARCH_FILTER_VARIANTS = 36
 const SEARCH_STOP_WORDS = new Set([
   "a",
   "an",
@@ -402,6 +403,26 @@ const SEARCH_STOP_WORDS = new Set([
   "to",
   "with"
 ])
+const SEARCH_ALIASES: Record<string, string[]> = {
+  back: ["bag", "bags", "handbag", "handbags"],
+  backs: ["bag", "bags", "handbag", "handbags"],
+  bag: ["bags", "handbag", "handbags", "purse", "purses"],
+  bags: ["bag", "handbag", "handbags", "purse", "purses"],
+  dress: ["dresses", "gown", "gowns"],
+  dresses: ["dress", "gown", "gowns"],
+  gown: ["gowns", "dress", "dresses"],
+  hair: ["wig", "wigs"],
+  jewellery: ["jewelry", "necklace", "necklaces", "bracelet", "bracelets", "earring", "earrings"],
+  jewelry: ["jewellery", "necklace", "necklaces", "bracelet", "bracelets", "earring", "earrings"],
+  lipstick: ["lipsticks", "lip", "lips"],
+  lipsticks: ["lipstick", "lip", "lips"],
+  shoe: ["shoes", "sandal", "sandals", "heel", "heels"],
+  shoes: ["shoe", "sandal", "sandals", "heel", "heels"],
+  watch: ["watches"],
+  watches: ["watch"],
+  wig: ["wigs", "hair"],
+  wigs: ["wig", "hair"]
+}
 
 type PersistedCacheEntry = {
   value: unknown
@@ -618,13 +639,19 @@ function getSearchTokenVariants(token: string): string[] {
     variants.add(token.slice(0, -1))
   }
 
+  for (const variant of [...variants]) {
+    for (const alias of SEARCH_ALIASES[variant] ?? []) {
+      variants.add(alias)
+    }
+  }
+
   return [...variants]
 }
 
 function buildSearchFilter(groups: SearchTokenGroup[], fields: string[]) {
   const variants = [
     ...new Set(groups.flatMap((group) => group.variants))
-  ].slice(0, MAX_SEARCH_TOKEN_GROUPS * 3)
+  ].slice(0, MAX_SEARCH_FILTER_VARIANTS)
 
   return variants
     .flatMap((variant) => fields.map((field) => `${field}.ilike.%${variant}%`))
@@ -636,12 +663,37 @@ function matchesSearchGroups(values: unknown[], groups: SearchTokenGroup[]) {
     return true
   }
 
+  return getSearchMatchScore(values, groups) > 0
+}
+
+function getSearchMatchScore(values: unknown[], groups: SearchTokenGroup[]) {
   const haystack = values
     .map((value) => String(value ?? "").toLocaleLowerCase())
     .join(" ")
 
-  return groups.every((group) =>
-    group.variants.some((variant) => haystack.includes(variant))
+  if (!haystack) {
+    return 0
+  }
+
+  return groups.reduce((score, group) => {
+    const matched = group.variants.some((variant) => haystack.includes(variant))
+    return matched ? score + 1 : score
+  }, 0)
+}
+
+function getProductSearchScore(
+  product: ProductSearchResult,
+  groups: SearchTokenGroup[]
+) {
+  if (groups.length === 0) {
+    return 0
+  }
+
+  return (
+    getSearchMatchScore([product.name], groups) * 8 +
+    getSearchMatchScore([product.description], groups) * 5 +
+    getSearchMatchScore([product.vendor.category], groups) * 3 +
+    getSearchMatchScore([product.vendor.storeName, product.vendor.city], groups)
   )
 }
 
@@ -1240,20 +1292,18 @@ export async function loadMarketplaceSearch(
     })
     .filter((item): item is ProductSearchResult => Boolean(item))
     .filter((product) =>
-      normalized
-        ? matchesSearchGroups(
-            [
-              product.name,
-              product.description,
-              product.vendor.storeName,
-              product.vendor.category,
-              product.vendor.city
-            ],
-            searchGroups
-          )
-        : true
+      normalized ? getProductSearchScore(product, searchGroups) > 0 : true
     )
     .sort((left, right) => {
+      if (normalized) {
+        const scoreDifference =
+          getProductSearchScore(right, searchGroups) -
+          getProductSearchScore(left, searchGroups)
+        if (scoreDifference !== 0) {
+          return scoreDifference
+        }
+      }
+
       if (left.inStock !== right.inStock) {
         return left.inStock ? -1 : 1
       }

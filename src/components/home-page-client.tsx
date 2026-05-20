@@ -91,7 +91,7 @@ export function HomePageClient({
   const showCompactHeader = scrollTop > 88
   const searchPlaceholder = isFindTab
     ? "Search store name or category"
-    : "Search bag, watch, wig, lipstick, or dress"
+    : "Search any product name or description"
   const resultCopy = isFindTab
     ? "Search across store names, categories, and cities."
     : "Browse newly uploaded products from active vendors."
@@ -103,7 +103,7 @@ export function HomePageClient({
       ? "product"
       : "products"
   const emptyProductState = deferredQuery.trim()
-    ? `No product matched "${deferredQuery.trim()}" yet. Try bag, watch, wig, lipstick, or dress.`
+    ? `No product matched "${deferredQuery.trim()}" yet. Try another word from the seller's product name or description.`
     : "Newly uploaded products from active vendors will show here."
   const stickyHeader = (
     <div

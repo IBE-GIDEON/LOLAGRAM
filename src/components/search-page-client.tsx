@@ -112,7 +112,7 @@ export function SearchPageClient() {
             <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
             <Input
               className="pl-11"
-              placeholder="Search bag, watch, wig, lipstick, or store name"
+              placeholder="Search any product name, description, or store"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -184,8 +184,8 @@ export function SearchPageClient() {
                 </div>
               ) : activeQuery ? (
                 <p className="text-sm leading-6 text-muted">
-                  No product matched "{activeQuery}" yet. Try another word like
-                  watch, wig, bag, lipstick, or dress.
+                  No product matched "{activeQuery}" yet. Try another word from
+                  the seller's product name or description.
                 </p>
               ) : null}
             </section>
