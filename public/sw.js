@@ -1,4 +1,4 @@
-const STATIC_CACHE = "glowgram-static-v4"
+const STATIC_CACHE = "glowgram-static-v5"
 const VENDOR_CACHE = "glowgram-vendors-v1"
 const IMAGE_CACHE = "glowgram-images-v1"
 const ORDER_DB = "glowgram-offline"

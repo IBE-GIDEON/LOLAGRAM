@@ -385,7 +385,7 @@ const userProfileCache = new Map<string, CacheEntry<UserProfile | null>>()
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const inFlight = new Map<string, Promise<any>>()
 const HIDDEN_ORDERS_KEY = "glowgram-hidden-orders"
-const PERSISTED_CACHE_KEY = "glowgram-persisted-cache-v2"
+const PERSISTED_CACHE_KEY = "glowgram-persisted-cache-v3"
 const PERSISTED_CACHE_TTL_MS = 10 * 60 * 1000
 const MAX_SEARCH_TOKEN_GROUPS = 6
 const SEARCH_STOP_WORDS = new Set([
@@ -1137,7 +1137,7 @@ export async function loadMarketplaceSearch(
         .select("*")
         .or(productSearchFilter)
         .order("created_at", { ascending: false })
-        .limit(18)
+        .limit(60)
     : supabase
         .from("products")
         .select("*")
@@ -1188,7 +1188,7 @@ export async function loadMarketplaceSearch(
             matchingVendorRows.map((vendor) => String(vendor.id))
           )
           .order("created_at", { ascending: false })
-          .limit(18)
+          .limit(36)
       : Promise.resolve({ data: [] as typeof productRows, error: null }),
     candidateExtraVendorIds.length > 0
       ? supabase

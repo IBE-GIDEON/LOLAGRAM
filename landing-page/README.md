@@ -13,7 +13,7 @@ This is a standalone static landing page for the GLOWGRAM PWA.
 The button currently points to:
 
 ```text
-https://glowgram.vercel.app/
+https://glowgramshop.vercel.app/
 ```
 
 If you host this landing page on the same domain as the PWA, browsers that support PWA installation can show the native install prompt. If it is hosted on another domain, the button opens the live app so users can install it from their browser menu.

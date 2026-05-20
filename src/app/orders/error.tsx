@@ -20,7 +20,8 @@ export default function OrdersError({
     try {
       const cacheKeys = [
         "glowgram-persisted-cache-v1",
-        "glowgram-persisted-cache-v2"
+        "glowgram-persisted-cache-v2",
+        "glowgram-persisted-cache-v3"
       ]
 
       for (const cacheKey of cacheKeys) {

@@ -10,4 +10,4 @@ Disallow: /seller/
 Disallow: /onboarding/
 Disallow: /order-confirmation
 
-Sitemap: https://glowgram.app/sitemap.xml
+Sitemap: https://glowgramshop.vercel.app/sitemap.xml

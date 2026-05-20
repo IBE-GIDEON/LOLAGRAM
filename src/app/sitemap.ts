@@ -1,5 +1,7 @@
 import type { MetadataRoute } from "next"
 
+import { getAppUrl } from "@/lib/app-url"
+
 /**
  * Static sitemap — only public pages are listed.
  * Authenticated routes (orders, profile, seller dashboard) are excluded
@@ -11,7 +13,7 @@ import type { MetadataRoute } from "next"
  * here and add an entry per vendor.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = "https://glowgram.app"
+  const base = getAppUrl()
   const now = new Date()
 
   return [
@@ -26,12 +28,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: now,
       changeFrequency: "daily",
       priority: 0.8
-    },
-    {
-      url: `${base}/vendor`,
-      lastModified: now,
-      changeFrequency: "weekly",
-      priority: 0.7
     }
   ]
 }

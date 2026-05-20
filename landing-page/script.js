@@ -1,4 +1,4 @@
-const APP_URL = "https://glowgram.vercel.app/";
+const APP_URL = "https://glowgramshop.vercel.app/";
 
 let deferredInstallPrompt = null;
 

@@ -4,6 +4,7 @@ import { Inter } from "next/font/google"
 import { MobileShell } from "@/components/mobile-shell"
 import { AppProviders } from "@/components/providers/app-providers"
 import { SplashScreen } from "@/components/splash-screen"
+import { getAppUrl } from "@/lib/app-url"
 import { THEME_KEY } from "@/lib/constants"
 
 import "@/app/globals.css"
@@ -18,8 +19,7 @@ const supabaseOrigin = process.env.NEXT_PUBLIC_SUPABASE_URL
     })()
   : null
 
-const APP_URL =
-  process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "https://glowgram.app"
+const APP_URL = getAppUrl()
 
 const inter = Inter({
   subsets: ["latin"],
@@ -33,6 +33,7 @@ const APP_DESCRIPTION =
   "Discover local vendors, shop products, and track your orders — all in one place. Nigeria's WhatsApp-style marketplace."
 
 export const metadata: Metadata = {
+  metadataBase: new URL(APP_URL),
   title: "GLOWGRAM",
   description: APP_DESCRIPTION,
   applicationName: "GLOWGRAM",
