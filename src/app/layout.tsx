@@ -99,7 +99,7 @@ export default function RootLayout({
     (function () {
       try {
         var stored = window.localStorage.getItem("${THEME_KEY}");
-        var isDark = stored ? stored === "dark" : true;
+        var isDark = stored ? stored === "dark" : false;
         document.documentElement.classList.toggle("dark", isDark);
       } catch (e) {}
     })();

@@ -25,17 +25,14 @@ function applyTheme(theme: Theme) {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark")
+  const [theme, setThemeState] = useState<Theme>("light")
 
   useEffect(() => {
     const stored = window.localStorage.getItem(THEME_KEY)
-    const preferredDark = window.matchMedia("(prefers-color-scheme: dark)").matches
     const nextTheme =
       stored === "dark" || stored === "light"
         ? stored
-        : preferredDark
-          ? "dark"
-          : "dark"
+        : "light"
 
     setThemeState(nextTheme)
     applyTheme(nextTheme)
