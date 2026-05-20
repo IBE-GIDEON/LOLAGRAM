@@ -387,6 +387,21 @@ const inFlight = new Map<string, Promise<any>>()
 const HIDDEN_ORDERS_KEY = "glowgram-hidden-orders"
 const PERSISTED_CACHE_KEY = "glowgram-persisted-cache-v2"
 const PERSISTED_CACHE_TTL_MS = 10 * 60 * 1000
+const MAX_SEARCH_TOKEN_GROUPS = 6
+const SEARCH_STOP_WORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "for",
+  "from",
+  "in",
+  "of",
+  "on",
+  "or",
+  "the",
+  "to",
+  "with"
+])
 
 type PersistedCacheEntry = {
   value: unknown
@@ -563,6 +578,71 @@ function deduplicatedFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T
   const promise = fetcher().finally(() => inFlight.delete(key))
   inFlight.set(key, promise)
   return promise
+}
+
+type SearchTokenGroup = {
+  raw: string
+  variants: string[]
+}
+
+function getSearchTokenGroups(query: string): SearchTokenGroup[] {
+  const tokens = query
+    .toLocaleLowerCase()
+    .match(/[\p{L}\p{N}]+/gu)
+    ?.filter((token) => token.length > 1 && !SEARCH_STOP_WORDS.has(token))
+
+  if (!tokens?.length) {
+    return []
+  }
+
+  return [...new Set(tokens)]
+    .slice(0, MAX_SEARCH_TOKEN_GROUPS)
+    .map((token) => ({
+      raw: token,
+      variants: getSearchTokenVariants(token)
+    }))
+}
+
+function getSearchTokenVariants(token: string): string[] {
+  const variants = new Set([token])
+
+  if (token.endsWith("ies") && token.length > 4) {
+    variants.add(`${token.slice(0, -3)}y`)
+  }
+
+  if (/(ches|shes|sses|xes|zes)$/u.test(token) && token.length > 4) {
+    variants.add(token.slice(0, -2))
+  }
+
+  if (token.endsWith("s") && token.length > 3) {
+    variants.add(token.slice(0, -1))
+  }
+
+  return [...variants]
+}
+
+function buildSearchFilter(groups: SearchTokenGroup[], fields: string[]) {
+  const variants = [
+    ...new Set(groups.flatMap((group) => group.variants))
+  ].slice(0, MAX_SEARCH_TOKEN_GROUPS * 3)
+
+  return variants
+    .flatMap((variant) => fields.map((field) => `${field}.ilike.%${variant}%`))
+    .join(",")
+}
+
+function matchesSearchGroups(values: unknown[], groups: SearchTokenGroup[]) {
+  if (groups.length === 0) {
+    return true
+  }
+
+  const haystack = values
+    .map((value) => String(value ?? "").toLocaleLowerCase())
+    .join(" ")
+
+  return groups.every((group) =>
+    group.variants.some((variant) => haystack.includes(variant))
+  )
 }
 
 type HiddenOrdersStore = {
@@ -1007,25 +1087,42 @@ export async function loadMarketplaceSearch(
 
   const normalized = query.trim()
   const cacheKey = normalized.toLowerCase()
-  const cached = readHybridCache(
-    marketplaceSearchCache,
-    cacheKey,
-    persistedCacheKeys.marketplaceSearch(cacheKey)
-  )
-  if (cached) {
-    return cached
+  const searchGroups = getSearchTokenGroups(normalized)
+  const shouldCacheSearch = normalized.length === 0
+
+  if (shouldCacheSearch) {
+    const cached = readHybridCache(
+      marketplaceSearchCache,
+      cacheKey,
+      persistedCacheKeys.marketplaceSearch(cacheKey)
+    )
+    if (cached) {
+      return cached
+    }
+  }
+
+  if (normalized && searchGroups.length === 0) {
+    return { products: [], vendors: [] }
   }
 
   return deduplicatedFetch(`marketplace-search:${cacheKey}`, async () => {
+  const vendorSearchFilter = buildSearchFilter(searchGroups, [
+    "store_name",
+    "category",
+    "city",
+    "bio"
+  ])
+  const productSearchFilter = buildSearchFilter(searchGroups, [
+    "name",
+    "description"
+  ])
 
   const vendorRequest = normalized
     ? supabase
         .from("vendor_profiles")
         .select("*")
         .eq("is_active", true)
-        .or(
-          `store_name.ilike.%${normalized}%,category.ilike.%${normalized}%,city.ilike.%${normalized}%,bio.ilike.%${normalized}%`
-        )
+        .or(vendorSearchFilter)
         .limit(12)
     : supabase
         .from("vendor_profiles")
@@ -1038,7 +1135,7 @@ export async function loadMarketplaceSearch(
     ? supabase
         .from("products")
         .select("*")
-        .or(`name.ilike.%${normalized}%,description.ilike.%${normalized}%`)
+        .or(productSearchFilter)
         .order("created_at", { ascending: false })
         .limit(18)
     : supabase
@@ -1063,7 +1160,15 @@ export async function loadMarketplaceSearch(
   //   • relatedVendorProducts only needs vendorRows IDs
   //   • candidateExtraVendorIds is derived from productRows + vendorRows
   // Fire both simultaneously instead of awaiting them one by one.
-  const knownVendorIdSet = new Set(vendorRows.map((v) => String(v.id)))
+  const matchingVendorRows = normalized
+    ? vendorRows.filter((row) =>
+        matchesSearchGroups(
+          [row.store_name, row.category, row.city, row.bio],
+          searchGroups
+        )
+      )
+    : vendorRows
+  const knownVendorIdSet = new Set(matchingVendorRows.map((v) => String(v.id)))
 
   const candidateExtraVendorIds = [
     ...new Set(
@@ -1074,13 +1179,13 @@ export async function loadMarketplaceSearch(
   ]
 
   const [relatedVendorProducts, extraVendorRows] = await Promise.all([
-    normalized && vendorRows.length > 0
+    normalized && matchingVendorRows.length > 0
       ? supabase
           .from("products")
           .select("*")
           .in(
             "vendor_id",
-            vendorRows.map((vendor) => String(vendor.id))
+            matchingVendorRows.map((vendor) => String(vendor.id))
           )
           .order("created_at", { ascending: false })
           .limit(18)
@@ -1109,7 +1214,7 @@ export async function loadMarketplaceSearch(
   // Merge known vendor rows with the extra profiles fetched above.
   // relatedVendorProducts items already belong to vendorRows vendors, so
   // no additional lookup is needed for them.
-  const allVendorRows = [...vendorRows, ...(extraVendorRows.data ?? [])]
+  const allVendorRows = [...matchingVendorRows, ...(extraVendorRows.data ?? [])]
   const vendorSnapshotMap = new Map(
     allVendorRows.map((row) => {
       const vendor = mapVendor(row)
@@ -1134,6 +1239,20 @@ export async function loadMarketplaceSearch(
       } satisfies ProductSearchResult
     })
     .filter((item): item is ProductSearchResult => Boolean(item))
+    .filter((product) =>
+      normalized
+        ? matchesSearchGroups(
+            [
+              product.name,
+              product.description,
+              product.vendor.storeName,
+              product.vendor.category,
+              product.vendor.city
+            ],
+            searchGroups
+          )
+        : true
+    )
     .sort((left, right) => {
       if (left.inStock !== right.inStock) {
         return left.inStock ? -1 : 1
@@ -1142,7 +1261,7 @@ export async function loadMarketplaceSearch(
     })
 
   const vendors = [
-    ...vendorRows.map((row) => vendorSnapshotMap.get(String(row.id))),
+    ...matchingVendorRows.map((row) => vendorSnapshotMap.get(String(row.id))),
     ...products.map((product) => product.vendor)
   ]
     .filter((vendor): vendor is VendorSnapshot => Boolean(vendor))
@@ -1151,15 +1270,19 @@ export async function loadMarketplaceSearch(
         list.findIndex((candidate) => candidate.id === vendor.id) === index
     )
 
-  return writeHybridCache(
-    marketplaceSearchCache,
-    cacheKey,
-    persistedCacheKeys.marketplaceSearch(cacheKey),
-    {
-      products,
-      vendors
-    }
-  )
+  const results = {
+    products,
+    vendors
+  }
+
+  return shouldCacheSearch
+    ? writeHybridCache(
+        marketplaceSearchCache,
+        cacheKey,
+        persistedCacheKeys.marketplaceSearch(cacheKey),
+        results
+      )
+    : results
   })
 }
 
@@ -1168,6 +1291,11 @@ export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]
 
   if (!hasSupabase) {
     return canUseDemoMode ? getProductFeed(query) : []
+  }
+
+  if (normalized) {
+    const results = await loadMarketplaceSearch(query)
+    return results.products
   }
 
   const cacheKey = normalized.toLowerCase()

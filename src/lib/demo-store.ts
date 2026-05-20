@@ -82,11 +82,66 @@ function buildVendorSnapshot(
   }
 }
 
+const DEMO_SEARCH_STOP_WORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "for",
+  "from",
+  "in",
+  "of",
+  "on",
+  "or",
+  "the",
+  "to",
+  "with"
+])
+
+function getDemoSearchGroups(query: string) {
+  return [
+    ...new Set(
+      query
+        .toLocaleLowerCase()
+        .match(/[\p{L}\p{N}]+/gu)
+        ?.filter((token) => token.length > 1 && !DEMO_SEARCH_STOP_WORDS.has(token)) ??
+        []
+    )
+  ].map((token) => {
+    const variants = new Set([token])
+
+    if (token.endsWith("ies") && token.length > 4) {
+      variants.add(`${token.slice(0, -3)}y`)
+    }
+
+    if (/(ches|shes|sses|xes|zes)$/u.test(token) && token.length > 4) {
+      variants.add(token.slice(0, -2))
+    }
+
+    if (token.endsWith("s") && token.length > 3) {
+      variants.add(token.slice(0, -1))
+    }
+
+    return [...variants]
+  })
+}
+
+function demoSearchMatches(values: string[], groups: string[][]) {
+  if (groups.length === 0) {
+    return true
+  }
+
+  const haystack = values.map((value) => value.toLocaleLowerCase()).join(" ")
+  return groups.every((group) =>
+    group.some((variant) => haystack.includes(variant))
+  )
+}
+
 function buildMarketplaceProductMatches(state: DemoState, normalized: string) {
   const activeVendors = state.vendors.filter((vendor) => vendor.isActive)
   const vendorSnapshotMap = new Map(
     activeVendors.map((vendor) => [vendor.id, buildVendorSnapshot(vendor, state)])
   )
+  const searchGroups = getDemoSearchGroups(normalized)
 
   const products: ProductSearchResult[] = state.products
     .filter((product) => vendorSnapshotMap.has(product.vendorId))
@@ -96,13 +151,13 @@ function buildMarketplaceProductMatches(state: DemoState, normalized: string) {
       const vendor = vendorSnapshotMap.get(product.vendorId)
       if (!vendor) return false
 
-      return [
+      return demoSearchMatches([
         product.name,
         product.description,
         vendor.storeName,
         vendor.category,
         vendor.city
-      ].some((value) => value.toLowerCase().includes(normalized))
+      ], searchGroups)
     })
     .map((product) => ({
       ...product,
