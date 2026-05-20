@@ -20,6 +20,7 @@ import {
   saveReview,
   updateOrderStatus
 } from "@/lib/marketplace"
+import { subscribeToOrderChanges } from "@/lib/orders-realtime"
 import {
   type OrderArchiveActor,
   type OrderDetail,
@@ -99,11 +100,16 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
   // Load the order — only fires once auth has settled
   // ------------------------------------------------------------------
   const loadOrder = useCallback(
-    async (signal?: { cancelled: boolean }) => {
+    async (
+      signal?: { cancelled: boolean },
+      options: { silent?: boolean } = {}
+    ) => {
       if (!profile) return
 
-      setFetching(true)
-      setLoadError(null)
+      if (!options.silent) {
+        setFetching(true)
+        setLoadError(null)
+      }
 
       try {
         const nextOrder = await loadOrderDetail(orderId, { fresh: true })
@@ -128,13 +134,15 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
       } catch (err) {
         if (signal?.cancelled) return
         console.error("[order-detail] load failed", err)
-        setLoadError(
-          err instanceof Error
-            ? err.message
-            : "Something went wrong loading this order."
-        )
+        if (!options.silent) {
+          setLoadError(
+            err instanceof Error
+              ? err.message
+              : "Something went wrong loading this order."
+          )
+        }
       } finally {
-        if (!signal?.cancelled) setFetching(false)
+        if (!signal?.cancelled && !options.silent) setFetching(false)
       }
     },
     [orderId, profile]
@@ -150,6 +158,39 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
       signal.cancelled = true
     }
   }, [authLoading, loadOrder])
+
+  useEffect(() => {
+    if (authLoading || !profile) return
+
+    const signal = { cancelled: false }
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer)
+      }
+
+      refreshTimer = setTimeout(() => {
+        if (!signal.cancelled) {
+          void loadOrder(signal, { silent: true })
+        }
+      }, 250)
+    }
+
+    const unsubscribe = subscribeToOrderChanges({
+      channelName: `order-detail:${orderId}:${profile.id}`,
+      filter: `id=eq.${orderId}`,
+      onChange: scheduleRefresh
+    })
+
+    return () => {
+      signal.cancelled = true
+      if (refreshTimer) {
+        clearTimeout(refreshTimer)
+      }
+      unsubscribe()
+    }
+  }, [authLoading, loadOrder, orderId, profile])
 
   useEffect(() => {
     setDeliveryDraft(order?.deliveryAddress ?? "")

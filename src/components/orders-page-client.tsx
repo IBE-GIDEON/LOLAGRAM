@@ -13,6 +13,7 @@ import {
 } from "@/lib/constants"
 import { formatCurrency, formatDate } from "@/lib/format"
 import { archiveCompletedOrder, loadBuyerOrders, loadSellerOrders } from "@/lib/marketplace"
+import { subscribeToOrderChanges } from "@/lib/orders-realtime"
 import { type OrderDetail } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -50,11 +51,16 @@ export function OrdersPageClient() {
   // profile becomes available for the first time.
   // ------------------------------------------------------------------
   const fetchOrders = useCallback(
-    async (signal?: { cancelled: boolean }) => {
+    async (
+      signal?: { cancelled: boolean },
+      options: { silent?: boolean } = {}
+    ) => {
       if (!profile) return
 
-      setFetching(true)
-      setLoadError(null)
+      if (!options.silent) {
+        setFetching(true)
+        setLoadError(null)
+      }
 
       try {
         const result =
@@ -67,11 +73,13 @@ export function OrdersPageClient() {
       } catch (err) {
         if (signal?.cancelled) return
         console.error("[orders-page] load failed", err)
-        setLoadError(
-          err instanceof Error ? err.message : "Could not load orders. Try again."
-        )
+        if (!options.silent) {
+          setLoadError(
+            err instanceof Error ? err.message : "Could not load orders. Try again."
+          )
+        }
       } finally {
-        if (!signal?.cancelled) setFetching(false)
+        if (!signal?.cancelled && !options.silent) setFetching(false)
       }
     },
     [profile, vendorProfile, tab]
@@ -90,6 +98,44 @@ export function OrdersPageClient() {
       signal.cancelled = true
     }
   }, [authLoading, fetchOrders, profile])
+
+  useEffect(() => {
+    if (authLoading || !profile) return
+    if (tab === "store" && !vendorProfile) return
+
+    const signal = { cancelled: false }
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null
+    const filter =
+      tab === "store" && vendorProfile
+        ? `vendor_id=eq.${vendorProfile.id}`
+        : `buyer_id=eq.${profile.id}`
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer)
+      }
+
+      refreshTimer = setTimeout(() => {
+        if (!signal.cancelled) {
+          void fetchOrders(signal, { silent: true })
+        }
+      }, 250)
+    }
+
+    const unsubscribe = subscribeToOrderChanges({
+      channelName: `orders:${tab}:${profile.id}:${vendorProfile?.id ?? "buyer"}`,
+      filter,
+      onChange: scheduleRefresh
+    })
+
+    return () => {
+      signal.cancelled = true
+      if (refreshTimer) {
+        clearTimeout(refreshTimer)
+      }
+      unsubscribe()
+    }
+  }, [authLoading, fetchOrders, profile, tab, vendorProfile])
 
   // ------------------------------------------------------------------
   // Auth / loading guards

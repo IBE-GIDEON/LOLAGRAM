@@ -1,4 +1,4 @@
-const STATIC_CACHE = "glowgram-static-v5"
+const STATIC_CACHE = "glowgram-static-v6"
 const VENDOR_CACHE = "glowgram-vendors-v1"
 const IMAGE_CACHE = "glowgram-images-v1"
 const ORDER_DB = "glowgram-offline"
@@ -41,6 +41,12 @@ self.addEventListener("activate", (event) => {
       )
       .then(() => self.clients.claim())
   )
+})
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting()
+  }
 })
 
 self.addEventListener("fetch", (event) => {

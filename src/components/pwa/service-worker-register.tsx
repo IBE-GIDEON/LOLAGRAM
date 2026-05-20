@@ -20,16 +20,72 @@ export function ServiceWorkerRegister() {
       return
     }
 
-    navigator.serviceWorker.register("/sw.js").catch(() => undefined)
+    const hadController = Boolean(navigator.serviceWorker.controller)
+    let controllerReloaded = false
+    let updateInterval: ReturnType<typeof setInterval> | null = null
+
+    const reloadOnControllerChange = () => {
+      if (!hadController) return
+      if (controllerReloaded) return
+      controllerReloaded = true
+      window.location.reload()
+    }
+
+    const checkForUpdate = async (registration?: ServiceWorkerRegistration) => {
+      try {
+        const activeRegistration =
+          registration ?? (await navigator.serviceWorker.getRegistration())
+        await activeRegistration?.update()
+      } catch (error) {
+        // Update checks should never interrupt app usage.
+      }
+    }
+
+    navigator.serviceWorker.addEventListener(
+      "controllerchange",
+      reloadOnControllerChange
+    )
+
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then((registration) => {
+        void checkForUpdate(registration)
+        updateInterval = setInterval(() => {
+          void checkForUpdate(registration)
+        }, 15 * 60 * 1000)
+      })
+      .catch(() => undefined)
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        void checkForUpdate()
+      }
+    }
+    const checkForUpdateFromFocus = () => {
+      void checkForUpdate()
+    }
 
     const flush = () => {
       flushOfflineOrders().catch(() => undefined)
     }
 
     window.addEventListener("online", flush)
+    window.addEventListener("focus", checkForUpdateFromFocus)
+    document.addEventListener("visibilitychange", refreshWhenVisible)
     flush()
 
-    return () => window.removeEventListener("online", flush)
+    return () => {
+      window.removeEventListener("online", flush)
+      window.removeEventListener("focus", checkForUpdateFromFocus)
+      document.removeEventListener("visibilitychange", refreshWhenVisible)
+      navigator.serviceWorker.removeEventListener(
+        "controllerchange",
+        reloadOnControllerChange
+      )
+      if (updateInterval) {
+        clearInterval(updateInterval)
+      }
+    }
   }, [])
 
   return null

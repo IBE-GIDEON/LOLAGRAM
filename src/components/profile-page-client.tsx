@@ -102,7 +102,7 @@ export function ProfilePageClient() {
         return
       }
 
-      const status = await getPushStatus()
+      const status = await getPushStatus({ syncExistingSubscription: true })
       if (!cancelled) {
         setPushStatus(status)
       }
@@ -164,27 +164,14 @@ export function ProfilePageClient() {
           applicationServerKey: urlBase64ToUint8Array(publicKey)
         }))
 
-      const supabaseClient = getSupabaseBrowserClient()
-      const { data: { session } } = supabaseClient
-        ? await supabaseClient.auth.getSession()
-        : { data: { session: null } }
-      const token = session?.access_token
-
-      const response = await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ subscription })
-      })
-
-      if (!response.ok) {
-        throw new Error("Could not save your notification subscription.")
-      }
+      await syncPushSubscription(subscription)
 
       setPushStatus("enabled")
-      toast.success("Push notifications enabled.")
+      toast.success(
+        existingSubscription
+          ? "Push notifications re-synced."
+          : "Push notifications enabled."
+      )
     } catch (error) {
       const status = await getPushStatus()
       setPushStatus(status)
@@ -410,7 +397,7 @@ export function ProfilePageClient() {
   const showSellerSection =
     viewMode === "seller" &&
     (profile.accountType === "seller" || profile.accountType === "both")
-  const pushButtonDisabled = !["ready"].includes(pushStatus)
+  const pushButtonDisabled = !["ready", "enabled"].includes(pushStatus)
 
   return (
     <div className="space-y-4 p-4 pb-safe-nav">
@@ -803,6 +790,27 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray
 }
 
+async function syncPushSubscription(subscription: PushSubscription) {
+  const supabaseClient = getSupabaseBrowserClient()
+  const { data: { session } } = supabaseClient
+    ? await supabaseClient.auth.getSession()
+    : { data: { session: null } }
+  const token = session?.access_token
+
+  const response = await fetch("/api/push/subscribe", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify({ subscription })
+  })
+
+  if (!response.ok) {
+    throw new Error("Could not save your notification subscription.")
+  }
+}
+
 function isIos() {
   if (typeof navigator === "undefined") {
     return false
@@ -819,7 +827,9 @@ function isStandaloneWebApp() {
   return window.matchMedia("(display-mode: standalone)").matches || Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone)
 }
 
-async function getPushStatus(): Promise<PushStatus> {
+async function getPushStatus(
+  options: { syncExistingSubscription?: boolean } = {}
+): Promise<PushStatus> {
   if (
     typeof window === "undefined" ||
     !("serviceWorker" in navigator) ||
@@ -852,6 +862,15 @@ async function getPushStatus(): Promise<PushStatus> {
     const registration = await navigator.serviceWorker.ready
     const subscription = await registration.pushManager.getSubscription()
 
+    if (subscription && options.syncExistingSubscription) {
+      try {
+        await syncPushSubscription(subscription)
+      } catch (error) {
+        console.warn("[push] Could not re-sync browser subscription", error)
+        return "ready"
+      }
+    }
+
     return subscription ? "enabled" : "ready"
   } catch (error) {
     return Notification.permission === "granted" ? "ready" : "ready"
@@ -863,7 +882,7 @@ function getPushButtonLabel(status: PushStatus) {
     case "checking":
       return "Checking notification status..."
     case "enabled":
-      return "Push notifications enabled"
+      return "Notifications enabled - tap to re-sync"
     case "enabling":
       return "Enabling notifications..."
     case "blocked":
