@@ -1,4 +1,4 @@
-const STATIC_CACHE = "glowgram-static-v3"
+const STATIC_CACHE = "glowgram-static-v4"
 const VENDOR_CACHE = "glowgram-vendors-v1"
 const IMAGE_CACHE = "glowgram-images-v1"
 const ORDER_DB = "glowgram-offline"
@@ -12,10 +12,11 @@ self.addEventListener("install", (event) => {
         "/orders",
         "/profile",
         "/search",
-        "/vendor",
-        "/order-confirmation",
         "/onboarding/seller",
         "/seller/products",
+        "/apple-touch-icon.png",
+        "/icon-192.png",
+        "/icon-512.png",
         "/pwa/icon-192.png",
         "/pwa/icon-512.png",
         "/favicon.ico",
