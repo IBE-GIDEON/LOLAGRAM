@@ -1378,6 +1378,11 @@ export async function loadMarketplaceSearch(
       : { products: [], vendors: [] }
   }
 
+  // Track IDs that came directly from the keyword DB query — the DB already
+  // confirmed their name or description contains the search word, so we
+  // never filter them out on the client side.
+  const directMatchIds = new Set(productRows.map((r) => String(r.id)))
+
   const mergedProductRows = [...productRows, ...(relatedVendorProducts.data ?? [])].filter(
     (product, index, list) =>
       list.findIndex((candidate) => String(candidate.id) === String(product.id)) ===
@@ -1412,11 +1417,21 @@ export async function loadMarketplaceSearch(
       } satisfies ProductSearchResult
     })
     .filter((item): item is ProductSearchResult => Boolean(item))
-    .filter((product) =>
-      normalized ? getProductSearchScore(product, searchGroups) > 0 : true
-    )
+    .filter((product) => {
+      if (!normalized) return true
+      // Direct keyword matches always appear — the DB already verified the
+      // product name or description contains the search word.
+      if (directMatchIds.has(product.id)) return true
+      // Vendor-matched products only appear if they also score against the query.
+      return getProductSearchScore(product, searchGroups) > 0
+    })
     .sort((left, right) => {
       if (normalized) {
+        // Direct keyword matches rank above vendor-only matches.
+        const leftDirect = directMatchIds.has(left.id) ? 1 : 0
+        const rightDirect = directMatchIds.has(right.id) ? 1 : 0
+        if (rightDirect !== leftDirect) return rightDirect - leftDirect
+
         const scoreDifference =
           getProductSearchScore(right, searchGroups) -
           getProductSearchScore(left, searchGroups)
