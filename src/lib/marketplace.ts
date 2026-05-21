@@ -1276,199 +1276,158 @@ export async function loadMarketplaceSearch(
   }
 
   return deduplicatedFetch(`marketplace-search:${cacheKey}`, async () => {
-  // Vendor search uses alias-expanded variants so category synonyms work
-  // (e.g. "hair" finds "wigs" vendors, "shoe" finds "footwear" vendors).
-  const vendorSearchFilter = buildSearchFilter(searchGroups, [
-    "store_name",
-    "category",
-    "city",
-    "bio"
-  ])
+    const productKeywordFilter = buildProductKeywordFilter(searchGroups)
+    const vendorSearchFilter = buildSearchFilter(searchGroups, [
+      "store_name",
+      "category",
+      "city",
+      "bio"
+    ])
 
-  // Product search uses ONLY the raw keywords the buyer typed, matched
-  // against name and description. No predefined aliases — sellers can list
-  // anything and buyers find it by typing words from the product listing.
-  const productKeywordFilter = buildProductKeywordFilter(searchGroups)
+    if (normalized) {
+      // --- SEARCH PATH ---
+      // Step 1: products + vendor join in one query (same pattern as loadProductFeed).
+      // The inner join means only products from active vendors are returned.
+      // The or() filter matches any keyword the buyer typed against name or description.
+      let products: ProductSearchResult[] = []
 
-  const vendorRequest = normalized
-    ? supabase
+      const { data: joinedRows, error: joinError } = await supabase
+        .from("products")
+        .select("*, vendor_profiles!inner(*)")
+        .eq("vendor_profiles.is_active", true)
+        .or(productKeywordFilter)
+        .order("created_at", { ascending: false })
+        .limit(80)
+
+      if (!joinError && joinedRows) {
+        products = joinedRows
+          .map((row): ProductSearchResult | null => {
+            const vRow = row.vendor_profiles
+            if (!vRow || typeof vRow !== "object" || Array.isArray(vRow)) return null
+            const vendor: VendorSnapshot = {
+              ...mapVendor(vRow as Record<string, unknown>),
+              reviewCount: 0,
+              productCount: 0
+            }
+            return { ...mapProduct(row), vendor }
+          })
+          .filter((item): item is ProductSearchResult => Boolean(item))
+      } else {
+        // Fallback: two separate queries when the join is unavailable
+        const { data: productRows } = await supabase
+          .from("products")
+          .select("*")
+          .or(productKeywordFilter)
+          .order("created_at", { ascending: false })
+          .limit(80)
+
+        if (productRows && productRows.length > 0) {
+          const vendorIds = [...new Set(productRows.map((p) => String(p.vendor_id)))]
+          const { data: vendorRows } = await supabase
+            .from("vendor_profiles")
+            .select("*")
+            .in("id", vendorIds)
+            .eq("is_active", true)
+
+          const vendorMap = new Map(
+            (vendorRows ?? []).map((row) => {
+              const v = mapVendor(row)
+              return [v.id, { ...v, reviewCount: 0, productCount: 0 } as VendorSnapshot]
+            })
+          )
+
+          products = productRows
+            .map((row): ProductSearchResult | null => {
+              const vendor = vendorMap.get(String(row.vendor_id))
+              if (!vendor) return null
+              return { ...mapProduct(row), vendor }
+            })
+            .filter((item): item is ProductSearchResult => Boolean(item))
+        }
+      }
+
+      // Sort: name matches first, then description matches, then by stock + date
+      products.sort((a, b) => {
+        const sa = getProductSearchScore(a, searchGroups)
+        const sb = getProductSearchScore(b, searchGroups)
+        if (sb !== sa) return sb - sa
+        if (a.inStock !== b.inStock) return a.inStock ? -1 : 1
+        return +new Date(b.createdAt) - +new Date(a.createdAt)
+      })
+
+      // Step 2: vendors matching the search (for the Stores section)
+      const { data: matchingVendorRows } = await supabase
         .from("vendor_profiles")
         .select("*")
         .eq("is_active", true)
         .or(vendorSearchFilter)
         .limit(12)
-    : supabase
-        .from("vendor_profiles")
-        .select("*")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .limit(6)
 
-  const productRequest = normalized
-    ? supabase
-        .from("products")
-        .select("*")
-        .or(productKeywordFilter)
-        .order("created_at", { ascending: false })
-        .limit(80)
-    : supabase
-        .from("products")
-        .select("*")
-        .eq("in_stock", true)
-        .order("created_at", { ascending: false })
-        .limit(10)
+      const vendorSet = new Map<string, VendorSnapshot>()
+      for (const row of matchingVendorRows ?? []) {
+        const v = mapVendor(row)
+        vendorSet.set(v.id, { ...v, reviewCount: 0, productCount: 0 })
+      }
+      for (const p of products) {
+        if (!vendorSet.has(p.vendor.id)) vendorSet.set(p.vendor.id, p.vendor)
+      }
 
-  const [
-    { data: vendorRows, error: vendorError },
-    { data: productRows, error: productError }
-  ] = await Promise.all([vendorRequest, productRequest])
+      return { products, vendors: [...vendorSet.values()] }
+    }
 
-  if (vendorError || productError || !vendorRows || !productRows) {
-    return canUseDemoMode
-      ? getMarketplaceSearchResults(query)
-      : { products: [], vendors: [] }
-  }
-
-  // Second round — both queries are independent of each other:
-  //   • relatedVendorProducts only needs vendorRows IDs
-  //   • candidateExtraVendorIds is derived from productRows + vendorRows
-  // Fire both simultaneously instead of awaiting them one by one.
-  const matchingVendorRows = normalized
-    ? vendorRows.filter((row) =>
-        matchesSearchGroups(
-          [row.store_name, row.category, row.city, row.bio],
-          searchGroups
-        )
-      )
-    : vendorRows
-  const knownVendorIdSet = new Set(matchingVendorRows.map((v) => String(v.id)))
-
-  const candidateExtraVendorIds = [
-    ...new Set(
-      productRows
-        .map((p) => String(p.vendor_id))
-        .filter((id) => !knownVendorIdSet.has(id))
+    // --- EMPTY QUERY PATH (home/trending feed) ---
+    const cached = readHybridCache(
+      marketplaceSearchCache,
+      "",
+      persistedCacheKeys.marketplaceSearch("")
     )
-  ]
+    if (cached) return cached
 
-  const [relatedVendorProducts, extraVendorRows] = await Promise.all([
-    normalized && matchingVendorRows.length > 0
-      ? supabase
-          .from("products")
-          .select("*")
-          .in(
-            "vendor_id",
-            matchingVendorRows.map((vendor) => String(vendor.id))
-          )
-          .order("created_at", { ascending: false })
-          .limit(36)
-      : Promise.resolve({ data: [] as typeof productRows, error: null }),
-    candidateExtraVendorIds.length > 0
-      ? supabase
+    const [{ data: vendorRows, error: vendorError }, { data: productRows, error: productError }] =
+      await Promise.all([
+        supabase
           .from("vendor_profiles")
           .select("*")
-          .in("id", candidateExtraVendorIds)
           .eq("is_active", true)
-      : Promise.resolve({ data: [] as typeof vendorRows, error: null })
-  ])
+          .order("created_at", { ascending: false })
+          .limit(6),
+        supabase
+          .from("products")
+          .select("*")
+          .eq("in_stock", true)
+          .order("created_at", { ascending: false })
+          .limit(10)
+      ])
 
-  if (relatedVendorProducts.error || extraVendorRows.error) {
-    return canUseDemoMode
-      ? getMarketplaceSearchResults(query)
-      : { products: [], vendors: [] }
-  }
+    if (vendorError || productError || !vendorRows || !productRows) {
+      return canUseDemoMode
+        ? getMarketplaceSearchResults(query)
+        : { products: [], vendors: [] }
+    }
 
-  // Track IDs that came directly from the keyword DB query — the DB already
-  // confirmed their name or description contains the search word, so we
-  // never filter them out on the client side.
-  const directMatchIds = new Set(productRows.map((r) => String(r.id)))
-
-  const mergedProductRows = [...productRows, ...(relatedVendorProducts.data ?? [])].filter(
-    (product, index, list) =>
-      list.findIndex((candidate) => String(candidate.id) === String(product.id)) ===
-      index
-  )
-
-  // Merge known vendor rows with the extra profiles fetched above.
-  // relatedVendorProducts items already belong to vendorRows vendors, so
-  // no additional lookup is needed for them.
-  const allVendorRows = [...matchingVendorRows, ...(extraVendorRows.data ?? [])]
-  const vendorSnapshotMap = new Map(
-    allVendorRows.map((row) => {
-      const vendor = mapVendor(row)
-      const snapshot: VendorSnapshot = {
-        ...vendor,
-        reviewCount: 0,
-        productCount: 0
-      }
-
-      return [vendor.id, snapshot]
-    })
-  )
-
-  const products = mergedProductRows
-    .map((row): ProductSearchResult | null => {
-      const vendor = vendorSnapshotMap.get(String(row.vendor_id))
-      if (!vendor) return null
-
-      return {
-        ...mapProduct(row),
-        vendor
-      } satisfies ProductSearchResult
-    })
-    .filter((item): item is ProductSearchResult => Boolean(item))
-    .filter((product) => {
-      if (!normalized) return true
-      // Direct keyword matches always appear — the DB already verified the
-      // product name or description contains the search word.
-      if (directMatchIds.has(product.id)) return true
-      // Vendor-matched products only appear if they also score against the query.
-      return getProductSearchScore(product, searchGroups) > 0
-    })
-    .sort((left, right) => {
-      if (normalized) {
-        // Direct keyword matches rank above vendor-only matches.
-        const leftDirect = directMatchIds.has(left.id) ? 1 : 0
-        const rightDirect = directMatchIds.has(right.id) ? 1 : 0
-        if (rightDirect !== leftDirect) return rightDirect - leftDirect
-
-        const scoreDifference =
-          getProductSearchScore(right, searchGroups) -
-          getProductSearchScore(left, searchGroups)
-        if (scoreDifference !== 0) {
-          return scoreDifference
-        }
-      }
-
-      if (left.inStock !== right.inStock) {
-        return left.inStock ? -1 : 1
-      }
-      return +new Date(right.createdAt) - +new Date(left.createdAt)
-    })
-
-  const vendors = [
-    ...matchingVendorRows.map((row) => vendorSnapshotMap.get(String(row.id))),
-    ...products.map((product) => product.vendor)
-  ]
-    .filter((vendor): vendor is VendorSnapshot => Boolean(vendor))
-    .filter(
-      (vendor, index, list) =>
-        list.findIndex((candidate) => candidate.id === vendor.id) === index
+    const vendorSnapshotMap = new Map(
+      vendorRows.map((row) => {
+        const v = mapVendor(row)
+        return [v.id, { ...v, reviewCount: 0, productCount: 0 } as VendorSnapshot]
+      })
     )
 
-  const results = {
-    products,
-    vendors
-  }
+    const products = productRows
+      .map((row): ProductSearchResult | null => {
+        const vendor = vendorSnapshotMap.get(String(row.vendor_id))
+        if (!vendor) return null
+        return { ...mapProduct(row), vendor } satisfies ProductSearchResult
+      })
+      .filter((item): item is ProductSearchResult => Boolean(item))
 
-  return shouldCacheSearch
-    ? writeHybridCache(
-        marketplaceSearchCache,
-        cacheKey,
-        persistedCacheKeys.marketplaceSearch(cacheKey),
-        results
-      )
-    : results
+    const results = { products, vendors: vendorRows.map((row) => ({ ...mapVendor(row), reviewCount: 0, productCount: 0 })) }
+
+    return writeHybridCache(
+      marketplaceSearchCache,
+      "",
+      persistedCacheKeys.marketplaceSearch(""),
+      results
+    )
   })
 }
 
