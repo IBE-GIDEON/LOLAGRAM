@@ -53,7 +53,7 @@ export function OrdersPageClient() {
   const fetchOrders = useCallback(
     async (
       signal?: { cancelled: boolean },
-      options: { silent?: boolean } = {}
+      options: { silent?: boolean; fresh?: boolean } = {}
     ) => {
       if (!profile) return
 
@@ -65,8 +65,8 @@ export function OrdersPageClient() {
       try {
         const result =
           tab === "store" && vendorProfile
-            ? await loadSellerOrders(profile.id, { fresh: true })
-            : await loadBuyerOrders(profile.id, { fresh: true })
+            ? await loadSellerOrders(profile.id, { fresh: options.fresh ?? false })
+            : await loadBuyerOrders(profile.id, { fresh: options.fresh ?? false })
 
         if (signal?.cancelled) return
         setOrders(result)
@@ -117,7 +117,7 @@ export function OrdersPageClient() {
 
       refreshTimer = setTimeout(() => {
         if (!signal.cancelled) {
-          void fetchOrders(signal, { silent: true })
+          void fetchOrders(signal, { silent: true, fresh: true })
         }
       }, 250)
     }
@@ -208,7 +208,7 @@ export function OrdersPageClient() {
         <Card className="p-5">
           <p className="text-lg font-semibold text-ink">Orders unavailable</p>
           <p className="mt-2 text-sm leading-6 text-muted">{loadError}</p>
-          <Button className="mt-4 w-full" onClick={() => void fetchOrders()}>
+          <Button className="mt-4 w-full" onClick={() => void fetchOrders(undefined, { fresh: true })}>
             Retry
           </Button>
         </Card>

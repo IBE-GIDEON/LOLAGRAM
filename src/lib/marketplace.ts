@@ -1700,6 +1700,7 @@ export async function loadBuyerOrders(
     .eq("buyer_id", userId)
     .is("buyer_hidden_at", null)
     .order("created_at", { ascending: false })
+    .limit(50)
 
   if (ordersError) {
     logMarketplaceError("buyer-orders", ordersError)
@@ -1783,6 +1784,7 @@ export async function loadSellerOrders(
     .eq("vendor_id", vendorRow.id)
     .is("seller_hidden_at", null)
     .order("created_at", { ascending: false })
+    .limit(50)
 
   if (ordersError) {
     logMarketplaceError("seller-orders", ordersError)

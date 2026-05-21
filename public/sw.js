@@ -57,7 +57,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (url.pathname.startsWith("/vendor/")) {
-    event.respondWith(cacheFirst(event.request, VENDOR_CACHE, 10))
+    event.respondWith(networkFirst(event.request))
     return
   }
 

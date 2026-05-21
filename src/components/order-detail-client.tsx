@@ -119,30 +119,33 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
           setLoadError(
             "This order was not found, or your account does not have access to it."
           )
-          setFetching(false)
+          if (!options.silent) setFetching(false)
           return
         }
 
         setOrder(nextOrder)
+        // Unblock the loading spinner as soon as the order is ready —
+        // vendor detail loads in the background so the page feels instant.
+        if (!options.silent) setFetching(false)
 
         // Fetch vendor detail only when the current user is the buyer
-        // (needed to show payment bank details etc.)
+        // (needed to show payment bank details). Non-blocking.
         if (nextOrder.vendorId && profile.id === nextOrder.buyerId) {
-          const detail = await loadVendorDetail(nextOrder.vendorId)
-          if (!signal?.cancelled) setVendorData(detail)
+          loadVendorDetail(nextOrder.vendorId)
+            .then((detail) => { if (!signal?.cancelled) setVendorData(detail) })
+            .catch(() => {})
         }
       } catch (err) {
         if (signal?.cancelled) return
         console.error("[order-detail] load failed", err)
         if (!options.silent) {
+          setFetching(false)
           setLoadError(
             err instanceof Error
               ? err.message
               : "Something went wrong loading this order."
           )
         }
-      } finally {
-        if (!signal?.cancelled && !options.silent) setFetching(false)
       }
     },
     [orderId, profile]
