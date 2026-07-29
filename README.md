@@ -65,6 +65,35 @@ Without it, signup fails for the second user who joins without a phone number.
 The display name is derived from the email handle and the phone number is asked
 for at first checkout, where the seller actually needs it.
 
+## Keeping Supabase awake
+
+Supabase **Free** projects pause after roughly 7 days without activity, and a
+paused project makes signup and checkout fail until someone restores it by hand.
+There is no setting that disables this — only a paid plan removes pausing. What
+this repo does instead is make sure the project is never idle:
+
+1. Run [supabase/keep-alive.sql](supabase/keep-alive.sql) once. It creates a
+   single-row `keep_alive` table with RLS on and no policies, so only the
+   service role can touch it.
+2. `GET /api/keep-alive` writes a timestamp to that row (falling back to a cheap
+   read if the table or service role key is missing).
+3. Two independent schedules call it, so one failing does not pause the project:
+   - Vercel cron, daily at 06:00 UTC ([vercel.json](vercel.json))
+   - GitHub Actions, every second day at 07:15 UTC
+     ([.github/workflows/keep-alive.yml](.github/workflows/keep-alive.yml))
+
+Optional: set `CRON_SECRET` in the environment to require a bearer token.
+Vercel cron sends it automatically once the variable exists; add the same value
+as a `CRON_SECRET` repository secret so the GitHub Action keeps working. Set
+`APP_URL` as a repository secret too if the production domain changes.
+
+Caveats worth knowing: this only prevents *inactivity* pausing. It does not help
+with a project disabled for exceeding Free tier quotas (database size, egress)
+or for billing reasons. GitHub also disables scheduled workflows in a repository
+that has had no activity for 60 days — push anything, or hit "Run workflow", to
+re-enable it. With real traffic every day, none of this is load-bearing; it is
+insurance for quiet stretches.
+
 ## Banner imagery
 
 Home page hero and category art lives in `public/banners` (Pexels licence: free
