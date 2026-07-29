@@ -19,7 +19,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Main navigation"
-      className="sticky bottom-0 z-40 shrink-0 border-t border-border bg-surface/95 px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-2 backdrop-blur"
+      className="sticky bottom-0 z-40 shrink-0 border-t border-border bg-surface/95 px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-2 backdrop-blur lg:hidden"
     >
       <div className="grid grid-cols-4 gap-1">
         {items.map((item) => {

@@ -16,6 +16,11 @@
   --color-border: 223 229 224;
   --color-success: 58 107 74;
   --color-warning: 155 125 10;
+  /* Editorial accents */
+  --color-plum: 58 18 38;
+  --color-rose: 183 110 121;
+  --color-gold: 197 160 74;
+  --color-blush: 250 235 238;
 }
 
 html.dark {
@@ -32,6 +37,11 @@ html.dark {
   --color-border: 42 59 67;
   --color-success: 85 174 108;
   --color-warning: 215 180 81;
+  /* Editorial accents */
+  --color-plum: 40 12 27;
+  --color-rose: 214 143 154;
+  --color-gold: 218 184 102;
+  --color-blush: 60 32 42;
 }
 
 html {
@@ -88,6 +98,14 @@ select {
 ::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: rgba(var(--color-muted), 0.32);
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }
 
 .pb-safe-nav {

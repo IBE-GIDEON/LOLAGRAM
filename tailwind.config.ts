@@ -22,7 +22,12 @@ const config: Config = {
         success: "rgb(var(--color-success) / <alpha-value>)",
         warning: "rgb(var(--color-warning) / <alpha-value>)",
         buyerBlue: "#3A6EA5",
-        border: "rgb(var(--color-border) / <alpha-value>)"
+        border: "rgb(var(--color-border) / <alpha-value>)",
+        // Editorial accents — deep plum, rose gold, gold, blush
+        plum: "rgb(var(--color-plum) / <alpha-value>)",
+        rose: "rgb(var(--color-rose) / <alpha-value>)",
+        gold: "rgb(var(--color-gold) / <alpha-value>)",
+        blush: "rgb(var(--color-blush) / <alpha-value>)"
       },
       borderRadius: {
         card: "12px"

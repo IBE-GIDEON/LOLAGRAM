@@ -12,14 +12,14 @@ import { RemoteImage } from "@/components/remote-image"
 import { BottomSheet, Button, Card } from "@/components/ui"
 import { PAYMENT_METHOD_META } from "@/lib/constants"
 import { formatCurrency } from "@/lib/format"
-import { loadVendorDetail, placeOrder } from "@/lib/marketplace"
+import { loadVendorDetail, placeOrder, saveUserProfile } from "@/lib/marketplace"
 import { getPrimaryProductImage } from "@/lib/product-images"
 import { queueOfflineOrder } from "@/lib/offline-orders"
 import { type PaymentMethod, type VendorDetail } from "@/lib/types"
 
 export function GlobalCart() {
   const router = useRouter()
-  const { profile } = useAuth()
+  const { profile, refreshProfile } = useAuth()
   const {
     vendorId,
     items,
@@ -31,6 +31,7 @@ export function GlobalCart() {
   } = useCart()
   const [open, setOpen] = useState(false)
   const [deliveryAddress, setDeliveryAddress] = useState("")
+  const [phone, setPhone] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [vendorData, setVendorData] = useState<VendorDetail | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pay_on_delivery")
@@ -63,13 +64,33 @@ export function GlobalCart() {
 
   const handleCheckout = async () => {
     if (!profile) {
-      toast.error("Sign in from Profile before placing an order.")
+      toast.error("Sign in to place your order.")
+      router.push("/login?next=/")
       return
     }
 
     if (!deliveryAddress.trim()) {
       toast.error("Add a delivery address to continue.")
       return
+    }
+
+    // Signup no longer asks for a phone number, so we collect it on the first
+    // order — the seller needs it to reach the buyer on WhatsApp.
+    const normalizedPhone = normalizeNigerianPhone(phone)
+
+    if (!profile.phone?.trim()) {
+      if (!normalizedPhone) {
+        toast.error("Add the phone number the seller should call you on.")
+        return
+      }
+
+      try {
+        await saveUserProfile({ ...profile, phone: normalizedPhone })
+        await refreshProfile(profile.id)
+      } catch {
+        toast.error("Could not save your phone number. Check it and try again.")
+        return
+      }
     }
 
     const payload = {
@@ -211,6 +232,24 @@ export function GlobalCart() {
               onChange={(event) => setDeliveryAddress(event.target.value)}
             />
 
+            {profile && !profile.phone?.trim() ? (
+              <div className="mt-4">
+                <p className="text-sm font-semibold text-ink">Phone number</p>
+                <p className="mt-1 text-xs leading-5 text-muted">
+                  The seller uses this to confirm delivery on WhatsApp.
+                </p>
+                <input
+                  className="mt-2 w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-ink outline-none focus:border-brand/40"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="0803 000 0000"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                />
+              </div>
+            ) : null}
+
             <div className="mt-4 space-y-3">
               <p className="text-sm font-semibold text-ink">Choose how you want to pay</p>
               <div className="space-y-2">
@@ -268,17 +307,36 @@ export function GlobalCart() {
                 : "You only pay the seller directly after they confirm the order."}
             </p>
             {!profile ? (
-              <p className="mt-3 text-xs text-muted">
-                Sign in from{" "}
-                <Link href="/profile" className="font-semibold text-brand" onClick={() => setOpen(false)}>
-                  Profile
-                </Link>{" "}
-                before placing an order.
-              </p>
+              <Link
+                href="/login?next=/"
+                className="mt-3 flex w-full items-center justify-center rounded-full border border-border px-4 py-3 text-sm font-semibold text-ink transition hover:border-rose/50 hover:text-rose"
+                onClick={() => setOpen(false)}
+              >
+                Sign in to place this order
+              </Link>
             ) : null}
           </Card>
         </div>
       </BottomSheet>
     </>
   )
+}
+
+/** Accepts 0803..., 803..., 234... and +234... — returns "" when unusable. */
+function normalizeNigerianPhone(rawPhone: string) {
+  const compact = rawPhone.trim().replace(/[\s()-]/g, "")
+
+  if (!compact || compact === "+234" || compact === "+") {
+    return ""
+  }
+
+  const withCountryCode = compact.startsWith("+")
+    ? compact
+    : compact.startsWith("234")
+      ? `+${compact}`
+      : compact.startsWith("0")
+        ? `+234${compact.slice(1)}`
+        : `+234${compact}`
+
+  return /^\+\d{7,15}$/.test(withCountryCode) ? withCountryCode : ""
 }

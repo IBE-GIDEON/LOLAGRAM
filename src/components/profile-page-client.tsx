@@ -5,21 +5,15 @@ import { useEffect, useState } from "react"
 import toast from "react-hot-toast"
 import { FiBell, FiCheck, FiEdit3, FiKey, FiLogOut, FiMail, FiShoppingBag, FiUser } from "react-icons/fi"
 
+import { AuthPanel } from "@/components/auth-panel"
 import { useAuth } from "@/components/providers/auth-provider"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Avatar, Badge, Button, Card, Input, SectionHeading } from "@/components/ui"
 import { uploadImage } from "@/lib/image"
 import { loadStoreAnalytics, saveUserProfile } from "@/lib/marketplace"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
-import {
-  type AccountType,
-  type SignInFormValues,
-  type SignUpFormValues,
-  type StoreAnalytics
-} from "@/lib/types"
+import { type StoreAnalytics } from "@/lib/types"
 import { VIEW_MODE_KEY } from "@/lib/constants"
-
-type AuthMode = "signin" | "signup" | "forgot"
 type PushStatus =
   | "checking"
   | "unsupported"
@@ -35,29 +29,12 @@ export function ProfilePageClient() {
     loading,
     profile,
     vendorProfile,
-    signIn,
     signOut,
-    signUp,
-    requestPasswordReset,
     updatePassword,
     updateEmailAddress,
     upgradeAccountType,
     refreshProfile
   } = useAuth()
-  const [authMode, setAuthMode] = useState<AuthMode>("signin")
-  const [signInValues, setSignInValues] = useState<SignInFormValues>({
-    email: "",
-    password: ""
-  })
-  const [signUpValues, setSignUpValues] = useState<SignUpFormValues>({
-    email: "",
-    phone: "+234",
-    fullName: "",
-    password: "",
-    accountType: "buyer"
-  })
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [forgotEmail, setForgotEmail] = useState("")
   const [savingProfile, setSavingProfile] = useState(false)
   const [editName, setEditName] = useState("")
   const [photoPreview, setPhotoPreview] = useState("")
@@ -187,209 +164,9 @@ export function ProfilePageClient() {
 
   if (!profile) {
     return (
-      <div className="space-y-4 p-4 pb-safe-nav">
+      <div className="space-y-4 p-4 pb-safe-nav lg:mx-auto lg:max-w-lg lg:py-8">
         <SectionHeading title="Profile" action={<ThemeToggle />} />
-
-        <Card className="p-5">
-          <div className="flex items-center gap-2 rounded-full bg-canvas p-1">
-            {([
-              ["signin", "Sign in"],
-              ["signup", "Create account"],
-              ["forgot", "Forgot password"]
-            ] as const).map(([mode, label]) => (
-              <button
-                key={mode}
-                className={`flex-1 rounded-full px-3 py-2.5 text-sm font-semibold transition ${
-                  authMode === mode
-                    ? "bg-chrome text-white"
-                    : "text-muted hover:bg-surface"
-                }`}
-                onClick={() => setAuthMode(mode)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {authMode === "signin" ? (
-            <div className="mt-5 space-y-3">
-              <div>
-                <p className="text-lg font-semibold text-ink">Welcome back</p>
-                <p className="mt-2 text-sm leading-6 text-muted">
-                  Sign in with your email and password.
-                </p>
-              </div>
-              <Input
-                type="email"
-                placeholder="Email address"
-                value={signInValues.email}
-                onChange={(event) =>
-                  setSignInValues((current) => ({
-                    ...current,
-                    email: event.target.value
-                  }))
-                }
-              />
-              <Input
-                type="password"
-                placeholder="Password"
-                value={signInValues.password}
-                onChange={(event) =>
-                  setSignInValues((current) => ({
-                    ...current,
-                    password: event.target.value
-                  }))
-                }
-              />
-              <Button
-                className="w-full"
-                onClick={async () => {
-                  try {
-                    await signIn(signInValues)
-                  } catch (error) {
-                    toast.error(error instanceof Error ? error.message : "Could not sign in.")
-                  }
-                }}
-              >
-                Sign in
-              </Button>
-            </div>
-          ) : null}
-
-          {authMode === "signup" ? (
-            <div className="mt-5 space-y-3">
-              <div>
-                <p className="text-lg font-semibold text-ink">Create your account</p>
-                <p className="mt-2 text-sm leading-6 text-muted">
-                  Use email for login and password reset. Your phone number stays
-                  required for shopping and seller contact.
-                </p>
-              </div>
-              <Input
-                placeholder="Full name"
-                value={signUpValues.fullName}
-                onChange={(event) =>
-                  setSignUpValues((current) => ({
-                    ...current,
-                    fullName: event.target.value
-                  }))
-                }
-              />
-              <Input
-                type="email"
-                placeholder="Email address"
-                value={signUpValues.email}
-                onChange={(event) =>
-                  setSignUpValues((current) => ({
-                    ...current,
-                    email: event.target.value
-                  }))
-                }
-              />
-              <Input
-                placeholder="Phone number"
-                value={signUpValues.phone}
-                onChange={(event) =>
-                  setSignUpValues((current) => ({
-                    ...current,
-                    phone: event.target.value
-                  }))
-                }
-              />
-              <Input
-                type="password"
-                placeholder="Password"
-                value={signUpValues.password}
-                onChange={(event) =>
-                  setSignUpValues((current) => ({
-                    ...current,
-                    password: event.target.value
-                  }))
-                }
-              />
-              <Input
-                type="password"
-                placeholder="Confirm password"
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-              />
-              <div className="grid grid-cols-2 gap-3 rounded-full bg-canvas p-1">
-                {(["buyer", "seller"] as AccountType[]).map((type) => (
-                  <button
-                    key={type}
-                    className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 py-3 text-center text-sm font-semibold transition ${
-                      signUpValues.accountType === type
-                        ? "bg-chrome text-white"
-                        : "text-muted hover:bg-surface"
-                    }`}
-                    onClick={() =>
-                      setSignUpValues((current) => ({ ...current, accountType: type }))
-                    }
-                  >
-                    {type === "buyer" ? "Buyer" : "Seller"}
-                  </button>
-                ))}
-              </div>
-              <Button
-                className="w-full"
-                onClick={async () => {
-                  if (signUpValues.password.length < 6) {
-                    toast.error("Use at least 6 characters for your password.")
-                    return
-                  }
-
-                  if (signUpValues.password !== confirmPassword) {
-                    toast.error("Passwords do not match.")
-                    return
-                  }
-
-                  try {
-                    await signUp(signUpValues)
-                  } catch (error) {
-                    toast.error(
-                      error instanceof Error ? error.message : "Could not create account."
-                    )
-                  }
-                }}
-              >
-                Create account
-              </Button>
-            </div>
-          ) : null}
-
-          {authMode === "forgot" ? (
-            <div className="mt-5 space-y-3">
-              <div>
-                <p className="text-lg font-semibold text-ink">Forgot password</p>
-                <p className="mt-2 text-sm leading-6 text-muted">
-                  Enter your email and we’ll send you a password reset link.
-                </p>
-              </div>
-              <Input
-                type="email"
-                placeholder="Email address"
-                value={forgotEmail}
-                onChange={(event) => setForgotEmail(event.target.value)}
-              />
-              <Button
-                className="w-full"
-                onClick={async () => {
-                  try {
-                    await requestPasswordReset(forgotEmail)
-                  } catch (error) {
-                    toast.error(
-                      error instanceof Error
-                        ? error.message
-                        : "Could not send reset link."
-                    )
-                  }
-                }}
-              >
-                Send reset link
-              </Button>
-            </div>
-          ) : null}
-        </Card>
+        <AuthPanel showLinks={false} />
       </div>
     )
   }

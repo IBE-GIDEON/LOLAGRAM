@@ -333,25 +333,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
 
       const result = (await response.json().catch(() => null)) as
-        | { error?: string; userId?: string }
+        | {
+            error?: string
+            userId?: string
+            needsEmailConfirmation?: boolean
+            session?: { access_token: string; refresh_token: string } | null
+          }
         | null
 
       if (!response.ok) {
         throw new Error(result?.error ?? "Unable to create account")
       }
 
+      // The API already signed the new user in, so we adopt that session
+      // instead of spending another round trip on signInWithPassword.
+      if (result?.session?.access_token && result.session.refresh_token) {
+        const { data, error } = await supabase.auth.setSession({
+          access_token: result.session.access_token,
+          refresh_token: result.session.refresh_token
+        })
+
+        if (!error && data.user) {
+          setSessionUserId(data.user.id)
+          await ensureProfileForSessionUser(data.user)
+          toast.success("Account created. Welcome to GLOWGRAM.")
+          return
+        }
+      }
+
+      if (result?.needsEmailConfirmation) {
+        toast.success("Account created. Check your email to confirm it.")
+        return
+      }
+
+      // Session handoff failed (rare) — fall back to a normal password sign in.
       const { data, error } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
         password: values.password
       })
 
       if (error || !data.user) {
-        throw error ?? new Error("Account created, but automatic sign in failed.")
+        throw new Error(
+          "Account created. Please sign in with your email and password."
+        )
       }
 
       setSessionUserId(data.user.id)
       await ensureProfileForSessionUser(data.user)
-      toast.success("Account created.")
+      toast.success("Account created. Welcome to GLOWGRAM.")
     },
     [ensureProfileForSessionUser, isDemoMode, refreshProfile]
   )

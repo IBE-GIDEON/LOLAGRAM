@@ -27,7 +27,9 @@ export function SellerOnboardingClient() {
   const [bio, setBio] = useState(vendorProfile?.bio ?? "")
   const [city, setCity] = useState(vendorProfile?.city ?? "")
   const [whatsappNumber, setWhatsappNumber] = useState(
-    vendorProfile?.whatsappNumber ?? profile?.phone ?? "+234"
+    // `||` not `??`: profiles created through the two-field signup carry an
+    // empty phone string, which should still fall through to the +234 prefix.
+    vendorProfile?.whatsappNumber || profile?.phone || "+234"
   )
   const [bankName, setBankName] = useState(vendorProfile?.bankName ?? "")
   const [accountName, setAccountName] = useState(vendorProfile?.accountName ?? "")

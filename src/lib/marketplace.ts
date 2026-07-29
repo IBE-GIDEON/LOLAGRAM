@@ -2003,6 +2003,18 @@ export async function loadVendorProfile(userId: string) {
   })
 }
 
+/** "ada.obi@mail.com" -> "Ada Obi". Mirrors the signup API's fallback name. */
+function deriveNameFromEmail(email: string) {
+  const handle = email.split("@")[0]?.replace(/[._-]+/g, " ").trim()
+  if (!handle) return "GLOWGRAM User"
+
+  return handle
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
+}
+
 export async function findOrCreateDemoUser(values: SignUpFormValues) {
   const existing = getDemoUserByEmail(values.email)
   if (existing) {
@@ -2012,9 +2024,9 @@ export async function findOrCreateDemoUser(values: SignUpFormValues) {
   const user: UserProfile = {
     id: createId("user"),
     email: values.email,
-    phone: values.phone,
-    fullName: values.fullName,
-    accountType: values.accountType,
+    phone: values.phone ?? "",
+    fullName: values.fullName?.trim() || deriveNameFromEmail(values.email),
+    accountType: values.accountType ?? "buyer",
     createdAt: new Date().toISOString()
   }
 
@@ -2075,7 +2087,9 @@ export async function saveUserProfile(input: UserProfile) {
     .upsert({
       id: input.id,
       email: input.email,
-      phone: input.phone,
+      // Empty strings would collide on the unique phone index once several
+      // buyers sign up without a number — store NULL instead.
+      phone: input.phone?.trim() ? input.phone.trim() : null,
       full_name: input.fullName,
       profile_photo_url: input.profilePhotoUrl,
       account_type: input.accountType

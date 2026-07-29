@@ -2,6 +2,7 @@ import dynamic from "next/dynamic"
 import type { PropsWithChildren } from "react"
 
 import { BottomNav } from "@/components/bottom-nav"
+import { DesktopNav } from "@/components/desktop-nav"
 
 // OfflineBanner: only visible when device is offline — skip from initial bundle
 const OfflineBanner = dynamic(
@@ -15,11 +16,16 @@ const GlobalCart = dynamic(
   { ssr: false }
 )
 
+/**
+ * One shell, two layouts: a phone-width app with a bottom nav below lg, and a
+ * full-width storefront with a top nav from lg up.
+ */
 export function MobileShell({ children }: PropsWithChildren) {
   return (
     <div className="min-h-screen bg-app">
-      <div className="mx-auto flex min-h-screen w-full justify-center lg:px-6 lg:py-6">
-        <main className="flex min-h-screen w-full max-w-[430px] flex-col bg-canvas lg:overflow-hidden lg:rounded-[36px] lg:border lg:border-border/60 lg:shadow-xl">
+      <div className="mx-auto flex min-h-screen w-full justify-center">
+        <main className="flex min-h-screen w-full max-w-[430px] flex-col bg-canvas lg:max-w-none">
+          <DesktopNav />
           <OfflineBanner />
           <GlobalCart />
           <div className="min-h-0 flex-1">{children}</div>

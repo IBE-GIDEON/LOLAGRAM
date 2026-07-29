@@ -57,7 +57,7 @@ export function ProductFeed({
       {header ? <div>{header}</div> : null}
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-3 px-4 pb-5 pt-4">
+        <div className="mx-auto grid w-full max-w-[1240px] grid-cols-2 gap-3 px-4 pb-5 pt-4 md:grid-cols-3 lg:gap-5 lg:px-6 xl:grid-cols-4">
           {Array.from({ length: 6 }).map((_, index) => (
             <div
               key={index}
@@ -73,13 +73,15 @@ export function ProductFeed({
           ))}
         </div>
       ) : products.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3 px-4 pb-5 pt-4">
+        <div className="mx-auto grid w-full max-w-[1240px] grid-cols-2 gap-3 px-4 pb-5 pt-4 md:grid-cols-3 lg:gap-5 lg:px-6 xl:grid-cols-4">
           {products.map((product) => (
             <ProductFeedCard key={product.id} product={product} />
           ))}
         </div>
       ) : (
-        <div className="px-4 pb-8 pt-6 text-sm leading-6 text-muted">{emptyState}</div>
+        <div className="mx-auto w-full max-w-[1240px] px-4 pb-8 pt-6 text-sm leading-6 text-muted lg:px-6">
+          {emptyState}
+        </div>
       )}
 
       {hasMore ? (
@@ -104,7 +106,7 @@ function ProductFeedCard({ product }: { product: ProductSearchResult }) {
           <RemoteImage
             src={primaryImage}
             alt={product.name}
-            sizes="(max-width: 430px) 50vw, 215px"
+            sizes="(max-width: 430px) 50vw, (max-width: 1024px) 33vw, 300px"
             className={product.inStock ? undefined : "opacity-40"}
           />
         ) : (

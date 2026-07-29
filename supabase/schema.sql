@@ -27,7 +27,9 @@ $$;
 create table if not exists public.users (
   id uuid primary key references auth.users (id) on delete cascade,
   email text unique not null,
-  phone text unique not null,
+  -- Optional: signup asks for email + password only. Phone is collected at
+  -- checkout / seller onboarding. NULLs are distinct in a unique index.
+  phone text unique,
   full_name text not null,
   profile_photo_url text,
   account_type public.account_type not null default 'buyer',
@@ -36,6 +38,9 @@ create table if not exists public.users (
 
 alter table public.users
 add column if not exists email text;
+
+alter table public.users
+alter column phone drop not null;
 
 update public.users u
 set
@@ -47,8 +52,7 @@ set
   phone = coalesce(
     nullif(btrim(u.phone), ''),
     nullif(btrim(au.raw_user_meta_data ->> 'phone'), ''),
-    nullif(btrim(au.phone), ''),
-    concat('missing-', u.id::text)
+    nullif(btrim(au.phone), '')
   ),
   full_name = coalesce(
     nullif(btrim(u.full_name), ''),
@@ -204,10 +208,10 @@ begin
     concat(new.id::text, '@missing.glowgram.local')
   );
 
-  profile_phone := coalesce(
-    nullif(btrim(new.raw_user_meta_data ->> 'phone'), ''),
-    nullif(btrim(new.phone), ''),
-    concat('missing-', new.id::text)
+  -- NULL, not a placeholder: a missing phone must not occupy the unique index.
+  profile_phone := nullif(
+    btrim(coalesce(new.raw_user_meta_data ->> 'phone', new.phone, '')),
+    ''
   );
 
   profile_name := coalesce(
@@ -226,26 +230,37 @@ begin
       profile_account_type := 'buyer';
   end;
 
-  insert into public.users (id, email, phone, full_name, account_type)
-  values (
-    new.id,
-    profile_email,
-    profile_phone,
-    profile_name,
-    profile_account_type
-  )
-  on conflict (id) do update
-  set
-    email = excluded.email,
-    phone = excluded.phone,
-    full_name = excluded.full_name,
-    account_type = excluded.account_type;
+  begin
+    insert into public.users (id, email, phone, full_name, account_type)
+    values (
+      new.id,
+      profile_email,
+      profile_phone,
+      profile_name,
+      profile_account_type
+    )
+    on conflict (id) do update
+    set
+      email = excluded.email,
+      phone = coalesce(excluded.phone, public.users.phone),
+      full_name = excluded.full_name,
+      account_type = excluded.account_type;
+  exception
+    when others then
+      -- A profile clash must never fail the auth signup itself.
+      null;
+  end;
 
   return new;
 end;
 $$;
 
 drop trigger if exists on_auth_user_created on auth.users;
+
+create trigger on_auth_user_created
+after insert on auth.users
+for each row
+execute function public.handle_new_user();
 
 create or replace function public.update_vendor_search_text()
 returns trigger

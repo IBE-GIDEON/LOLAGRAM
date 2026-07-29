@@ -1,3 +1,5 @@
+const isProduction = process.env.NODE_ENV === "production"
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
@@ -22,6 +24,16 @@ const nextConfig = {
         protocol: "https",
         hostname: "*.supabase.in",
         pathname: "/storage/v1/object/public/**"
+      },
+      {
+        // Demo / seed catalogue imagery
+        protocol: "https",
+        hostname: "images.unsplash.com"
+      },
+      {
+        // Editorial banner sources
+        protocol: "https",
+        hostname: "images.pexels.com"
       }
     ],
     formats: ["image/avif", "image/webp"],
@@ -32,12 +44,16 @@ const nextConfig = {
   async headers() {
     return [
       {
-        // JS/CSS bundles — content-hashed filenames, safe to cache 1 year
+        // JS/CSS bundles — content-hashed filenames, safe to cache 1 year.
+        // Dev reuses chunk names between restarts, so `immutable` there pins
+        // stale bundles in the browser and edits appear not to apply.
         source: "/_next/static/:path*",
         headers: [
           {
             key: "Cache-Control",
-            value: "public, max-age=31536000, immutable"
+            value: isProduction
+              ? "public, max-age=31536000, immutable"
+              : "no-store, must-revalidate"
           }
         ]
       },

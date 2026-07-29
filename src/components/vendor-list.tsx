@@ -128,7 +128,7 @@ export function VendorList({
           ))}
         </div>
       ) : (
-        <div>{renderedVendors}</div>
+        <div className="mx-auto w-full max-w-[1240px] lg:px-6">{renderedVendors}</div>
       )}
       {hasMore ? (
         <div className="border-t border-border px-4 py-3 text-center text-xs text-muted">
@@ -151,7 +151,7 @@ function VendorRow({
   return (
     <Link
       href={`/vendor/${vendor.id}`}
-      className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3 transition hover:bg-canvas active:bg-canvas last:border-b-0"
+      className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3 transition hover:bg-canvas active:bg-canvas last:border-b-0 lg:rounded-2xl lg:border lg:border-border/60 lg:px-5 lg:py-4 lg:mb-2"
     >
       <Avatar src={vendor.storePhotoUrl} alt={vendor.storeName} />
       <div className="min-w-0 flex-1">

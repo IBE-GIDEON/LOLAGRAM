@@ -16,3 +16,16 @@ export function createPaystackReference() {
 export function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
+
+/**
+ * Keeps `?next=` redirects inside the app. Anything protocol-relative or
+ * absolute falls back to the home feed so the login page can't be used to
+ * bounce shoppers to an external site.
+ */
+export function safeInternalPath(path?: string | null, fallback = "/") {
+  if (!path || !path.startsWith("/") || path.startsWith("//")) {
+    return fallback
+  }
+
+  return path
+}

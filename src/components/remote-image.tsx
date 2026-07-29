@@ -14,8 +14,28 @@ type RemoteImageProps = {
 }
 
 /**
- * Renders an optimized next/image for real HTTPS URLs (Supabase storage, CDN)
- * and falls back to a plain <img> for data: / blob: URLs that appear in demo mode.
+ * Hosts declared in next.config.mjs `images.remotePatterns`. Anything else is
+ * rendered with a plain <img>: next/image THROWS on an unconfigured host, and
+ * that throw takes down the whole feed. Sellers can paste any image URL, so
+ * this component must never be able to crash the page it lives on.
+ */
+const OPTIMIZABLE_HOST_PATTERNS = [/\.supabase\.co$/i, /\.supabase\.in$/i]
+
+function canOptimize(src: string) {
+  if (src.startsWith("/")) return true
+  if (!src.startsWith("https://") && !src.startsWith("http://")) return false
+
+  try {
+    const { hostname } = new URL(src)
+    return OPTIMIZABLE_HOST_PATTERNS.some((pattern) => pattern.test(hostname))
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Renders an optimized next/image for known hosts and falls back to a plain
+ * <img> for data: / blob: URLs and any unconfigured remote host.
  * The parent element must have `position: relative` when using fill layout.
  *
  * className is ADDITIVE — base styles (object-cover etc.) are always applied.
@@ -24,10 +44,8 @@ type RemoteImageProps = {
 export function RemoteImage({ src, alt, sizes, className, priority }: RemoteImageProps) {
   if (!src) return null
 
-  const isOptimizable = src.startsWith("https://") || src.startsWith("http://")
-
-  if (!isOptimizable) {
-    // data: or blob: URLs — can't pass through Next.js image optimizer
+  if (!canOptimize(src)) {
+    // data:, blob:, or a host we have not allowlisted for the optimizer
     // eslint-disable-next-line @next/next/no-img-element
     return (
       <img

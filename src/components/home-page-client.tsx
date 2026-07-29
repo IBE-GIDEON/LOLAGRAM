@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useDeferredValue, useEffect, useMemo, useState } from "react"
 import { FiSearch } from "react-icons/fi"
 
+import { CategoryRail, HeroBanner } from "@/components/hero-banner"
 import { ProductFeed } from "@/components/product-feed"
 import { useAuth } from "@/components/providers/auth-provider"
 import { Avatar, Input } from "@/components/ui"
@@ -127,8 +128,9 @@ export function HomePageClient({
     </div>
   )
   const header = (
-    <div className="bg-brand px-4 pb-4 pt-3 text-chrome dark:bg-chrome dark:text-white">
-      <div className="flex items-center justify-between gap-3">
+    <div className="bg-gradient-to-b from-brand to-brand/90 px-4 pb-4 pt-3 text-chrome dark:from-chrome dark:to-chrome dark:text-white lg:bg-none lg:px-6 lg:pb-2 lg:pt-6 lg:dark:bg-none">
+      <div className="mx-auto w-full max-w-[1240px]">
+      <div className="flex items-center justify-between gap-3 lg:hidden">
         <h1 className="text-[44px] font-bold leading-none tracking-[-0.05em]">
           {pageTitle}
         </h1>
@@ -145,7 +147,7 @@ export function HomePageClient({
         </Link>
       </div>
 
-      <div className="relative mt-4 flex-1">
+      <div className="relative mt-4 flex-1 lg:mx-auto lg:mt-0 lg:max-w-xl">
         <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted dark:text-white/55" />
         <Input
           className="border-black/5 bg-white/90 pl-11 text-ink placeholder:text-muted focus:border-chrome/10 focus:ring-black/5 dark:border-white/10 dark:bg-white/10 dark:text-white dark:placeholder:text-white/50 dark:focus:border-brand/50 dark:focus:ring-brand/15"
@@ -155,7 +157,7 @@ export function HomePageClient({
         />
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-3">
+      <div className="mt-3 flex items-center justify-between gap-3 lg:mx-auto lg:max-w-xl">
         <p className="text-xs font-medium text-chrome/72 dark:text-white/60">
           {resultCopy}
         </p>
@@ -164,7 +166,7 @@ export function HomePageClient({
         </span>
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-3">
+      <div className="mt-3 flex items-center justify-between gap-3 lg:mx-auto lg:max-w-md">
         {!searchOnly ? (
           <div className="grid flex-1 grid-cols-2 gap-2">
             {[
@@ -192,6 +194,14 @@ export function HomePageClient({
           </span>
         )}
       </div>
+
+      {!searchOnly ? (
+        <div className="mt-5 space-y-6 text-ink">
+          <HeroBanner />
+          <CategoryRail />
+        </div>
+      ) : null}
+      </div>
     </div>
   )
 
@@ -206,7 +216,7 @@ export function HomePageClient({
           onScrollPositionChange={setScrollTop}
           stickyHeader={stickyHeader}
           header={header}
-          className="h-[calc(100dvh-116px)]"
+          className="h-[calc(100dvh-116px)] lg:h-[calc(100dvh-72px)]"
         />
       ) : (
         <ProductFeed
@@ -222,7 +232,7 @@ export function HomePageClient({
           stickyHeader={stickyHeader}
           header={header}
           emptyState={emptyProductState}
-          className="h-[calc(100dvh-116px)]"
+          className="h-[calc(100dvh-116px)] lg:h-[calc(100dvh-72px)]"
         />
       )}
     </div>

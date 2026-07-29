@@ -169,10 +169,13 @@ export interface DemoState {
 
 export interface SignUpFormValues {
   email: string
-  phone: string
-  fullName: string
   password: string
-  accountType: AccountType
+  /** Optional at signup — defaults to the email handle, editable in Profile. */
+  fullName?: string
+  /** Collected later (checkout / seller onboarding), never blocks account creation. */
+  phone?: string
+  /** Everyone starts as a buyer; sellers upgrade from Profile. */
+  accountType?: AccountType
 }
 
 export interface SignInFormValues {
