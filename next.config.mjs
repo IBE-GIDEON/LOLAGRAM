@@ -37,7 +37,9 @@ const nextConfig = {
       }
     ],
     formats: ["image/avif", "image/webp"],
-    deviceSizes: [390, 430, 768, 1024],
+    // 1280/1600 added for the desktop storefront — without them wide screens
+    // stretch a 1024px hero across the full banner.
+    deviceSizes: [390, 430, 768, 1024, 1280, 1600],
     imageSizes: [64, 96, 128, 200, 215]
   },
 
