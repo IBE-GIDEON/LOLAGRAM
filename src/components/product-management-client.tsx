@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import toast from "react-hot-toast"
-import { FiTrash2 } from "react-icons/fi"
+import { FiShare2, FiTrash2 } from "react-icons/fi"
 
 import { useAuth } from "@/components/providers/auth-provider"
 import { RemoteImage } from "@/components/remote-image"
@@ -11,6 +11,7 @@ import { formatCurrency } from "@/lib/format"
 import { uploadImages } from "@/lib/image"
 import { deleteProduct, loadSellerProducts, saveProduct } from "@/lib/marketplace"
 import { getPrimaryProductImage } from "@/lib/product-images"
+import { buildProductUrl, shareLink } from "@/lib/share"
 import { type Product } from "@/lib/types"
 
 const MAX_PRODUCT_IMAGES = 6
@@ -30,6 +31,22 @@ export function ProductManagementClient() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [uploadingImages, setUploadingImages] = useState(false)
+
+  async function shareProductLink(product: Product) {
+    if (!vendorProfile) return
+
+    const outcome = await shareLink({
+      title: product.name,
+      text: `${product.name} — ${formatCurrency(product.price)} on GLOWGRAM`,
+      url: buildProductUrl(vendorProfile.id, product.id)
+    })
+
+    if (outcome === "copied") {
+      toast.success("Link copied. Paste it in WhatsApp or your status.")
+    } else if (outcome === "failed") {
+      toast.error("Could not copy the link on this device.")
+    }
+  }
 
   async function refreshProducts() {
     if (!profile) return
@@ -130,20 +147,32 @@ export function ProductManagementClient() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="mx-auto grid w-full max-w-[1100px] grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5 xl:grid-cols-4">
         {products.map((product) => {
           const primaryImage = getPrimaryProductImage(product)
           return (
-          <button
+          <div
             key={product.id}
-            className="overflow-hidden rounded-[22px] bg-surface text-left shadow-soft"
-            onClick={() => openProductEditor(product)}
+            className="relative overflow-hidden rounded-[22px] bg-surface text-left shadow-soft"
           >
+            <button
+              type="button"
+              aria-label={`Share ${product.name}`}
+              className="absolute left-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition hover:bg-black/75"
+              onClick={() => shareProductLink(product)}
+            >
+              <FiShare2 className="text-sm" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="block w-full text-left"
+              onClick={() => openProductEditor(product)}
+            >
             <div className="relative aspect-square overflow-hidden bg-canvas">
               <RemoteImage
                 src={primaryImage}
                 alt={product.name}
-                sizes="(max-width: 430px) 50vw, 215px"
+                sizes="(max-width: 430px) 50vw, (max-width: 1024px) 33vw, 260px"
               />
               {product.photoUrls.length > 1 ? (
                 <span className="absolute right-3 top-3 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-semibold text-white">
@@ -166,7 +195,8 @@ export function ProductManagementClient() {
                 {product.inStock ? "In stock" : "Out of stock"}
               </span>
             </div>
-          </button>
+            </button>
+          </div>
           )
         })}
       </div>

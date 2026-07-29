@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import toast from "react-hot-toast"
-import { FiMessageCircle, FiStar } from "react-icons/fi"
+import { FiMessageCircle, FiShare2, FiStar } from "react-icons/fi"
 
 import { useCart } from "@/components/providers/cart-provider"
 import { BottomSheet, Button, Card, SectionHeading, StarRating } from "@/components/ui"
@@ -15,6 +15,7 @@ import {
 import { RemoteImage } from "@/components/remote-image"
 import { getPrimaryProductImage } from "@/lib/product-images"
 import { loadVendorDetail, peekCachedVendorDetail } from "@/lib/marketplace"
+import { buildProductUrl, shareLink } from "@/lib/share"
 import { type Product, type VendorDetail } from "@/lib/types"
 
 export function VendorStoreClient({
@@ -30,7 +31,56 @@ export function VendorStoreClient({
   )
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
+  const [sharing, setSharing] = useState(false)
   const productRef = useRef<HTMLDivElement | null>(null)
+
+  /**
+   * Keeps ?product=<id> in the address bar in step with the open product, so
+   * the URL a seller copies always opens straight onto that product.
+   * history.replaceState rather than router.replace — no server round trip and
+   * no re-render of the store underneath.
+   */
+  const syncProductParam = (productId: string | null) => {
+    if (typeof window === "undefined") return
+
+    const url = new URL(window.location.href)
+
+    if (productId) {
+      url.searchParams.set("product", productId)
+    } else {
+      url.searchParams.delete("product")
+    }
+
+    window.history.replaceState(window.history.state, "", url.toString())
+  }
+
+  const openProduct = (product: Product) => {
+    setSelectedProduct(product)
+    syncProductParam(product.id)
+  }
+
+  const closeProduct = () => {
+    setSelectedProduct(null)
+    syncProductParam(null)
+  }
+
+  const shareProduct = async (product: Product) => {
+    setSharing(true)
+
+    const outcome = await shareLink({
+      title: product.name,
+      text: `${product.name} — ${formatCurrency(product.price)} on GLOWGRAM`,
+      url: buildProductUrl(vendorId, product.id)
+    })
+
+    setSharing(false)
+
+    if (outcome === "copied") {
+      toast.success("Product link copied.")
+    } else if (outcome === "failed") {
+      toast.error("Could not share this product. Copy the link from the address bar.")
+    }
+  }
 
   useEffect(() => {
     loadVendorDetail(vendorId).then(setData)
@@ -149,7 +199,7 @@ export function VendorStoreClient({
                 <button
                   key={product.id}
                   className="overflow-hidden rounded-[22px] bg-surface text-left shadow-soft transition active:scale-[0.99]"
-                  onClick={() => setSelectedProduct(product)}
+                  onClick={() => openProduct(product)}
                 >
                   {/* Image + stock overlay */}
                   <div className="relative aspect-square overflow-hidden bg-canvas">
@@ -243,7 +293,7 @@ export function VendorStoreClient({
 
       <BottomSheet
         open={Boolean(selectedProduct)}
-        onClose={() => setSelectedProduct(null)}
+        onClose={closeProduct}
         title={selectedProduct?.name}
         size="lg"
       >
@@ -319,17 +369,28 @@ export function VendorStoreClient({
                 {selectedProduct.description}
               </p>
 
-              <Button
-                className="mt-6 w-full md:mt-8"
-                disabled={!selectedProduct.inStock}
-                onClick={() => {
-                  addItem(data.vendor.id, selectedProduct)
-                  setSelectedProduct(null)
-                  toast.success("Added to cart.")
-                }}
-              >
-                {selectedProduct.inStock ? "Add to Cart" : "Out of Stock"}
-              </Button>
+              <div className="mt-6 flex items-center gap-3 md:mt-8">
+                <Button
+                  className="flex-1"
+                  disabled={!selectedProduct.inStock}
+                  onClick={() => {
+                    addItem(data.vendor.id, selectedProduct)
+                    closeProduct()
+                    toast.success("Added to cart.")
+                  }}
+                >
+                  {selectedProduct.inStock ? "Add to Cart" : "Out of Stock"}
+                </Button>
+                <button
+                  type="button"
+                  aria-label="Share this product"
+                  disabled={sharing}
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border text-ink transition hover:border-rose/50 hover:text-rose disabled:opacity-60"
+                  onClick={() => shareProduct(selectedProduct)}
+                >
+                  <FiShare2 aria-hidden="true" />
+                </button>
+              </div>
             </div>
           </div>
         ) : null}
