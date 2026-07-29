@@ -68,7 +68,7 @@ export function VendorStoreClient({
   return (
     <div className="pb-safe-nav">
       <div className="relative">
-        <div className="h-44 overflow-hidden bg-gradient-to-br from-chrome via-chrome to-brand/70">
+        <div className="h-44 overflow-hidden bg-gradient-to-br from-chrome via-chrome to-brand/70 lg:h-72">
           {data.vendor.storePhotoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -78,7 +78,7 @@ export function VendorStoreClient({
             />
           ) : null}
         </div>
-        <div className="relative z-10 -mt-12 px-4">
+        <div className="relative z-10 mx-auto -mt-12 w-full max-w-[1100px] px-4 lg:-mt-16 lg:px-6">
           <Card className="overflow-hidden">
             <div className="p-4">
               <div className="flex items-start gap-4">
@@ -116,7 +116,7 @@ export function VendorStoreClient({
                   </div>
                 </div>
               </div>
-              <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="mt-5 grid grid-cols-2 gap-3 lg:max-w-md">
                 <Button
                   onClick={() =>
                     productRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -139,10 +139,10 @@ export function VendorStoreClient({
         </div>
       </div>
 
-      <div className="space-y-6 px-4 py-6">
+      <div className="mx-auto w-full max-w-[1100px] space-y-6 px-4 py-6 lg:px-6 lg:py-8">
         <div ref={productRef}>
           <SectionHeading title="Products" />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5 xl:grid-cols-4">
             {data.products.map((product) => {
               const primaryImage = getPrimaryProductImage(product)
               return (
@@ -156,7 +156,7 @@ export function VendorStoreClient({
                     <RemoteImage
                       src={primaryImage}
                       alt={product.name}
-                      sizes="(max-width: 430px) 50vw, 215px"
+                      sizes="(max-width: 430px) 50vw, (max-width: 1024px) 33vw, 260px"
                       className={product.inStock ? undefined : "opacity-40"}
                     />
 
@@ -245,62 +245,92 @@ export function VendorStoreClient({
         open={Boolean(selectedProduct)}
         onClose={() => setSelectedProduct(null)}
         title={selectedProduct?.name}
+        size="lg"
       >
         {selectedProduct ? (
-          <div className="space-y-4">
-            <div className="overflow-hidden rounded-[24px] bg-canvas">
-              {selectedProductImages[selectedImageIndex] ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={selectedProductImages[selectedImageIndex]}
-                  alt={selectedProduct.name}
-                  className="aspect-square w-full object-cover"
-                />
+          <div className="md:grid md:grid-cols-2 md:items-start md:gap-7">
+            {/* Gallery — capped so a wide dialog never renders a giant image */}
+            <div className="mx-auto w-full max-w-[420px] space-y-3 md:max-w-none">
+              <div className="relative aspect-square overflow-hidden rounded-[24px] bg-canvas">
+                {selectedProductImages[selectedImageIndex] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={selectedProductImages[selectedImageIndex]}
+                    alt={selectedProduct.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-xs font-medium text-muted">
+                    No photo
+                  </div>
+                )}
+
+                {!selectedProduct.inStock ? (
+                  <span className="absolute left-3 top-3 rounded-full bg-black/75 px-3 py-1.5 text-[11px] font-semibold tracking-wide text-white">
+                    Out of Stock
+                  </span>
+                ) : null}
+              </div>
+
+              {selectedProductImages.length > 1 ? (
+                <div className="scrollbar-none flex gap-2 overflow-x-auto pb-1">
+                  {selectedProductImages.map((image, index) => (
+                    <button
+                      key={`${selectedProduct.id}-${index}`}
+                      type="button"
+                      aria-label={`View photo ${index + 1}`}
+                      aria-current={selectedImageIndex === index}
+                      className={`h-16 w-16 shrink-0 overflow-hidden rounded-2xl border-2 transition ${
+                        selectedImageIndex === index
+                          ? "border-brand"
+                          : "border-border hover:border-border/60"
+                      }`}
+                      onClick={() => setSelectedImageIndex(index)}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={image}
+                        alt={`${selectedProduct.name} ${index + 1}`}
+                        className="h-full w-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
               ) : null}
             </div>
-            {selectedProductImages.length > 1 ? (
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {selectedProductImages.map((image, index) => (
-                  <button
-                    key={`${selectedProduct.id}-${index}`}
-                    type="button"
-                    className={`h-16 w-16 shrink-0 overflow-hidden rounded-2xl border ${
-                      selectedImageIndex === index
-                        ? "border-brand"
-                        : "border-border"
-                    }`}
-                    onClick={() => setSelectedImageIndex(index)}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={image}
-                      alt={`${selectedProduct.name} ${index + 1}`}
-                      className="h-full w-full object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            <div>
-              <p className="text-xl font-bold text-ink">{selectedProduct.name}</p>
-              <p className="mt-2 text-lg font-bold text-brand">
+
+            {/* Details — sticky CTA on desktop so it stays reachable */}
+            <div className="mt-5 flex flex-col md:mt-0">
+              <p className="text-xl font-bold leading-tight text-ink md:text-2xl">
+                {selectedProduct.name}
+              </p>
+              <p className="mt-2 text-lg font-bold text-brand md:text-xl">
                 {formatCurrency(selectedProduct.price)}
               </p>
-              <p className="mt-3 text-sm leading-6 text-muted">
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
+                <span className="rounded-full bg-canvas px-2.5 py-1 font-medium">
+                  {formatCategory(data.vendor.category)}
+                </span>
+                <span className="rounded-full bg-canvas px-2.5 py-1 font-medium">
+                  {data.vendor.city}
+                </span>
+              </div>
+              <p className="mt-4 whitespace-pre-line text-sm leading-6 text-muted">
                 {selectedProduct.description}
               </p>
+
+              <Button
+                className="mt-6 w-full md:mt-8"
+                disabled={!selectedProduct.inStock}
+                onClick={() => {
+                  addItem(data.vendor.id, selectedProduct)
+                  setSelectedProduct(null)
+                  toast.success("Added to cart.")
+                }}
+              >
+                {selectedProduct.inStock ? "Add to Cart" : "Out of Stock"}
+              </Button>
             </div>
-            <Button
-              className="w-full"
-              disabled={!selectedProduct.inStock}
-              onClick={() => {
-                addItem(data.vendor.id, selectedProduct)
-                setSelectedProduct(null)
-                toast.success("Added to cart.")
-              }}
-            >
-              {selectedProduct.inStock ? "Add to Cart" : "Out of Stock"}
-            </Button>
           </div>
         ) : null}
       </BottomSheet>
