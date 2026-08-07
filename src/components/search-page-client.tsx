@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react"
+import { useDeferredValue, useEffect, useRef, useState } from "react"
 import { FiChevronRight, FiMapPin, FiSearch } from "react-icons/fi"
 
 import {
@@ -19,6 +19,7 @@ import {
   peekCachedMarketplaceSearch
 } from "@/lib/marketplace"
 import { getPrimaryProductImage } from "@/lib/product-images"
+import { usePageScroll } from "@/lib/use-page-scroll"
 import {
   type MarketplaceSearchResults,
   type ProductSearchResult,
@@ -58,28 +59,22 @@ export function SearchPageClient() {
   )
   const stickyRef = useRef<HTMLDivElement | null>(null)
   const compactRef = useRef(false)
-  const rafRef = useRef<number | null>(null)
   const deferredQuery = useDeferredValue(query)
   const activeQuery = deferredQuery.trim()
   const showProducts = mode === "all" || mode === "products"
   const showVendors =
     VENDOR_DISCOVERY_ENABLED && (mode === "all" || mode === "stores")
 
-  // Same reason as the home feed: this was setting React state on every scroll
-  // event, re-rendering the entire results grid mid-swipe.
-  const handleScroll = useCallback((element: HTMLDivElement) => {
-    if (rafRef.current !== null) return
-    const { scrollTop } = element
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null
-      const next = scrollTop > 88
-      if (next === compactRef.current) return
-      compactRef.current = next
-      if (stickyRef.current) {
-        stickyRef.current.dataset.compact = next ? "true" : "false"
-      }
-    })
-  }, [])
+  // Written to the DOM rather than to state: keeping it in state re-rendered
+  // the whole results grid on every scroll frame.
+  usePageScroll(({ scrollTop }) => {
+    const next = scrollTop > 88
+    if (next === compactRef.current) return
+    compactRef.current = next
+    if (stickyRef.current) {
+      stickyRef.current.dataset.compact = next ? "true" : "false"
+    }
+  })
 
   useEffect(() => {
     let ignore = false
@@ -104,14 +99,11 @@ export function SearchPageClient() {
 
   return (
     <div className="pb-6 pt-0">
-      <div
-        className="h-[calc(100dvh-116px)] overflow-y-auto bg-canvas"
-        onScroll={(event) => handleScroll(event.currentTarget)}
-      >
+      <div className="bg-canvas">
         <div
           ref={stickyRef}
           data-compact="false"
-          className="group pointer-events-none sticky top-0 z-20 -mb-12 border-b border-transparent bg-transparent transition-colors duration-200 data-[compact=true]:border-black/5 data-[compact=true]:bg-white/70 data-[compact=true]:backdrop-blur-md dark:data-[compact=true]:border-white/10 dark:data-[compact=true]:bg-black/40"
+          className="group pointer-events-none sticky top-0 z-20 -mb-12 lg:top-[72px] border-b border-transparent bg-transparent transition-colors duration-200 data-[compact=true]:border-black/5 data-[compact=true]:bg-white/70 data-[compact=true]:backdrop-blur-md dark:data-[compact=true]:border-white/10 dark:data-[compact=true]:bg-black/40"
         >
           <div className="flex h-12 items-center justify-center">
             <span className="translate-y-1 text-sm font-semibold tracking-[-0.01em] text-ink opacity-0 transition duration-200 group-data-[compact=true]:translate-y-0 group-data-[compact=true]:opacity-100 dark:text-white">

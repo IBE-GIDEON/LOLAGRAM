@@ -1,13 +1,14 @@
 "use client"
 
 import Link from "next/link"
-import { type ReactNode, useCallback, useRef } from "react"
+import { type ReactNode } from "react"
 
 import { RemoteImage } from "@/components/remote-image"
 import { Badge } from "@/components/ui"
 import { formatCategory, formatCurrency } from "@/lib/format"
 import { getPrimaryProductImage } from "@/lib/product-images"
 import { type ProductSearchResult } from "@/lib/types"
+import { usePageScroll } from "@/lib/use-page-scroll"
 import { cn } from "@/lib/utils"
 
 export function ProductFeed({
@@ -31,28 +32,15 @@ export function ProductFeed({
   onScrollPositionChange?: (scrollTop: number) => void
   className?: string
 }) {
-  const parentRef = useRef<HTMLDivElement | null>(null)
-  const rafRef = useRef<number | null>(null)
-
-  const handleScroll = useCallback(() => {
-    if (rafRef.current !== null) return
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null
-      if (!parentRef.current) return
-      const { scrollTop, scrollHeight, clientHeight } = parentRef.current
-      onScrollPositionChange?.(scrollTop)
-      if (onReachEnd && hasMore && scrollHeight - scrollTop - clientHeight < 180) {
-        onReachEnd()
-      }
-    })
-  }, [hasMore, onReachEnd, onScrollPositionChange])
+  usePageScroll(({ scrollTop, nearBottom }) => {
+    onScrollPositionChange?.(scrollTop)
+    if (onReachEnd && hasMore && nearBottom) {
+      onReachEnd()
+    }
+  })
 
   return (
-    <div
-      ref={parentRef}
-      className={cn("h-[calc(100vh-252px)] overflow-y-auto bg-canvas", className)}
-      onScroll={handleScroll}
-    >
+    <div className={cn("bg-canvas", className)}>
       {stickyHeader ? stickyHeader : null}
       {header ? <div>{header}</div> : null}
 

@@ -141,7 +141,7 @@ export function HomePageClient({
     <div
       ref={stickyRef}
       data-compact="false"
-      className="group pointer-events-none sticky top-0 z-20 -mb-12 border-b border-transparent bg-transparent transition-colors duration-200 data-[compact=true]:border-black/5 data-[compact=true]:bg-white/70 data-[compact=true]:backdrop-blur-md dark:data-[compact=true]:border-white/10 dark:data-[compact=true]:bg-black/40"
+      className="group pointer-events-none sticky top-0 z-20 -mb-12 lg:top-[72px] border-b border-transparent bg-transparent transition-colors duration-200 data-[compact=true]:border-black/5 data-[compact=true]:bg-white/70 data-[compact=true]:backdrop-blur-md dark:data-[compact=true]:border-white/10 dark:data-[compact=true]:bg-black/40"
     >
       <div className="flex h-12 items-center justify-center">
         <span className="translate-y-1 text-sm font-semibold tracking-[-0.01em] text-ink opacity-0 transition duration-200 group-data-[compact=true]:translate-y-0 group-data-[compact=true]:opacity-100 dark:text-white">
@@ -261,7 +261,6 @@ export function HomePageClient({
           onScrollPositionChange={handleScrollPosition}
           stickyHeader={stickyHeader}
           header={header}
-          className="h-[calc(100dvh-116px)] lg:h-[calc(100dvh-72px)]"
         />
       ) : (
         <ProductFeed
@@ -277,7 +276,6 @@ export function HomePageClient({
           stickyHeader={stickyHeader}
           header={header}
           emptyState={emptyProductState}
-          className="h-[calc(100dvh-116px)] lg:h-[calc(100dvh-72px)]"
         />
       )}
     </div>

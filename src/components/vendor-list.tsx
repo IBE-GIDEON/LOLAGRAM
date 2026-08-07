@@ -1,13 +1,14 @@
 "use client"
 
 import Link from "next/link"
-import { type ReactNode, useCallback, useMemo, useRef } from "react"
-import { useVirtualizer } from "@tanstack/react-virtual"
+import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useWindowVirtualizer } from "@tanstack/react-virtual"
 import { FiChevronRight, FiMapPin } from "react-icons/fi"
 
 import { Avatar, Badge, StarRating } from "@/components/ui"
 import { formatCategory } from "@/lib/format"
 import { type VendorSnapshot } from "@/lib/types"
+import { usePageScroll } from "@/lib/use-page-scroll"
 import { cn } from "@/lib/utils"
 
 export function VendorList({
@@ -34,32 +35,39 @@ export function VendorList({
   className?: string
 }) {
   const parentRef = useRef<HTMLDivElement | null>(null)
-  const rafRef = useRef<number | null>(null)
   const shouldVirtualize = vendors.length > 50
 
   const rowHeight = searchMode ? 78 : 86
 
-  const virtualizer = useVirtualizer({
+  // The page is the scroller now, so the virtualizer measures the window and
+  // offsets by how far down the page this list starts.
+  const [listOffset, setListOffset] = useState(0)
+
+  useLayoutEffect(() => {
+    if (!parentRef.current) return
+    setListOffset(
+      parentRef.current.getBoundingClientRect().top + window.scrollY
+    )
+  }, [vendors.length])
+
+  const virtualizer = useWindowVirtualizer({
     count: shouldVirtualize ? vendors.length : 0,
-    getScrollElement: () => parentRef.current,
     estimateSize: () => rowHeight,
-    overscan: 6
+    overscan: 6,
+    scrollMargin: listOffset
   })
 
   const virtualItems = virtualizer.getVirtualItems()
 
-  const handleScroll = useCallback(() => {
-    if (rafRef.current !== null) return
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null
-      if (!parentRef.current) return
-      const { scrollTop, scrollHeight, clientHeight } = parentRef.current
+  usePageScroll(
+    ({ scrollTop, nearBottom }) => {
       onScrollPositionChange?.(scrollTop)
-      if (onReachEnd && hasMore && scrollHeight - scrollTop - clientHeight < 120) {
+      if (onReachEnd && hasMore && nearBottom) {
         onReachEnd()
       }
-    })
-  }, [hasMore, onReachEnd, onScrollPositionChange])
+    },
+    { bottomThreshold: 120 }
+  )
 
   const renderedVendors = useMemo(() => {
     if (!shouldVirtualize) {
@@ -81,7 +89,9 @@ export function VendorList({
           data-index={item.index}
           ref={virtualizer.measureElement}
           className="absolute left-0 top-0 w-full"
-          style={{ transform: `translateY(${item.start}px)` }}
+          style={{
+            transform: `translateY(${item.start - virtualizer.options.scrollMargin}px)`
+          }}
         >
           <VendorRow
             vendor={vendor}
@@ -101,14 +111,7 @@ export function VendorList({
   ])
 
   return (
-    <div
-      ref={parentRef}
-      className={cn(
-        "h-[calc(100vh-252px)] overflow-y-auto bg-canvas",
-        className
-      )}
-      onScroll={handleScroll}
-    >
+    <div ref={parentRef} className={cn("bg-canvas", className)}>
       {stickyHeader ? stickyHeader : null}
       {header ? <div>{header}</div> : null}
       {shouldVirtualize ? (
