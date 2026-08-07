@@ -4,7 +4,10 @@
 
 :root {
   color-scheme: light;
-  --color-brand: 37 211 102;
+  /* Brand is rose, not WhatsApp green — this is a hair house, not a chat app.
+     Deep enough to pass contrast on white for prices and links. */
+  --color-brand: 156 74 90;
+  /* Stays green: it labels the actual WhatsApp button and nothing else. */
   --color-whatsapp: 37 211 102;
   --color-chrome: 17 27 33;
   --color-app: 234 239 235;
@@ -25,7 +28,8 @@
 
 html.dark {
   color-scheme: dark;
-  --color-brand: 37 211 102;
+  /* Lifted rose — the light-mode value goes muddy on dark surfaces. */
+  --color-brand: 214 143 154;
   --color-whatsapp: 37 211 102;
   --color-chrome: 6 18 24;
   --color-app: 8 19 24;
@@ -58,13 +62,24 @@ body {
   box-sizing: border-box;
 }
 
-*,
-*::before,
-*::after {
+/* Only while the theme is actually switching. Left on permanently, this makes
+   the browser re-evaluate transitions for every node in a long product grid on
+   each paint, which is what made scrolling stutter on phones. */
+html.theme-anim *,
+html.theme-anim *::before,
+html.theme-anim *::after {
   transition:
     background-color 180ms ease,
     border-color 180ms ease,
     color 180ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.theme-anim *,
+  html.theme-anim *::before,
+  html.theme-anim *::after {
+    transition: none;
+  }
 }
 
 a {

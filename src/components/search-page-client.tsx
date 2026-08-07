@@ -1,10 +1,17 @@
 "use client"
 
 import Link from "next/link"
-import { useDeferredValue, useEffect, useState } from "react"
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react"
 import { FiChevronRight, FiMapPin, FiSearch } from "react-icons/fi"
 
-import { Avatar, Badge, Input, SectionHeading, StarRating } from "@/components/ui"
+import {
+  Avatar,
+  Badge,
+  Input,
+  PAGE_WIDTH,
+  SectionHeading,
+  StarRating
+} from "@/components/ui"
 import { VENDOR_DISCOVERY_ENABLED } from "@/lib/feature-flags"
 import { formatCategory, formatCurrency } from "@/lib/format"
 import {
@@ -49,13 +56,30 @@ export function SearchPageClient() {
   const [loading, setLoading] = useState(
     initialResults.products.length === 0 && initialResults.vendors.length === 0
   )
-  const [scrollTop, setScrollTop] = useState(0)
+  const stickyRef = useRef<HTMLDivElement | null>(null)
+  const compactRef = useRef(false)
+  const rafRef = useRef<number | null>(null)
   const deferredQuery = useDeferredValue(query)
   const activeQuery = deferredQuery.trim()
   const showProducts = mode === "all" || mode === "products"
   const showVendors =
     VENDOR_DISCOVERY_ENABLED && (mode === "all" || mode === "stores")
-  const showCompactHeader = scrollTop > 88
+
+  // Same reason as the home feed: this was setting React state on every scroll
+  // event, re-rendering the entire results grid mid-swipe.
+  const handleScroll = useCallback((element: HTMLDivElement) => {
+    if (rafRef.current !== null) return
+    const { scrollTop } = element
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null
+      const next = scrollTop > 88
+      if (next === compactRef.current) return
+      compactRef.current = next
+      if (stickyRef.current) {
+        stickyRef.current.dataset.compact = next ? "true" : "false"
+      }
+    })
+  }, [])
 
   useEffect(() => {
     let ignore = false
@@ -82,31 +106,21 @@ export function SearchPageClient() {
     <div className="pb-6 pt-0">
       <div
         className="h-[calc(100dvh-116px)] overflow-y-auto bg-canvas"
-        onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+        onScroll={(event) => handleScroll(event.currentTarget)}
       >
         <div
-          className={cn(
-            "pointer-events-none sticky top-0 z-20 -mb-12 transition-all duration-200",
-            showCompactHeader
-              ? "border-b border-black/5 bg-white/38 backdrop-blur-xl dark:border-white/10 dark:bg-black/18"
-              : "border-b border-transparent bg-transparent backdrop-blur-0"
-          )}
+          ref={stickyRef}
+          data-compact="false"
+          className="group pointer-events-none sticky top-0 z-20 -mb-12 border-b border-transparent bg-transparent transition-colors duration-200 data-[compact=true]:border-black/5 data-[compact=true]:bg-white/70 data-[compact=true]:backdrop-blur-md dark:data-[compact=true]:border-white/10 dark:data-[compact=true]:bg-black/40"
         >
           <div className="flex h-12 items-center justify-center">
-            <span
-              className={cn(
-                "text-sm font-semibold tracking-[-0.01em] text-ink transition-all duration-200 dark:text-white",
-                showCompactHeader
-                  ? "translate-y-0 opacity-100"
-                  : "translate-y-1 opacity-0"
-              )}
-            >
+            <span className="translate-y-1 text-sm font-semibold tracking-[-0.01em] text-ink opacity-0 transition duration-200 group-data-[compact=true]:translate-y-0 group-data-[compact=true]:opacity-100 dark:text-white">
               Search
             </span>
           </div>
         </div>
 
-        <div className="bg-canvas px-4 pb-3 pt-3">
+        <div className={`${PAGE_WIDTH.wide} bg-canvas px-4 pb-3 pt-3 lg:px-6`}>
           <h1 className="text-[32px] font-bold tracking-[-0.04em] text-ink">Search</h1>
           <p className="mt-1 text-sm text-muted">
             {VENDOR_DISCOVERY_ENABLED
@@ -166,7 +180,7 @@ export function SearchPageClient() {
           ) : null}
         </div>
 
-        <div className="space-y-6 px-4 py-4">
+        <div className={`${PAGE_WIDTH.wide} space-y-6 px-4 py-4 lg:px-6`}>
           {showProducts ? (
             <section>
               <SectionHeading
@@ -178,7 +192,7 @@ export function SearchPageClient() {
                 }
               />
               {loading ? (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5 xl:grid-cols-4">
                   {Array.from({ length: 4 }).map((_, index) => (
                     <div
                       key={index}
@@ -187,7 +201,7 @@ export function SearchPageClient() {
                   ))}
                 </div>
               ) : results.products.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5 xl:grid-cols-4">
                   {results.products.map((product) => (
                     <ProductSearchCard key={product.id} product={product} />
                   ))}

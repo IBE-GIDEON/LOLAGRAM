@@ -7,7 +7,15 @@ import { FiShare2, FiTrash2 } from "react-icons/fi"
 import { useAuth } from "@/components/providers/auth-provider"
 import { RemoteImage } from "@/components/remote-image"
 import { SellerClosedNotice } from "@/components/seller-closed-notice"
-import { BottomSheet, Button, Card, Input, SectionHeading, Textarea } from "@/components/ui"
+import {
+  BottomSheet,
+  Button,
+  Card,
+  Input,
+  PAGE_WIDTH,
+  SectionHeading,
+  Textarea
+} from "@/components/ui"
 import { canOpenStore } from "@/lib/feature-flags"
 import { formatCurrency } from "@/lib/format"
 import { uploadImages } from "@/lib/image"
@@ -117,7 +125,7 @@ export function ProductManagementClient() {
 
   if (!profile) {
     return (
-      <div className="space-y-4 p-4 pb-safe-nav">
+      <div className={`${PAGE_WIDTH.wide} space-y-4 p-4 pb-safe-nav lg:py-8`}>
         <SectionHeading title="Manage products" />
         <Card className="p-5">
           <p className="text-lg font-semibold text-ink">Sign in first</p>
@@ -141,7 +149,7 @@ export function ProductManagementClient() {
 
   if (!vendorProfile) {
     return (
-      <div className="space-y-4 p-4 pb-safe-nav">
+      <div className={`${PAGE_WIDTH.wide} space-y-4 p-4 pb-safe-nav lg:py-8`}>
         <SectionHeading title="Manage products" />
         <Card className="p-5">
           <p className="text-lg font-semibold text-ink">Create your store first</p>
@@ -160,7 +168,7 @@ export function ProductManagementClient() {
   }
 
   return (
-    <div className="space-y-4 p-4 pb-safe-nav">
+    <div className={`${PAGE_WIDTH.wide} space-y-4 p-4 pb-safe-nav lg:py-8`}>
       <SectionHeading
         title="Manage products"
         action={
@@ -173,7 +181,7 @@ export function ProductManagementClient() {
         }
       />
 
-      <div className="mx-auto grid w-full max-w-[1100px] grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5 xl:grid-cols-4">
+      <div className="grid w-full grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5 xl:grid-cols-4">
         {products.map((product) => {
           const primaryImage = getPrimaryProductImage(product)
           return (

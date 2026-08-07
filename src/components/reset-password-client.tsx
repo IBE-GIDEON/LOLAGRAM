@@ -5,7 +5,7 @@ import { useState } from "react"
 import toast from "react-hot-toast"
 
 import { useAuth } from "@/components/providers/auth-provider"
-import { Button, Card, Input, SectionHeading } from "@/components/ui"
+import { Button, Card, Input, PAGE_WIDTH, SectionHeading } from "@/components/ui"
 
 export function ResetPasswordClient() {
   const { loading, sessionUserId, updatePassword } = useAuth()
@@ -19,7 +19,7 @@ export function ResetPasswordClient() {
   const readyToReset = Boolean(sessionUserId)
 
   return (
-    <div className="space-y-4 p-4 pb-safe-nav">
+    <div className={`${PAGE_WIDTH.form} space-y-4 p-4 pb-safe-nav lg:py-8`}>
       <SectionHeading title="Reset password" />
 
       <Card className="space-y-4 p-5">

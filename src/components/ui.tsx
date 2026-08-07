@@ -59,6 +59,23 @@ export function Textarea({
   )
 }
 
+/**
+ * The three page widths, and the only place they are defined.
+ *
+ * MobileShell already caps phones at 430px, so these only take effect from lg
+ * up — they stop a settings page or an order from being stretched across a
+ * whole desktop monitor. Pick by what the page holds, not by which page it is:
+ *
+ * - `wide`    product grids and storefronts
+ * - `content` lists and detail pages
+ * - `form`    anything that is mostly inputs
+ */
+export const PAGE_WIDTH = {
+  wide: "mx-auto w-full max-w-[1240px]",
+  content: "mx-auto w-full max-w-[880px]",
+  form: "mx-auto w-full max-w-[640px]"
+} as const
+
 export function Card({
   className,
   children

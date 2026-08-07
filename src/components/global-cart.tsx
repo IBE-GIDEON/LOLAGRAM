@@ -134,7 +134,7 @@ export function GlobalCart() {
             <FiShoppingBag />
             Cart
           </span>
-          <span className="rounded-full bg-brand px-2.5 py-1 text-[11px] font-bold text-chrome">
+          <span className="rounded-full bg-brand px-2.5 py-1 text-[11px] font-bold text-white">
             {itemCount}
           </span>
         </button>

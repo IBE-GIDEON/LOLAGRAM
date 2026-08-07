@@ -8,12 +8,21 @@ import { FiBell, FiCheck, FiEdit3, FiKey, FiLogOut, FiMail, FiShoppingBag, FiUse
 import { AuthPanel } from "@/components/auth-panel"
 import { useAuth } from "@/components/providers/auth-provider"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { Avatar, Badge, Button, Card, Input, SectionHeading } from "@/components/ui"
+import {
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  Input,
+  PAGE_WIDTH,
+  SectionHeading
+} from "@/components/ui"
 import { canOpenStore } from "@/lib/feature-flags"
 import { uploadImage } from "@/lib/image"
 import { loadStoreAnalytics, saveUserProfile } from "@/lib/marketplace"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { type StoreAnalytics } from "@/lib/types"
+import { cn } from "@/lib/utils"
 import { VIEW_MODE_KEY } from "@/lib/constants"
 type PushStatus =
   | "checking"
@@ -165,7 +174,7 @@ export function ProfilePageClient() {
 
   if (!profile) {
     return (
-      <div className="space-y-4 p-4 pb-safe-nav lg:mx-auto lg:max-w-lg lg:py-8">
+      <div className={cn(PAGE_WIDTH.form, "space-y-4 p-4 pb-safe-nav lg:py-8")}>
         <SectionHeading title="Profile" action={<ThemeToggle />} />
         <AuthPanel showLinks={false} />
       </div>
@@ -183,7 +192,7 @@ export function ProfilePageClient() {
   })
 
   return (
-    <div className="space-y-4 p-4 pb-safe-nav">
+    <div className={cn(PAGE_WIDTH.form, "space-y-4 p-4 pb-safe-nav lg:py-8")}>
       <SectionHeading title="Profile" />
 
       <Card className="p-5">

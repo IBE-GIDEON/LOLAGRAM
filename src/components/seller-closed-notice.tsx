@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 
-import { Card, SectionHeading } from "@/components/ui"
+import { Card, PAGE_WIDTH, SectionHeading } from "@/components/ui"
 
 /**
  * Shown on the seller routes while store signups are closed. The routes stay in
@@ -14,7 +14,7 @@ export function SellerClosedNotice({
   title?: string
 }) {
   return (
-    <div className="space-y-4 p-4 pb-safe-nav">
+    <div className={`${PAGE_WIDTH.form} space-y-4 p-4 pb-safe-nav lg:py-8`}>
       <SectionHeading title={title} />
       <Card className="p-5">
         <p className="text-lg font-semibold text-ink">

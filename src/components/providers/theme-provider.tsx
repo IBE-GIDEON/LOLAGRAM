@@ -20,8 +20,26 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
-function applyTheme(theme: Theme) {
-  document.documentElement.classList.toggle("dark", theme === "dark")
+let themeAnimTimer: number | undefined
+
+/**
+ * The colour cross-fade is opt-in per switch: `theme-anim` turns the universal
+ * transition on just long enough to cover the repaint, then takes it back off
+ * so it never taxes scrolling.
+ */
+function applyTheme(theme: Theme, animate = false) {
+  const root = document.documentElement
+
+  if (animate) {
+    root.classList.add("theme-anim")
+    window.clearTimeout(themeAnimTimer)
+    themeAnimTimer = window.setTimeout(
+      () => root.classList.remove("theme-anim"),
+      220
+    )
+  }
+
+  root.classList.toggle("dark", theme === "dark")
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -44,13 +62,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setTheme(nextTheme) {
         setThemeState(nextTheme)
         window.localStorage.setItem(THEME_KEY, nextTheme)
-        applyTheme(nextTheme)
+        applyTheme(nextTheme, true)
       },
       toggleTheme() {
         const nextTheme = theme === "dark" ? "light" : "dark"
         setThemeState(nextTheme)
         window.localStorage.setItem(THEME_KEY, nextTheme)
-        applyTheme(nextTheme)
+        applyTheme(nextTheme, true)
       }
     }),
     [theme]

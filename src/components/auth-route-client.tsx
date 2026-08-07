@@ -5,6 +5,7 @@ import { useEffect } from "react"
 
 import { AuthPanel, type AuthMode } from "@/components/auth-panel"
 import { useAuth } from "@/components/providers/auth-provider"
+import { PAGE_WIDTH } from "@/components/ui"
 
 /**
  * Standalone /login and /signup screens. Anyone who is already signed in is
@@ -27,7 +28,7 @@ export function AuthRouteClient({
   }, [loading, next, profile, router])
 
   return (
-    <div className="p-4 pb-safe-nav lg:mx-auto lg:max-w-lg lg:py-10">
+    <div className={`${PAGE_WIDTH.form} p-4 pb-safe-nav lg:py-10`}>
       <AuthPanel defaultMode={mode} redirectTo={next} />
     </div>
   )

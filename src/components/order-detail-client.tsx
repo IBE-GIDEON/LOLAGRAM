@@ -6,7 +6,14 @@ import toast from "react-hot-toast"
 import { FiMessageCircle, FiRefreshCw } from "react-icons/fi"
 
 import { useAuth } from "@/components/providers/auth-provider"
-import { Badge, Button, Card, SectionHeading, Textarea } from "@/components/ui"
+import {
+  Badge,
+  Button,
+  Card,
+  PAGE_WIDTH,
+  SectionHeading,
+  Textarea
+} from "@/components/ui"
 import {
   getOrderStatusMeta,
   getPaymentMethodMeta,
@@ -39,7 +46,7 @@ const STATUS_STEPS: OrderStatus[] = ["pending", "confirmed", "dispatched", "deli
 // ---------------------------------------------------------------------------
 function LoadingState() {
   return (
-    <div className="space-y-4 p-4 pb-safe-nav">
+    <div className={`${PAGE_WIDTH.content} space-y-4 p-4 pb-safe-nav lg:py-8`}>
       <SectionHeading title="Order detail" />
       <div className="h-48 animate-pulse rounded-[26px] bg-surface shadow-soft" />
       <div className="h-28 animate-pulse rounded-[26px] bg-surface shadow-soft" />
@@ -57,7 +64,7 @@ function ErrorState({
   onBack: () => void
 }) {
   return (
-    <div className="space-y-4 p-4 pb-safe-nav">
+    <div className={`${PAGE_WIDTH.content} space-y-4 p-4 pb-safe-nav lg:py-8`}>
       <SectionHeading title="Order detail" />
       <Card className="space-y-4 p-5">
         <div>
@@ -343,7 +350,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
   // Full render
   // ------------------------------------------------------------------
   return (
-    <div className="space-y-4 p-4 pb-safe-nav">
+    <div className={`${PAGE_WIDTH.content} space-y-4 p-4 pb-safe-nav lg:py-8`}>
       <SectionHeading title="Order detail" />
 
       {/* ---- Order summary card ---- */}

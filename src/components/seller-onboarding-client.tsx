@@ -7,7 +7,14 @@ import { FiTrash2 } from "react-icons/fi"
 
 import { useAuth } from "@/components/providers/auth-provider"
 import { SellerClosedNotice } from "@/components/seller-closed-notice"
-import { Button, Card, Input, SectionHeading, Textarea } from "@/components/ui"
+import {
+  Button,
+  Card,
+  Input,
+  PAGE_WIDTH,
+  SectionHeading,
+  Textarea
+} from "@/components/ui"
 import { CATEGORY_OPTIONS } from "@/lib/constants"
 import { canOpenStore } from "@/lib/feature-flags"
 import { uploadImage, uploadImages } from "@/lib/image"
@@ -74,7 +81,7 @@ export function SellerOnboardingClient() {
 
   if (!profile) {
     return (
-      <div className="space-y-4 p-4 pb-safe-nav">
+      <div className={`${PAGE_WIDTH.form} space-y-4 p-4 pb-safe-nav lg:py-8`}>
         <SectionHeading title="Seller onboarding" />
         <Card className="p-5">
           <p className="text-lg font-semibold text-ink">Sign in first</p>
@@ -99,7 +106,7 @@ export function SellerOnboardingClient() {
   }
 
   return (
-    <div className="space-y-4 p-4 pb-safe-nav">
+    <div className={`${PAGE_WIDTH.form} space-y-4 p-4 pb-safe-nav lg:py-8`}>
       <SectionHeading title={isEditingStore ? "Edit store" : "Seller onboarding"} />
       <Card className="p-4">
         <div className="flex items-center justify-between">

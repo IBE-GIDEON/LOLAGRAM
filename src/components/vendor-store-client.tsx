@@ -118,7 +118,7 @@ export function VendorStoreClient({
   return (
     <div className="pb-safe-nav">
       <div className="relative">
-        <div className="h-44 overflow-hidden bg-gradient-to-br from-chrome via-chrome to-brand/70 lg:h-72">
+        <div className="h-44 overflow-hidden bg-gradient-to-br from-plum via-plum to-rose/60 lg:h-72">
           {data.vendor.storePhotoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -128,7 +128,7 @@ export function VendorStoreClient({
             />
           ) : null}
         </div>
-        <div className="relative z-10 mx-auto -mt-12 w-full max-w-[1100px] px-4 lg:-mt-16 lg:px-6">
+        <div className="relative z-10 mx-auto -mt-12 w-full max-w-[1240px] px-4 lg:-mt-16 lg:px-6">
           <Card className="overflow-hidden">
             <div className="p-4">
               <div className="flex items-start gap-4">
@@ -189,7 +189,7 @@ export function VendorStoreClient({
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-[1100px] space-y-6 px-4 py-6 lg:px-6 lg:py-8">
+      <div className="mx-auto w-full max-w-[1240px] space-y-6 px-4 py-6 lg:px-6 lg:py-8">
         <div ref={productRef}>
           <SectionHeading title="Products" />
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5 xl:grid-cols-4">
@@ -220,7 +220,7 @@ export function VendorStoreClient({
                     ) : (
                       /* In stock — small dot badge top-left */
                       <span className="absolute left-2.5 top-2.5 flex items-center gap-1 rounded-full bg-black/50 px-2 py-1 text-[10px] font-semibold text-white">
-                        <span className="h-1.5 w-1.5 rounded-full bg-brand" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                         In Stock
                       </span>
                     )}

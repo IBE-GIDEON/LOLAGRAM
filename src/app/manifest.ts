@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "GLOWGRAM",
     short_name: "GLOWGRAM",
     description: "Your local Nigerian marketplace",
-    theme_color: "#25D366",
+    theme_color: "#3A1226",
     background_color: "#08131A",
     display: "standalone",
     display_override: ["standalone", "minimal-ui"],

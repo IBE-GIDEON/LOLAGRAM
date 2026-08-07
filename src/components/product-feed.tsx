@@ -125,7 +125,7 @@ function ProductFeedCard({ product }: { product: ProductSearchResult }) {
         ) : (
           /* In stock — small dot badge top-left */
           <span className="absolute left-2.5 top-2.5 flex items-center gap-1 rounded-full bg-black/50 px-2 py-1 text-[10px] font-semibold text-white">
-            <span className="h-1.5 w-1.5 rounded-full bg-brand" />
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
             In Stock
           </span>
         )}

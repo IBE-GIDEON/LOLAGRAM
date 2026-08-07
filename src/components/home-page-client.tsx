@@ -1,7 +1,15 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
-import { useDeferredValue, useEffect, useMemo, useState } from "react"
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react"
 import { FiSearch } from "react-icons/fi"
 
 import { CategoryRail, HeroBanner } from "@/components/hero-banner"
@@ -45,7 +53,23 @@ export function HomePageClient({
     initialTab === "find" ? initialVendors.length === 0 : initialProducts.length === 0
   )
   const [visibleCount, setVisibleCount] = useState(INITIAL_PRODUCT_BATCH)
-  const [scrollTop, setScrollTop] = useState(0)
+  const stickyRef = useRef<HTMLDivElement | null>(null)
+  const compactRef = useRef(false)
+
+  /**
+   * Scroll position drives one thing — whether the compact title bar is shown —
+   * so it is written straight to the DOM. Holding it in React state re-rendered
+   * this whole component (hero carousel, category rail, every product card) on
+   * each scroll frame, which is what made phones stutter.
+   */
+  const handleScrollPosition = useCallback((top: number) => {
+    const next = top > 88
+    if (next === compactRef.current) return
+    compactRef.current = next
+    if (stickyRef.current) {
+      stickyRef.current.dataset.compact = next ? "true" : "false"
+    }
+  }, [])
 
   useEffect(() => {
     let ignore = false
@@ -93,7 +117,6 @@ export function HomePageClient({
   )
   const visibleResultCount = isFindTab ? vendors.length : products.length
   const hasMore = !isFindTab && visibleCount < products.length
-  const showCompactHeader = scrollTop > 88
   const searchPlaceholder = isFindTab
     ? "Search store name or category"
     : "Search any product name or description"
@@ -116,49 +139,58 @@ export function HomePageClient({
       : "New arrivals show up here as soon as they are listed."
   const stickyHeader = (
     <div
-      className={cn(
-        "pointer-events-none sticky top-0 z-20 -mb-12 transition-all duration-200",
-        showCompactHeader
-          ? "border-b border-black/5 bg-white/38 backdrop-blur-xl dark:border-white/10 dark:bg-black/18"
-          : "border-b border-transparent bg-transparent backdrop-blur-0"
-      )}
+      ref={stickyRef}
+      data-compact="false"
+      className="group pointer-events-none sticky top-0 z-20 -mb-12 border-b border-transparent bg-transparent transition-colors duration-200 data-[compact=true]:border-black/5 data-[compact=true]:bg-white/70 data-[compact=true]:backdrop-blur-md dark:data-[compact=true]:border-white/10 dark:data-[compact=true]:bg-black/40"
     >
       <div className="flex h-12 items-center justify-center">
-        <span
-          className={cn(
-            "text-sm font-semibold tracking-[-0.01em] text-ink transition-all duration-200 dark:text-white",
-            showCompactHeader ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
-          )}
-        >
+        <span className="translate-y-1 text-sm font-semibold tracking-[-0.01em] text-ink opacity-0 transition duration-200 group-data-[compact=true]:translate-y-0 group-data-[compact=true]:opacity-100 dark:text-white">
           Glowgram
         </span>
       </div>
     </div>
   )
   const header = (
-    <div className="bg-gradient-to-b from-brand to-brand/90 px-4 pb-4 pt-3 text-chrome dark:from-chrome dark:to-chrome dark:text-white lg:bg-none lg:px-6 lg:pb-2 lg:pt-6 lg:dark:bg-none">
-      <div className="mx-auto w-full max-w-[1240px]">
+    <>
+    <div className="relative overflow-hidden bg-plum px-4 pb-5 pt-3 text-white lg:px-6 lg:pb-4 lg:pt-6">
+      {/* Photo banner instead of a flat colour block. Sits at 40% under a plum
+          wash so white type stays readable over any part of the image. */}
+      <Image
+        src="/banners/hero-noir.jpg"
+        alt=""
+        fill
+        priority
+        quality={55}
+        sizes="100vw"
+        className="pointer-events-none select-none object-cover object-[50%_35%] opacity-40"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-plum/45 via-plum/70 to-plum"
+      />
+
+      <div className="relative mx-auto w-full max-w-[1240px]">
       <div className="flex items-center justify-between gap-3 lg:hidden">
-        <h1 className="text-[44px] font-bold leading-none tracking-[-0.05em]">
+        <h1 className="text-[44px] font-bold leading-none tracking-[-0.05em] drop-shadow-sm">
           {pageTitle}
         </h1>
         <Link
           href="/profile"
           aria-label="Open profile"
-          className="inline-flex rounded-full ring-2 ring-white/40 transition hover:scale-[1.02] hover:ring-white/60 dark:ring-white/10 dark:hover:ring-white/20"
+          className="inline-flex rounded-full ring-2 ring-white/35 transition hover:scale-[1.02] hover:ring-white/60"
         >
           <Avatar
             src={profile?.profilePhotoUrl}
             alt={profile?.fullName ?? "Profile"}
-            className="h-11 w-11 border border-black/10 bg-white/80 text-chrome shadow-sm dark:border-white/10 dark:bg-white/10 dark:text-white"
+            className="h-11 w-11 border border-white/20 bg-white/15 text-white shadow-sm"
           />
         </Link>
       </div>
 
       <div className="relative mt-4 flex-1 lg:mx-auto lg:mt-0 lg:max-w-xl">
-        <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted dark:text-white/55" />
+        <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
         <Input
-          className="border-black/5 bg-white/90 pl-11 text-ink placeholder:text-muted focus:border-chrome/10 focus:ring-black/5 dark:border-white/10 dark:bg-white/10 dark:text-white dark:placeholder:text-white/50 dark:focus:border-brand/50 dark:focus:ring-brand/15"
+          className="border-white/15 bg-white/92 pl-11 text-ink shadow-soft placeholder:text-muted focus:border-rose/40 focus:ring-rose/20"
           placeholder={searchPlaceholder}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -166,10 +198,8 @@ export function HomePageClient({
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3 lg:mx-auto lg:max-w-xl">
-        <p className="text-xs font-medium text-chrome/72 dark:text-white/60">
-          {resultCopy}
-        </p>
-        <span className="shrink-0 rounded-full border border-black/10 bg-white/45 px-3 py-1.5 text-[11px] font-semibold text-chrome/80 dark:border-white/10 dark:bg-white/10 dark:text-white/75">
+        <p className="text-xs font-medium text-white/70">{resultCopy}</p>
+        <span className="shrink-0 rounded-full border border-white/20 bg-white/15 px-3 py-1.5 text-[11px] font-semibold text-white/85 backdrop-blur-sm">
           {visibleResultCount} {resultLabel}
         </span>
       </div>
@@ -200,21 +230,24 @@ export function HomePageClient({
               ))}
             </div>
           ) : (
-            <span className="rounded-full border border-black/10 bg-white/35 px-4 py-2 text-sm font-medium text-chrome/78 dark:border-white/10 dark:bg-white/5 dark:text-white/75">
+            <span className="rounded-full border border-white/20 bg-white/15 px-4 py-2 text-sm font-medium text-white/80">
               Live search
             </span>
           )}
         </div>
       ) : null}
-
-      {!searchOnly ? (
-        <div className="mt-5 space-y-6 text-ink">
-          <HeroBanner />
-          <CategoryRail />
-        </div>
-      ) : null}
       </div>
     </div>
+
+    {/* Editorial content sits on the page, not on the banner — one photo
+        behind the search bar reads premium, two stacked reads busy. */}
+    {!searchOnly ? (
+      <div className="mx-auto w-full max-w-[1240px] space-y-6 px-4 pt-5 text-ink lg:px-6">
+        <HeroBanner />
+        <CategoryRail />
+      </div>
+    ) : null}
+    </>
   )
 
   return (
@@ -225,7 +258,7 @@ export function HomePageClient({
           showRating={false}
           searchMode
           loading={loading}
-          onScrollPositionChange={setScrollTop}
+          onScrollPositionChange={handleScrollPosition}
           stickyHeader={stickyHeader}
           header={header}
           className="h-[calc(100dvh-116px)] lg:h-[calc(100dvh-72px)]"
@@ -240,7 +273,7 @@ export function HomePageClient({
               Math.min(current + INITIAL_PRODUCT_BATCH, products.length)
             )
           }
-          onScrollPositionChange={setScrollTop}
+          onScrollPositionChange={handleScrollPosition}
           stickyHeader={stickyHeader}
           header={header}
           emptyState={emptyProductState}

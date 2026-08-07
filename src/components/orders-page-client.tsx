@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react"
 import toast from "react-hot-toast"
 
 import { useAuth } from "@/components/providers/auth-provider"
-import { Badge, Button, Card, SectionHeading } from "@/components/ui"
+import { Badge, Button, Card, PAGE_WIDTH, SectionHeading } from "@/components/ui"
 import {
   getOrderStatusMeta,
   getPaymentMethodMeta,
@@ -142,7 +142,7 @@ export function OrdersPageClient() {
   // ------------------------------------------------------------------
   if (authLoading) {
     return (
-      <div className="space-y-4 p-4 pb-safe-nav">
+      <div className={`${PAGE_WIDTH.content} space-y-4 p-4 pb-safe-nav lg:py-8`}>
         <SectionHeading title="Orders" />
         <OrderSkeleton />
       </div>
@@ -151,7 +151,7 @@ export function OrdersPageClient() {
 
   if (!profile) {
     return (
-      <div className="space-y-4 p-4 pb-safe-nav">
+      <div className={`${PAGE_WIDTH.content} space-y-4 p-4 pb-safe-nav lg:py-8`}>
         <SectionHeading title="Orders" />
         <Card className="p-5">
           <p className="text-lg font-semibold text-ink">Sign in to view your orders</p>
@@ -173,7 +173,7 @@ export function OrdersPageClient() {
   // Render
   // ------------------------------------------------------------------
   return (
-    <div className="space-y-4 p-4 pb-safe-nav">
+    <div className={`${PAGE_WIDTH.content} space-y-4 p-4 pb-safe-nav lg:py-8`}>
       <SectionHeading title="Orders" />
 
       {/* Tab switcher — only shown to sellers */}
