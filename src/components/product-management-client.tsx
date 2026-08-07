@@ -6,7 +6,9 @@ import { FiShare2, FiTrash2 } from "react-icons/fi"
 
 import { useAuth } from "@/components/providers/auth-provider"
 import { RemoteImage } from "@/components/remote-image"
+import { SellerClosedNotice } from "@/components/seller-closed-notice"
 import { BottomSheet, Button, Card, Input, SectionHeading, Textarea } from "@/components/ui"
+import { canOpenStore } from "@/lib/feature-flags"
 import { formatCurrency } from "@/lib/format"
 import { uploadImages } from "@/lib/image"
 import { deleteProduct, loadSellerProducts, saveProduct } from "@/lib/marketplace"
@@ -113,7 +115,31 @@ export function ProductManagementClient() {
     }
   }
 
-  if (!profile || !vendorProfile) {
+  if (!profile) {
+    return (
+      <div className="space-y-4 p-4 pb-safe-nav">
+        <SectionHeading title="Manage products" />
+        <Card className="p-5">
+          <p className="text-lg font-semibold text-ink">Sign in first</p>
+          <p className="mt-2 text-sm text-muted">
+            Your store is tied to the same GLOWGRAM account you use as a buyer.
+          </p>
+          <a
+            href="/profile"
+            className="mt-4 inline-flex rounded-full bg-chrome px-4 py-3 text-sm font-semibold text-white"
+          >
+            Go to Profile
+          </a>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!canOpenStore({ email: profile.email, hasStore: Boolean(vendorProfile) })) {
+    return <SellerClosedNotice title="Manage products" />
+  }
+
+  if (!vendorProfile) {
     return (
       <div className="space-y-4 p-4 pb-safe-nav">
         <SectionHeading title="Manage products" />

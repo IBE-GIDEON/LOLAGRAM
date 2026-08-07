@@ -86,8 +86,8 @@ export const CATEGORY_TILES: CategoryTile[] = [
   {
     id: "stores",
     image: "/banners/cat-stores.jpg",
-    label: "Hair stores",
-    caption: "Browse every vendor",
+    label: "Everything",
+    caption: "Browse the full range",
     href: "/search"
   }
 ]

@@ -258,7 +258,7 @@ export function AuthPanel({
         {mode === "signup" ? (
           <p className="mt-4 rounded-2xl bg-canvas px-4 py-3 text-[12px] leading-5 text-muted">
             No phone number needed to join. We only ask for it when you place
-            your first order or open a store.
+            your first order.
           </p>
         ) : null}
       </div>

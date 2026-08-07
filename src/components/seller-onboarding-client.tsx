@@ -6,8 +6,10 @@ import toast from "react-hot-toast"
 import { FiTrash2 } from "react-icons/fi"
 
 import { useAuth } from "@/components/providers/auth-provider"
+import { SellerClosedNotice } from "@/components/seller-closed-notice"
 import { Button, Card, Input, SectionHeading, Textarea } from "@/components/ui"
 import { CATEGORY_OPTIONS } from "@/lib/constants"
+import { canOpenStore } from "@/lib/feature-flags"
 import { uploadImage, uploadImages } from "@/lib/image"
 import { saveProduct, saveSellerProfile } from "@/lib/marketplace"
 import { type VendorCategory } from "@/lib/types"
@@ -85,6 +87,11 @@ export function SellerOnboardingClient() {
         </Card>
       </div>
     )
+  }
+
+  // Typing the URL is not a way around a closed signup.
+  if (!canOpenStore({ email: profile.email, hasStore: Boolean(vendorProfile) })) {
+    return <SellerClosedNotice />
   }
 
   return (

@@ -6,7 +6,7 @@ import { safeInternalPath } from "@/lib/utils"
 export const metadata: Metadata = {
   title: "Create your GLOWGRAM account",
   description:
-    "Join GLOWGRAM in seconds with just an email and password, then shop wigs, hair and beauty from vendors near you."
+    "Join GLOWGRAM in seconds with just an email and password, then shop wigs, hair and beauty delivered across Nigeria."
 }
 
 export default function SignUpPage({

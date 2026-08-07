@@ -7,7 +7,11 @@ export const env = {
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? "",
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? "",
   appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-  enableDemoMode: process.env.NEXT_PUBLIC_ENABLE_DEMO_MODE === "true"
+  enableDemoMode: process.env.NEXT_PUBLIC_ENABLE_DEMO_MODE === "true",
+  enableVendorDiscovery:
+    process.env.NEXT_PUBLIC_ENABLE_VENDOR_DISCOVERY === "true",
+  enableSellerSignup: process.env.NEXT_PUBLIC_ENABLE_SELLER_SIGNUP === "true",
+  sellerEmails: process.env.NEXT_PUBLIC_SELLER_EMAILS ?? ""
 }
 
 export const hasSupabase =

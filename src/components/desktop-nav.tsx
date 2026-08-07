@@ -8,6 +8,7 @@ import { BrandLogo } from "@/components/brand-logo"
 import { useAuth } from "@/components/providers/auth-provider"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Avatar } from "@/components/ui"
+import { canOpenStore } from "@/lib/feature-flags"
 import { cn } from "@/lib/utils"
 
 const LINKS = [
@@ -23,6 +24,10 @@ const LINKS = [
 export function DesktopNav() {
   const pathname = usePathname()
   const { profile, vendorProfile } = useAuth()
+  const showStoreLink = canOpenStore({
+    email: profile?.email,
+    hasStore: Boolean(vendorProfile)
+  })
 
   return (
     <header className="sticky top-0 z-40 hidden border-b border-border/70 bg-surface/85 backdrop-blur-xl lg:block">
@@ -68,13 +73,15 @@ export function DesktopNav() {
 
           {profile ? (
             <>
-              <Link
-                href={vendorProfile ? "/seller/products" : "/onboarding/seller"}
-                className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2.5 text-sm font-semibold text-ink transition hover:border-rose/50 hover:text-rose"
-              >
-                <FiShoppingBag aria-hidden="true" />
-                {vendorProfile ? "My store" : "Start selling"}
-              </Link>
+              {showStoreLink ? (
+                <Link
+                  href={vendorProfile ? "/seller/products" : "/onboarding/seller"}
+                  className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2.5 text-sm font-semibold text-ink transition hover:border-rose/50 hover:text-rose"
+                >
+                  <FiShoppingBag aria-hidden="true" />
+                  {vendorProfile ? "My store" : "Start selling"}
+                </Link>
+              ) : null}
               <Link
                 href="/profile"
                 aria-label="Open profile"

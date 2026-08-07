@@ -5,6 +5,7 @@ import { useDeferredValue, useEffect, useState } from "react"
 import { FiChevronRight, FiMapPin, FiSearch } from "react-icons/fi"
 
 import { Avatar, Badge, Input, SectionHeading, StarRating } from "@/components/ui"
+import { VENDOR_DISCOVERY_ENABLED } from "@/lib/feature-flags"
 import { formatCategory, formatCurrency } from "@/lib/format"
 import {
   loadMarketplaceSearch,
@@ -52,7 +53,8 @@ export function SearchPageClient() {
   const deferredQuery = useDeferredValue(query)
   const activeQuery = deferredQuery.trim()
   const showProducts = mode === "all" || mode === "products"
-  const showVendors = mode === "all" || mode === "stores"
+  const showVendors =
+    VENDOR_DISCOVERY_ENABLED && (mode === "all" || mode === "stores")
   const showCompactHeader = scrollTop > 88
 
   useEffect(() => {
@@ -107,7 +109,9 @@ export function SearchPageClient() {
         <div className="bg-canvas px-4 pb-3 pt-3">
           <h1 className="text-[32px] font-bold tracking-[-0.04em] text-ink">Search</h1>
           <p className="mt-1 text-sm text-muted">
-            Search products, stores, categories, or cities in one place.
+            {VENDOR_DISCOVERY_ENABLED
+              ? "Search products, stores, categories, or cities in one place."
+              : "Search any product by name, description, or category."}
           </p>
 
           <div className="relative mt-4">
@@ -120,27 +124,31 @@ export function SearchPageClient() {
             />
           </div>
 
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-            {([
-              ["all", "All"],
-              ["products", "Products"],
-              ["stores", "Stores"]
-            ] as const).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                className={cn(
-                  "shrink-0 rounded-full border px-4 py-2.5 text-sm font-semibold transition",
-                  mode === value
-                    ? "border-transparent bg-chrome text-white dark:bg-brand dark:text-chrome"
-                    : "border-border bg-surface text-muted hover:bg-canvas"
-                )}
-                onClick={() => setMode(value)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {/* All / Products / Stores only means something once there are other
+              stores to filter down to. */}
+          {VENDOR_DISCOVERY_ENABLED ? (
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+              {([
+                ["all", "All"],
+                ["products", "Products"],
+                ["stores", "Stores"]
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={cn(
+                    "shrink-0 rounded-full border px-4 py-2.5 text-sm font-semibold transition",
+                    mode === value
+                      ? "border-transparent bg-chrome text-white dark:bg-brand dark:text-chrome"
+                      : "border-border bg-surface text-muted hover:bg-canvas"
+                  )}
+                  onClick={() => setMode(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           {!activeQuery ? (
             <div className="mt-3 flex gap-2 overflow-x-auto pb-1">

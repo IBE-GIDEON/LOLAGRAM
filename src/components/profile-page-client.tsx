@@ -9,6 +9,7 @@ import { AuthPanel } from "@/components/auth-panel"
 import { useAuth } from "@/components/providers/auth-provider"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Avatar, Badge, Button, Card, Input, SectionHeading } from "@/components/ui"
+import { canOpenStore } from "@/lib/feature-flags"
 import { uploadImage } from "@/lib/image"
 import { loadStoreAnalytics, saveUserProfile } from "@/lib/marketplace"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
@@ -175,6 +176,11 @@ export function ProfilePageClient() {
     viewMode === "seller" &&
     (profile.accountType === "seller" || profile.accountType === "both")
   const pushButtonDisabled = !["ready", "enabled"].includes(pushStatus)
+  // Everyone else is a buyer for now — no store card, no seller upgrade.
+  const canSell = canOpenStore({
+    email: profile.email,
+    hasStore: Boolean(vendorProfile)
+  })
 
   return (
     <div className="space-y-4 p-4 pb-safe-nav">
@@ -393,7 +399,7 @@ export function ProfilePageClient() {
         </Button>
       </Card>
 
-      {profile.accountType === "buyer" && !vendorProfile ? (
+      {canSell && profile.accountType === "buyer" && !vendorProfile ? (
         <Card className="p-5">
           <div className="flex items-center gap-3">
             <FiShoppingBag className="text-brand" />
@@ -413,7 +419,8 @@ export function ProfilePageClient() {
         </Card>
       ) : null}
 
-      {profile.accountType === "seller" || profile.accountType === "both" ? (
+      {canSell &&
+      (profile.accountType === "seller" || profile.accountType === "both") ? (
         <div className="space-y-4">
           <Card className="p-5">
             <div className="space-y-4">
@@ -529,26 +536,22 @@ export function ProfilePageClient() {
         </div>
       ) : null}
 
-      <Button
-        variant="secondary"
-        className="w-full"
-        onClick={async () => {
-          if (profile.accountType === "buyer") {
+      {canSell && profile.accountType === "buyer" ? (
+        <Button
+          variant="secondary"
+          className="w-full"
+          onClick={async () => {
             await upgradeAccountType("both")
             toast.success("Your account can now shop and sell.")
-          } else {
-            await signOut()
-          }
-        }}
-      >
-        {profile.accountType === "buyer" ? (
-          "Upgrade to Buyer + Seller"
-        ) : (
-          <>
-            <FiLogOut />
-            Logout
-          </>
-        )}
+          }}
+        >
+          Upgrade to Buyer + Seller
+        </Button>
+      ) : null}
+
+      <Button variant="secondary" className="w-full" onClick={signOut}>
+        <FiLogOut />
+        Logout
       </Button>
     </div>
   )

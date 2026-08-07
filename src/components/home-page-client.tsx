@@ -9,6 +9,7 @@ import { ProductFeed } from "@/components/product-feed"
 import { useAuth } from "@/components/providers/auth-provider"
 import { Avatar, Input } from "@/components/ui"
 import { VendorList } from "@/components/vendor-list"
+import { VENDOR_DISCOVERY_ENABLED } from "@/lib/feature-flags"
 import {
   loadProductFeed,
   loadVendors,
@@ -27,14 +28,17 @@ export function HomePageClient({
   searchOnly?: boolean
 }) {
   const { profile } = useAuth()
-  const initialTab: HomeTab = searchOnly ? "find" : "general"
+  const initialTab: HomeTab =
+    searchOnly && VENDOR_DISCOVERY_ENABLED ? "find" : "general"
   const initialVendors = initialTab === "find" ? peekCachedVendors("") : []
   const initialProducts =
     initialTab === "general" ? peekCachedProductFeed("") : []
   const [activeTab, setActiveTab] = useState<HomeTab>(initialTab)
   const [query, setQuery] = useState("")
   const deferredQuery = useDeferredValue(query)
-  const isFindTab = searchOnly || activeTab === "find"
+  // With vendor discovery closed there is only one store to browse, so the feed
+  // is always the product feed no matter what the tab state says.
+  const isFindTab = VENDOR_DISCOVERY_ENABLED && (searchOnly || activeTab === "find")
   const [vendors, setVendors] = useState<VendorSnapshot[]>(initialVendors)
   const [products, setProducts] = useState<ProductSearchResult[]>(initialProducts)
   const [loading, setLoading] = useState(
@@ -95,7 +99,9 @@ export function HomePageClient({
     : "Search any product name or description"
   const resultCopy = isFindTab
     ? "Search across store names, categories, and cities."
-    : "Browse newly uploaded products from active vendors."
+    : VENDOR_DISCOVERY_ENABLED
+      ? "Browse newly uploaded products from active vendors."
+      : "Browse everything we have in stock right now."
   const resultLabel = isFindTab
     ? visibleResultCount === 1
       ? "vendor"
@@ -105,7 +111,9 @@ export function HomePageClient({
       : "products"
   const emptyProductState = deferredQuery.trim()
     ? `No product matched "${deferredQuery.trim()}" yet. Try another word from the seller's product name or description.`
-    : "Newly uploaded products from active vendors will show here."
+    : VENDOR_DISCOVERY_ENABLED
+      ? "Newly uploaded products from active vendors will show here."
+      : "New arrivals show up here as soon as they are listed."
   const stickyHeader = (
     <div
       className={cn(
@@ -166,34 +174,38 @@ export function HomePageClient({
         </span>
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-3 lg:mx-auto lg:max-w-md">
-        {!searchOnly ? (
-          <div className="grid flex-1 grid-cols-2 gap-2">
-            {[
-              { key: "general", label: "General" },
-              { key: "find", label: "Find Vendors" }
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                className={cn(
-                  "rounded-full border px-4 py-3 text-center text-sm font-semibold transition",
-                  activeTab === tab.key
-                    ? "border-transparent bg-chrome text-white dark:bg-brand dark:text-chrome"
-                    : "border-black/10 bg-white/35 text-chrome/78 hover:bg-white/50 dark:border-white/10 dark:bg-white/5 dark:text-white/75 dark:hover:bg-white/10"
-                )}
-                onClick={() => setActiveTab(tab.key as HomeTab)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <span className="rounded-full border border-black/10 bg-white/35 px-4 py-2 text-sm font-medium text-chrome/78 dark:border-white/10 dark:bg-white/5 dark:text-white/75">
-            Live search
-          </span>
-        )}
-      </div>
+      {/* Nothing to switch between while we are the only store: the General /
+          Find Vendors pair comes back with VENDOR_DISCOVERY_ENABLED. */}
+      {VENDOR_DISCOVERY_ENABLED || searchOnly ? (
+        <div className="mt-3 flex items-center justify-between gap-3 lg:mx-auto lg:max-w-md">
+          {!searchOnly ? (
+            <div className="grid flex-1 grid-cols-2 gap-2">
+              {[
+                { key: "general", label: "General" },
+                { key: "find", label: "Find Vendors" }
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  className={cn(
+                    "rounded-full border px-4 py-3 text-center text-sm font-semibold transition",
+                    activeTab === tab.key
+                      ? "border-transparent bg-chrome text-white dark:bg-brand dark:text-chrome"
+                      : "border-black/10 bg-white/35 text-chrome/78 hover:bg-white/50 dark:border-white/10 dark:bg-white/5 dark:text-white/75 dark:hover:bg-white/10"
+                  )}
+                  onClick={() => setActiveTab(tab.key as HomeTab)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span className="rounded-full border border-black/10 bg-white/35 px-4 py-2 text-sm font-medium text-chrome/78 dark:border-white/10 dark:bg-white/5 dark:text-white/75">
+              Live search
+            </span>
+          )}
+        </div>
+      ) : null}
 
       {!searchOnly ? (
         <div className="mt-5 space-y-6 text-ink">
