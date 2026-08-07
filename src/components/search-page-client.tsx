@@ -22,14 +22,14 @@ import { cn } from "@/lib/utils"
 type SearchMode = "all" | "products" | "stores"
 
 const suggestionTerms = [
-  "phone",
-  "perfume",
-  "dress",
-  "cream",
   "wig",
-  "shoes",
-  "ankara",
-  "jewellery"
+  "lace front",
+  "closure",
+  "frontal",
+  "bone straight",
+  "body wave",
+  "curly",
+  "braids"
 ]
 
 const emptyResults: MarketplaceSearchResults = {

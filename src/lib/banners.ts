@@ -22,25 +22,25 @@ export const HERO_SLIDES: HeroSlide[] = [
     eyebrow: "Wigs & Hair",
     title: "Find your wig",
     subtitle:
-      "Lace fronts, bone straight, curls and braids from vetted vendors near you.",
+      "Lace fronts, bone straight, curls and braids — picked, checked and sent out by us.",
     ctaLabel: "Shop wigs",
     href: "/search?q=wig"
   },
   {
     id: "noir",
     image: "/banners/hero-noir.jpg",
-    eyebrow: "Beauty drops",
-    title: "Soft glam, delivered",
-    subtitle: "Lashes, skincare and cosmetics from stores that actually deliver.",
-    ctaLabel: "Shop beauty",
-    href: "/search?q=beauty"
+    eyebrow: "Lace & closures",
+    title: "Lace that disappears",
+    subtitle: "HD lace, 13x4 frontals and closures that sit flat on the hairline.",
+    ctaLabel: "Shop closures",
+    href: "/search?q=closure"
   },
   {
     id: "street",
     image: "/banners/hero-street.jpg",
     eyebrow: "New this week",
-    title: "Fresh from your city",
-    subtitle: "Newly uploaded pieces from active vendors, updated every day.",
+    title: "Just landed",
+    subtitle: "Fresh units added to the shelf, restocked as they come in.",
     ctaLabel: "See what's new",
     href: "/"
   }

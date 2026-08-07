@@ -18,6 +18,10 @@ const MAX_PRODUCT_IMAGES = 6
 
 export function SellerOnboardingClient() {
   const { profile, vendorProfile, refreshProfile, upgradeAccountType } = useAuth()
+  // Profile → Edit Store lands on this same wizard. A store that already
+  // exists is editing, not onboarding, and must be able to save a detail
+  // change without inventing another product to go with it.
+  const isEditingStore = Boolean(vendorProfile)
   const [step, setStep] = useState(1)
   const [busy, setBusy] = useState(false)
   const [uploadingProductImages, setUploadingProductImages] = useState(false)
@@ -96,7 +100,7 @@ export function SellerOnboardingClient() {
 
   return (
     <div className="space-y-4 p-4 pb-safe-nav">
-      <SectionHeading title="Seller onboarding" />
+      <SectionHeading title={isEditingStore ? "Edit store" : "Seller onboarding"} />
       <Card className="p-4">
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold text-ink">Step {step} of 4</p>
@@ -226,10 +230,14 @@ export function SellerOnboardingClient() {
                 ? "Uploading product photos..."
                 : productPhotoUrls.length > 0
                   ? `Add more photos (${productPhotoUrls.length}/${MAX_PRODUCT_IMAGES})`
-                  : "Upload first product photos"}
+                  : isEditingStore
+                    ? "Upload photos for another product"
+                    : "Upload first product photos"}
             </p>
             <p className="mt-1 text-xs text-muted">
-              Add up to {MAX_PRODUCT_IMAGES} images for your first listing.
+              {isEditingStore
+                ? `Optional — leave this step empty to save your store details on their own. Up to ${MAX_PRODUCT_IMAGES} images per product.`
+                : `Add up to ${MAX_PRODUCT_IMAGES} images for your first listing.`}
             </p>
           </label>
 
@@ -294,19 +302,36 @@ export function SellerOnboardingClient() {
                   return
                 }
 
-                if (!productName.trim()) {
-                  toast.error("Add your first product name.")
-                  return
-                }
+                // A new store must ship with its first product. An existing one
+                // only validates the product fields if it actually started
+                // filling them in.
+                const hasProductDraft = Boolean(
+                  productName.trim() ||
+                    productPrice.trim() ||
+                    productDescription.trim() ||
+                    productPhotoUrls.length > 0
+                )
+                const savingProduct = !isEditingStore || hasProductDraft
 
-                if (!Number(productPrice)) {
-                  toast.error("Enter a valid first product price.")
-                  return
-                }
+                if (savingProduct) {
+                  if (!productName.trim()) {
+                    toast.error(
+                      isEditingStore
+                        ? "Add the product name, or clear this step to save just your store."
+                        : "Add your first product name."
+                    )
+                    return
+                  }
 
-                if (productPhotoUrls.length === 0) {
-                  toast.error("Upload at least one product photo.")
-                  return
+                  if (!Number(productPrice)) {
+                    toast.error("Enter a valid product price.")
+                    return
+                  }
+
+                  if (productPhotoUrls.length === 0) {
+                    toast.error("Upload at least one product photo.")
+                    return
+                  }
                 }
 
                 setBusy(true)
@@ -324,15 +349,17 @@ export function SellerOnboardingClient() {
                     paymentNote: paymentNote.trim() || undefined
                   })
 
-                  await saveProduct({
-                    vendorId: vendor.id,
-                    name: productName.trim(),
-                    description: productDescription.trim(),
-                    price: Number(productPrice || 0),
-                    photoUrl: productPhotoUrls[0],
-                    photoUrls: productPhotoUrls,
-                    inStock: true
-                  })
+                  if (savingProduct) {
+                    await saveProduct({
+                      vendorId: vendor.id,
+                      name: productName.trim(),
+                      description: productDescription.trim(),
+                      price: Number(productPrice || 0),
+                      photoUrl: productPhotoUrls[0],
+                      photoUrls: productPhotoUrls,
+                      inStock: true
+                    })
+                  }
 
                   if (profile.accountType === "buyer") {
                     await upgradeAccountType("both")
@@ -342,14 +369,24 @@ export function SellerOnboardingClient() {
                   setStep(4)
                 } catch (error) {
                   toast.error(
-                    error instanceof Error ? error.message : "Could not launch store."
+                    error instanceof Error
+                      ? error.message
+                      : isEditingStore
+                        ? "Could not save your store."
+                        : "Could not launch store."
                   )
                 } finally {
                   setBusy(false)
                 }
               }}
             >
-              {busy ? "Launching store..." : "Launch store"}
+              {busy
+                ? isEditingStore
+                  ? "Saving store..."
+                  : "Launching store..."
+                : isEditingStore
+                  ? "Save store"
+                  : "Launch store"}
             </Button>
           </div>
         </Card>
@@ -357,7 +394,11 @@ export function SellerOnboardingClient() {
 
       {step === 4 ? (
         <Card className="p-6 text-center">
-          <p className="text-2xl font-bold text-ink">Your store is live on GLOWGRAM</p>
+          <p className="text-2xl font-bold text-ink">
+            {isEditingStore
+              ? "Store updated"
+              : "Your store is live on GLOWGRAM"}
+          </p>
           <p className="mt-3 text-sm leading-6 text-muted">
             You can now manage products, track store orders, and share your store
             link with buyers.
