@@ -15,7 +15,18 @@ export type HeroSlide = {
   href: string
 }
 
+// Order matters twice over: this is what a first-time visitor sees, and only
+// the first slide is eager-loaded, so whatever sits here is the LCP image.
 export const HERO_SLIDES: HeroSlide[] = [
+  {
+    id: "arrivals",
+    image: "/banners/latest-arrivals.jpg",
+    eyebrow: "New this week",
+    title: "New arrivals",
+    subtitle: "Fresh units added to the shelf, restocked as they come in.",
+    ctaLabel: "See what's new",
+    href: "/"
+  },
   {
     id: "glow",
     image: "/banners/find-hair.jpg",
@@ -25,15 +36,6 @@ export const HERO_SLIDES: HeroSlide[] = [
       "Lace fronts, bone straight, curls and braids — picked, checked and sent out by us.",
     ctaLabel: "Shop wigs",
     href: "/search?q=wig"
-  },
-  {
-    id: "arrivals",
-    image: "/banners/latest-arrivals.jpg",
-    eyebrow: "New this week",
-    title: "New arrivals",
-    subtitle: "Fresh units added to the shelf, restocked as they come in.",
-    ctaLabel: "See what's new",
-    href: "/"
   }
 ]
 
