@@ -8,7 +8,12 @@ const nextConfig = {
 
   experimental: {
     // Tree-shake react-icons — only bundles the icons actually imported
-    optimizePackageImports: ["react-icons", "react-icons/fi"]
+    optimizePackageImports: [
+      "react-icons",
+      "react-icons/fi",
+      // 272 flags ship in one index; without this every one is bundled.
+      "country-flag-icons"
+    ]
   },
 
   images: {

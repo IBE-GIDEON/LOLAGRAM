@@ -5,6 +5,7 @@ import toast from "react-hot-toast"
 import { FiMessageCircle, FiShare2, FiStar } from "react-icons/fi"
 
 import { useCart } from "@/components/providers/cart-provider"
+import { useLocale } from "@/components/providers/locale-provider"
 import { BottomSheet, Button, Card, SectionHeading, StarRating } from "@/components/ui"
 import {
   formatCategory,
@@ -26,6 +27,7 @@ export function VendorStoreClient({
   initialProductId?: string
 }) {
   const { addItem } = useCart()
+  const { money } = useLocale()
   const [data, setData] = useState<VendorDetail | null>(() =>
     peekCachedVendorDetail(vendorId)
   )
@@ -69,6 +71,8 @@ export function VendorStoreClient({
 
     const outcome = await shareLink({
       title: product.name,
+      // Naira, not the sharer's currency: whoever opens this link may be
+      // anywhere, and naira is the figure that will actually be charged.
       text: `${product.name} — ${formatCurrency(product.price)} on Afunwa`,
       url: buildProductUrl(vendorId, product.id)
     })
@@ -239,7 +243,7 @@ export function VendorStoreClient({
                       {product.name}
                     </p>
                     <p className="mt-1.5 text-base font-bold text-brand">
-                      {formatCurrency(product.price)}
+                      {money(product.price).text}
                     </p>
                   </div>
                 </button>
@@ -355,7 +359,7 @@ export function VendorStoreClient({
                 {selectedProduct.name}
               </p>
               <p className="mt-2 text-lg font-bold text-brand md:text-xl">
-                {formatCurrency(selectedProduct.price)}
+                {money(selectedProduct.price).text}
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
                 <span className="rounded-full bg-canvas px-2.5 py-1 font-medium">

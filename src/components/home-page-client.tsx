@@ -13,6 +13,7 @@ import {
 import { FiSearch, FiX } from "react-icons/fi"
 
 import { BrandLockup } from "@/components/brand-logo"
+import { CurrencySwitcher } from "@/components/currency-switcher"
 import { CategoryRail, HeroBanner } from "@/components/hero-banner"
 import { ProductFeed } from "@/components/product-feed"
 import { useAuth } from "@/components/providers/auth-provider"
@@ -192,17 +193,21 @@ export function HomePageClient({
             <BrandLockup tone="light" className="h-12 sm:h-14" priority />
           )}
         </h1>
-        <Link
-          href="/profile"
-          aria-label="Open profile"
-          className="inline-flex rounded-full ring-2 ring-white/35 transition hover:scale-[1.02] hover:ring-white/60"
-        >
-          <Avatar
-            src={profile?.profilePhotoUrl}
-            alt={profile?.fullName ?? "Profile"}
-            className="h-11 w-11 border border-white/20 bg-white/15 text-white shadow-sm"
-          />
-        </Link>
+        {/* Currency sits on the same line as the logo and avatar, top right. */}
+        <div className="flex shrink-0 items-center gap-2">
+          <CurrencySwitcher tone="light" />
+          <Link
+            href="/profile"
+            aria-label="Open profile"
+            className="inline-flex rounded-full ring-2 ring-white/35 transition hover:scale-[1.02] hover:ring-white/60"
+          >
+            <Avatar
+              src={profile?.profilePhotoUrl}
+              alt={profile?.fullName ?? "Profile"}
+              className="h-11 w-11 border border-white/20 bg-white/15 text-white shadow-sm"
+            />
+          </Link>
+        </div>
       </div>
 
       <div className="relative mt-4 flex-1 lg:mx-auto lg:mt-0 lg:max-w-xl">

@@ -11,7 +11,7 @@ import { useCart } from "@/components/providers/cart-provider"
 import { RemoteImage } from "@/components/remote-image"
 import { BottomSheet, Button, Card } from "@/components/ui"
 import { PAYMENT_METHOD_META } from "@/lib/constants"
-import { formatCurrency } from "@/lib/format"
+import { useLocale } from "@/components/providers/locale-provider"
 import { loadVendorDetail, placeOrder, saveUserProfile } from "@/lib/marketplace"
 import { getPrimaryProductImage } from "@/lib/product-images"
 import { queueOfflineOrder } from "@/lib/offline-orders"
@@ -29,6 +29,7 @@ export function GlobalCart() {
     itemCount,
     subtotal
   } = useCart()
+  const { money } = useLocale()
   const [open, setOpen] = useState(false)
   const [deliveryAddress, setDeliveryAddress] = useState("")
   const [phone, setPhone] = useState("")
@@ -181,7 +182,7 @@ export function GlobalCart() {
                       <div>
                         <p className="font-semibold text-ink">{item.name}</p>
                         <p className="mt-1 text-sm text-muted">
-                          {formatCurrency(item.price)} each
+                          {money(item.price).text} each
                         </p>
                       </div>
                       <button
@@ -214,7 +215,7 @@ export function GlobalCart() {
                       </div>
 
                       <p className="text-sm font-bold text-brand">
-                        {formatCurrency(item.price * item.quantity)}
+                        {money(item.price * item.quantity).text}
                       </p>
                     </div>
                   </div>
@@ -291,7 +292,7 @@ export function GlobalCart() {
             <div className="mt-4 flex items-center justify-between">
               <p className="text-sm text-muted">Subtotal</p>
               <p className="text-lg font-bold text-brand">
-                {formatCurrency(subtotal)}
+                {money(subtotal).text}
               </p>
             </div>
             <Button

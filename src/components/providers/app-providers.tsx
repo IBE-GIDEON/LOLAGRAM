@@ -4,6 +4,7 @@ import dynamic from "next/dynamic"
 
 import { AuthProvider } from "@/components/providers/auth-provider"
 import { CartProvider } from "@/components/providers/cart-provider"
+import { LocaleProvider } from "@/components/providers/locale-provider"
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register"
 import { ThemeProvider } from "@/components/providers/theme-provider"
 
@@ -16,8 +17,9 @@ const Toaster = dynamic(
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <CartProvider>
+      <LocaleProvider>
+        <AuthProvider>
+          <CartProvider>
           <ServiceWorkerRegister />
           {children}
           <Toaster
@@ -29,8 +31,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
               }
             }}
           />
-        </CartProvider>
-      </AuthProvider>
+          </CartProvider>
+        </AuthProvider>
+      </LocaleProvider>
     </ThemeProvider>
   )
 }

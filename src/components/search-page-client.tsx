@@ -13,7 +13,8 @@ import {
   StarRating
 } from "@/components/ui"
 import { VENDOR_DISCOVERY_ENABLED } from "@/lib/feature-flags"
-import { formatCategory, formatCurrency } from "@/lib/format"
+import { useLocale } from "@/components/providers/locale-provider"
+import { formatCategory } from "@/lib/format"
 import {
   loadMarketplaceSearch,
   peekCachedMarketplaceSearch
@@ -248,6 +249,7 @@ export function SearchPageClient() {
 
 function ProductSearchCard({ product }: { product: ProductSearchResult }) {
   const primaryImage = getPrimaryProductImage(product)
+  const { money } = useLocale()
 
   return (
     <Link
@@ -272,7 +274,7 @@ function ProductSearchCard({ product }: { product: ProductSearchResult }) {
       <div className="space-y-2 p-3">
         <p className="line-clamp-2 text-sm font-semibold text-ink">{product.name}</p>
         <p className="text-base font-bold text-brand">
-          {formatCurrency(product.price)}
+          {money(product.price).text}
         </p>
         <p className="text-xs text-muted">Sold by {product.vendor.storeName}</p>
         <div className="flex flex-wrap items-center gap-2">

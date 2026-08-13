@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import { FiHome, FiPackage, FiSearch, FiShoppingBag, FiUser } from "react-icons/fi"
 
 import { BrandLockup } from "@/components/brand-logo"
+import { CurrencySwitcher } from "@/components/currency-switcher"
 import { useAuth } from "@/components/providers/auth-provider"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Avatar } from "@/components/ui"
@@ -67,6 +68,7 @@ export function DesktopNav() {
         </nav>
 
         <div className="ml-auto flex items-center gap-3">
+          <CurrencySwitcher />
           <ThemeToggle />
 
           {profile ? (

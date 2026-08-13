@@ -5,7 +5,8 @@ import { type ReactNode } from "react"
 
 import { RemoteImage } from "@/components/remote-image"
 import { Badge } from "@/components/ui"
-import { formatCategory, formatCurrency } from "@/lib/format"
+import { useLocale } from "@/components/providers/locale-provider"
+import { formatCategory } from "@/lib/format"
 import { getPrimaryProductImage } from "@/lib/product-images"
 import { type ProductSearchResult } from "@/lib/types"
 import { usePageScroll } from "@/lib/use-page-scroll"
@@ -83,6 +84,7 @@ export function ProductFeed({
 
 function ProductFeedCard({ product }: { product: ProductSearchResult }) {
   const primaryImage = getPrimaryProductImage(product)
+  const { money } = useLocale()
 
   return (
     <Link
@@ -133,7 +135,7 @@ function ProductFeedCard({ product }: { product: ProductSearchResult }) {
         <p className="line-clamp-2 text-sm font-semibold leading-5 text-ink">
           {product.name}
         </p>
-        <p className="text-base font-bold text-brand">{formatCurrency(product.price)}</p>
+        <p className="text-base font-bold text-brand">{money(product.price).text}</p>
 
         <div className="flex flex-wrap items-center gap-2">
           <Badge className="bg-canvas text-[11px]">
