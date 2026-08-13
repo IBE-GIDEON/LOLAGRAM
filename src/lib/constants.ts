@@ -32,24 +32,20 @@ export const LANGUAGE_KEY = "glowgram-language"
 export const CURRENCY_KEY = "glowgram-currency"
 export const RATES_CACHE_KEY = "glowgram-fx-rates"
 
+/**
+ * Only the values `public.vendor_category` accepts. The old list offered nine
+ * more — phones, beauty, footwear and so on — none of which exist in the enum,
+ * so picking one failed the insert and the store never got created.
+ */
 export const CATEGORY_OPTIONS: Array<{
   label: string
   value: VendorCategory
 }> = [
-  { label: "Phones", value: "phones" },
-  { label: "Electronics", value: "electronics" },
-  { label: "Clothing", value: "clothing" },
-  { label: "Fashion", value: "fashion" },
-  { label: "Fabric & Materials", value: "fabric" },
-  { label: "Footwear", value: "footwear" },
-  { label: "Bags & Accessories", value: "bags" },
-  { label: "Beauty & Skincare", value: "beauty" },
-  { label: "Cosmetics", value: "cosmetics" },
-  { label: "Perfume & Fragrance", value: "perfume" },
   { label: "Wigs & Hair", value: "wigs" },
+  { label: "Cosmetics", value: "cosmetics" },
+  { label: "Fashion", value: "fashion" },
   { label: "Jewellery", value: "jewellery" },
   { label: "Watches", value: "watches" },
-  { label: "Food & Drinks", value: "food" },
   { label: "Other", value: "other" }
 ]
 

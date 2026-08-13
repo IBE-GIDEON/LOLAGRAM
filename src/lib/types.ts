@@ -1,20 +1,18 @@
 export type AccountType = "buyer" | "seller" | "both"
 
+/**
+ * Must stay in step with the `public.vendor_category` enum in
+ * supabase/schema.sql. Postgres rejects any value outside the enum, and the
+ * failure lands as a raw database error at the end of seller onboarding — so a
+ * value listed here but missing from the enum is a broken store, not a typo.
+ * Adding a category means an `alter type ... add value` first, then this list.
+ */
 export type VendorCategory =
-  | "cosmetics"
-  | "beauty"
   | "wigs"
+  | "cosmetics"
+  | "fashion"
   | "jewellery"
   | "watches"
-  | "fashion"
-  | "clothing"
-  | "phones"
-  | "electronics"
-  | "food"
-  | "perfume"
-  | "fabric"
-  | "footwear"
-  | "bags"
   | "other"
 
 export type OrderStatus =

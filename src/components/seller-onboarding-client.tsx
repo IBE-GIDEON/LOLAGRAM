@@ -34,7 +34,7 @@ export function SellerOnboardingClient() {
   const [uploadingProductImages, setUploadingProductImages] = useState(false)
   const [storeName, setStoreName] = useState(vendorProfile?.storeName ?? "")
   const [category, setCategory] = useState<VendorCategory>(
-    vendorProfile?.category ?? "fashion"
+    vendorProfile?.category ?? "wigs"
   )
   const [storePhotoUrl, setStorePhotoUrl] = useState(vendorProfile?.storePhotoUrl ?? "")
   const [bio, setBio] = useState(vendorProfile?.bio ?? "")
@@ -306,6 +306,19 @@ export function SellerOnboardingClient() {
               onClick={async () => {
                 if (!storeName.trim()) {
                   toast.error("Add your store name first.")
+                  return
+                }
+
+                // city and whatsapp_number are NOT NULL in the schema, and an
+                // empty WhatsApp number silently breaks the wa.me button that
+                // is the only way a buyer can reach the store.
+                if (!city.trim()) {
+                  toast.error("Add the city you deliver from (step 2).")
+                  return
+                }
+
+                if (whatsappNumber.replace(/\D/g, "").length < 10) {
+                  toast.error("Add a valid WhatsApp number (step 2).")
                   return
                 }
 

@@ -10,7 +10,7 @@ import {
   useRef,
   useState
 } from "react"
-import { FiSearch } from "react-icons/fi"
+import { FiSearch, FiX } from "react-icons/fi"
 
 import { BrandLockup } from "@/components/brand-logo"
 import { CategoryRail, HeroBanner } from "@/components/hero-banner"
@@ -111,6 +111,13 @@ export function HomePageClient({
     setVisibleCount(INITIAL_PRODUCT_BATCH)
   }, [activeTab, deferredQuery])
 
+  /**
+   * Typing turns the home page into a results page: the hero and the category
+   * rail are browsing furniture, and they push the actual matches below the
+   * fold exactly when the buyer has told us what they want. Keyed off `query`
+   * rather than the deferred value so the chrome clears on the first keystroke.
+   */
+  const isSearching = query.trim().length > 0
   const pageTitle = searchOnly ? "Search" : "Afunwa"
   const displayedProducts = useMemo(
     () => products.slice(0, visibleCount),
@@ -121,11 +128,13 @@ export function HomePageClient({
   const searchPlaceholder = isFindTab
     ? "Search store name or category"
     : "Search any product name or description"
-  const resultCopy = isFindTab
-    ? "Search across store names, categories, and cities."
-    : VENDOR_DISCOVERY_ENABLED
-      ? "Browse newly uploaded products from active vendors."
-      : "Browse everything we have in stock right now."
+  const resultCopy = isSearching
+    ? `Showing what matches "${query.trim()}".`
+    : isFindTab
+      ? "Search across store names, categories, and cities."
+      : VENDOR_DISCOVERY_ENABLED
+        ? "Browse newly uploaded products from active vendors."
+        : "Browse everything we have in stock right now."
   const resultLabel = isFindTab
     ? visibleResultCount === 1
       ? "vendor"
@@ -199,11 +208,22 @@ export function HomePageClient({
       <div className="relative mt-4 flex-1 lg:mx-auto lg:mt-0 lg:max-w-xl">
         <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
         <Input
-          className="border-white/15 bg-white/92 pl-11 text-ink shadow-soft placeholder:text-muted focus:border-rose/40 focus:ring-rose/20"
+          className="border-white/15 bg-white/92 pl-11 pr-11 text-ink shadow-soft placeholder:text-muted focus:border-rose/40 focus:ring-rose/20"
           placeholder={searchPlaceholder}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
+        {/* Searching hides the hero, so there has to be a one-tap way back. */}
+        {isSearching ? (
+          <button
+            type="button"
+            aria-label="Clear search"
+            onClick={() => setQuery("")}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-2 text-muted transition hover:bg-black/5 hover:text-ink"
+          >
+            <FiX />
+          </button>
+        ) : null}
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3 lg:mx-auto lg:max-w-xl">
@@ -250,7 +270,7 @@ export function HomePageClient({
 
     {/* Editorial content sits on the page, not on the banner — one photo
         behind the search bar reads premium, two stacked reads busy. */}
-    {!searchOnly ? (
+    {!searchOnly && !isSearching ? (
       <div className="text-ink">
         {/* Full bleed, and flush against the search banner above it — both are
             the same burgundy, so they read as one block rather than a card
