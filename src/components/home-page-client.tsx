@@ -251,9 +251,14 @@ export function HomePageClient({
     {/* Editorial content sits on the page, not on the banner — one photo
         behind the search bar reads premium, two stacked reads busy. */}
     {!searchOnly ? (
-      <div className="mx-auto w-full max-w-[1240px] space-y-6 px-4 pt-5 text-ink lg:px-6">
+      <div className="text-ink">
+        {/* Full bleed, and flush against the search banner above it — both are
+            the same burgundy, so they read as one block rather than a card
+            floating on the page. */}
         <HeroBanner />
-        <CategoryRail />
+        <div className="mx-auto w-full max-w-[1240px] px-4 pt-6 lg:px-6">
+          <CategoryRail />
+        </div>
       </div>
     ) : null}
     </>

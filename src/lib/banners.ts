@@ -18,7 +18,7 @@ export type HeroSlide = {
 export const HERO_SLIDES: HeroSlide[] = [
   {
     id: "glow",
-    image: "/banners/hero-glow.jpg",
+    image: "/banners/find-hair.jpg",
     eyebrow: "Wigs & Hair",
     title: "Find your wig",
     subtitle:
@@ -27,19 +27,10 @@ export const HERO_SLIDES: HeroSlide[] = [
     href: "/search?q=wig"
   },
   {
-    id: "noir",
-    image: "/banners/hero-noir.jpg",
-    eyebrow: "Lace & closures",
-    title: "Lace that disappears",
-    subtitle: "HD lace, 13x4 frontals and closures that sit flat on the hairline.",
-    ctaLabel: "Shop closures",
-    href: "/search?q=closure"
-  },
-  {
-    id: "street",
-    image: "/banners/hero-street.jpg",
+    id: "arrivals",
+    image: "/banners/latest-arrivals.jpg",
     eyebrow: "New this week",
-    title: "Just landed",
+    title: "New arrivals",
     subtitle: "Fresh units added to the shelf, restocked as they come in.",
     ctaLabel: "See what's new",
     href: "/"

@@ -8,7 +8,7 @@ import { FiArrowRight } from "react-icons/fi"
 import { CATEGORY_TILES, HERO_SLIDES } from "@/lib/banners"
 import { cn } from "@/lib/utils"
 
-const ROTATE_MS = 6000
+const ROTATE_MS = 2000
 
 /**
  * Editorial hero for the home feed. Auto-rotates, pauses on hover, and only
@@ -30,13 +30,13 @@ export function HeroBanner() {
 
   return (
     <section
-      className="relative overflow-hidden rounded-[28px] border border-border/50 bg-plum shadow-soft"
+      className="relative overflow-hidden bg-plum"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       aria-roledescription="carousel"
       aria-label="Featured collections"
     >
-      <div className="relative h-[300px] sm:h-[340px] lg:h-[420px]">
+      <div className="relative h-[400px] sm:h-[460px] lg:h-[540px]">
         {HERO_SLIDES.map((slide, slideIndex) => (
           <div
             key={slide.id}
@@ -52,49 +52,56 @@ export function HeroBanner() {
               fill
               priority={slideIndex === 0}
               sizes="(max-width: 1024px) 100vw, 1100px"
-              className="object-cover object-[50%_30%]"
+              className="object-cover object-[50%_40%]"
             />
-            {/* Warm wash keeps white type readable over any photo */}
-            <div className="absolute inset-0 bg-gradient-to-t from-plum via-plum/70 to-plum/10" />
-            <div className="absolute inset-0 bg-gradient-to-r from-plum/85 via-plum/25 to-transparent" />
-
-            <div className="absolute inset-0 flex flex-col justify-end p-5 sm:p-7 lg:max-w-2xl lg:p-10">
-              <span className="w-fit rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/85 backdrop-blur">
-                {slide.eyebrow}
-              </span>
-              <h2 className="mt-3 text-[34px] font-bold leading-[1.05] tracking-[-0.03em] text-white sm:text-[42px] lg:text-[54px]">
-                {slide.title}
-              </h2>
-              <p className="mt-2 max-w-md text-sm leading-6 text-white/80 lg:text-base">
-                {slide.subtitle}
-              </p>
-              <Link
-                href={slide.href}
-                className="mt-4 inline-flex w-fit items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-plum shadow-soft transition hover:bg-blush active:scale-[0.99]"
-              >
-                {slide.ctaLabel}
-                <FiArrowRight aria-hidden="true" />
-              </Link>
+            {/* The photo runs edge to edge, but the type stays on the same
+                1240 column as the rest of the page rather than drifting out
+                to the screen edge on a wide monitor. */}
+            <div className="absolute inset-0 flex items-end">
+              <div className="mx-auto w-full max-w-[1240px] px-4 pb-6 sm:pb-8 lg:px-6 lg:pb-12">
+                {/* No wash over the photo, so legibility rides on the type
+                    itself — a shadow on the glyphs darkens nothing behind them. */}
+                <div className="flex flex-col [text-shadow:0_2px_10px_rgba(0,0,0,0.55)] lg:max-w-2xl">
+                  <span className="w-fit rounded-full border border-white/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white">
+                    {slide.eyebrow}
+                  </span>
+                  <h2 className="mt-3 text-[34px] font-bold leading-[1.05] tracking-[-0.03em] text-white sm:text-[42px] lg:text-[54px]">
+                    {slide.title}
+                  </h2>
+                  <p className="mt-2 max-w-md text-sm leading-6 text-white/90 lg:text-base">
+                    {slide.subtitle}
+                  </p>
+                  <Link
+                    href={slide.href}
+                    className="mt-4 inline-flex w-fit items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-plum shadow-soft transition hover:bg-blush active:scale-[0.99]"
+                  >
+                    {slide.ctaLabel}
+                    <FiArrowRight aria-hidden="true" />
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
         ))}
 
-        <div className="absolute bottom-4 right-5 flex items-center gap-2 lg:bottom-6 lg:right-8">
-          {HERO_SLIDES.map((slide, slideIndex) => (
-            <button
-              key={slide.id}
-              type="button"
-              aria-label={`Show ${slide.title}`}
-              aria-current={slideIndex === index}
-              onClick={() => setIndex(slideIndex)}
-              className={cn(
-                "h-1.5 rounded-full transition-all",
-                slideIndex === index
-                  ? "w-7 bg-white"
-                  : "w-3 bg-white/45 hover:bg-white/70"
-              )}
-            />
-          ))}
+        <div className="pointer-events-none absolute inset-x-0 bottom-4 lg:bottom-6">
+          <div className="mx-auto flex w-full max-w-[1240px] justify-end gap-2 px-4 lg:px-6">
+            {HERO_SLIDES.map((slide, slideIndex) => (
+              <button
+                key={slide.id}
+                type="button"
+                aria-label={`Show ${slide.title}`}
+                aria-current={slideIndex === index}
+                onClick={() => setIndex(slideIndex)}
+                className={cn(
+                  "pointer-events-auto h-1.5 rounded-full transition-all",
+                  slideIndex === index
+                    ? "w-7 bg-white"
+                    : "w-3 bg-white/45 hover:bg-white/70"
+                )}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </section>
