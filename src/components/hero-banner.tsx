@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { FiArrowRight } from "react-icons/fi"
 
-import { CATEGORY_TILES, HERO_SLIDES } from "@/lib/banners"
+import { CATEGORY_TILES, categoryHref, HERO_SLIDES } from "@/lib/banners"
 import { cn } from "@/lib/utils"
 
 const ROTATE_MS = 2000
@@ -121,12 +121,17 @@ export function CategoryRail() {
         </Link>
       </div>
 
-      <div className="scrollbar-none mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 lg:grid lg:grid-cols-5 lg:overflow-visible">
+      {/* Stays a scroller at every width. It used to become a 5-column grid at
+          lg, which pinned it to exactly five and wrapped a sixth onto a second
+          row. The width below keeps five across on desktop — the rest scroll. */}
+      <div className="scrollbar-none mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 lg:gap-5">
         {CATEGORY_TILES.map((tile) => (
           <Link
             key={tile.id}
-            href={tile.href}
-            className="group relative aspect-[3/4] w-[150px] shrink-0 snap-start overflow-hidden rounded-[22px] border border-border/50 bg-canvas shadow-soft lg:w-auto"
+            href={categoryHref(tile)}
+            // lg width = (container - 4 gaps of 1.25rem) / 5, so exactly five
+            // sit in view and the sixth waits just off the right edge.
+            className="group relative aspect-[3/4] w-[150px] shrink-0 snap-start overflow-hidden rounded-[22px] border border-border/50 bg-canvas shadow-soft lg:w-[calc((100%-5rem)/5)]"
           >
             <Image
               src={tile.image}

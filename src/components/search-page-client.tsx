@@ -12,6 +12,7 @@ import {
   SectionHeading,
   StarRating
 } from "@/components/ui"
+import { CATEGORY_TILES } from "@/lib/banners"
 import { VENDOR_DISCOVERY_ENABLED } from "@/lib/feature-flags"
 import { useLocale } from "@/components/providers/locale-provider"
 import { formatCategory } from "@/lib/format"
@@ -30,25 +31,18 @@ import { cn } from "@/lib/utils"
 
 type SearchMode = "all" | "products" | "stores"
 
-const suggestionTerms = [
-  "wig",
-  "lace front",
-  "closure",
-  "frontal",
-  "bone straight",
-  "body wave",
-  "curly",
-  "braids"
-]
-
 const emptyResults: MarketplaceSearchResults = {
   products: [],
   vendors: []
 }
 
-export function SearchPageClient() {
-  const initialResults = peekCachedMarketplaceSearch("")
-  const [query, setQuery] = useState("")
+export function SearchPageClient({
+  initialQuery = ""
+}: {
+  initialQuery?: string
+}) {
+  const initialResults = peekCachedMarketplaceSearch(initialQuery)
+  const [query, setQuery] = useState(initialQuery)
   const [mode, setMode] = useState<SearchMode>("all")
   const [results, setResults] = useState<MarketplaceSearchResults>(
     initialResults.products.length || initialResults.vendors.length
@@ -65,6 +59,24 @@ export function SearchPageClient() {
   const showProducts = mode === "all" || mode === "products"
   const showVendors =
     VENDOR_DISCOVERY_ENABLED && (mode === "all" || mode === "stores")
+
+  /**
+   * Tapping a chip also rewrites ?q= so the view is shareable and Back works,
+   * via replaceState rather than the router — no server round trip, and the
+   * results are already being fetched client-side.
+   */
+  const selectCategory = (term: string) => {
+    setQuery(term)
+
+    if (typeof window === "undefined") return
+    const url = new URL(window.location.href)
+    if (term) {
+      url.searchParams.set("q", term)
+    } else {
+      url.searchParams.delete("q")
+    }
+    window.history.replaceState(window.history.state, "", url.toString())
+  }
 
   // Written to the DOM rather than to state: keeping it in state re-rendered
   // the whole results grid on every scroll frame.
@@ -157,20 +169,29 @@ export function SearchPageClient() {
             </div>
           ) : null}
 
-          {!activeQuery ? (
-            <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-              {suggestionTerms.map((term) => (
+          {/* The same six as the home rail. Shown even with a query running,
+              so a buyer can jump straight from one category to another. */}
+          <div className="scrollbar-none mt-3 flex gap-2 overflow-x-auto pb-1">
+            {CATEGORY_TILES.map((tile) => {
+              const active = query.trim().toLowerCase() === tile.term
+              return (
                 <button
-                  key={term}
+                  key={tile.id}
                   type="button"
-                  className="shrink-0 rounded-full border border-border bg-surface px-3 py-2 text-xs font-medium text-muted transition hover:bg-canvas"
-                  onClick={() => setQuery(term)}
+                  aria-pressed={active}
+                  className={cn(
+                    "shrink-0 rounded-full border px-3 py-2 text-xs font-semibold transition",
+                    active
+                      ? "border-transparent bg-chrome text-white dark:bg-brand dark:text-chrome"
+                      : "border-border bg-surface text-muted hover:bg-canvas"
+                  )}
+                  onClick={() => selectCategory(active ? "" : tile.term)}
                 >
-                  {term}
+                  {tile.label}
                 </button>
-              ))}
-            </div>
-          ) : null}
+              )
+            })}
+          </div>
         </div>
 
         <div className={`${PAGE_WIDTH.wide} space-y-6 px-4 py-4 lg:px-6`}>
