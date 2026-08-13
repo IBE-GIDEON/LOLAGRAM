@@ -17,6 +17,16 @@ export const VENDOR_DISCOVERY_ENABLED = env.enableVendorDiscovery
 export const SELLER_SIGNUP_OPEN = env.enableSellerSignup
 
 /**
+ * Offer "Pay on Delivery" at checkout.
+ *
+ * Off for now, leaving direct payment to the seller as the only route. The
+ * option is hidden, not removed: existing orders keep their pay_on_delivery
+ * status and the order route still accepts it, so nothing already placed
+ * breaks and turning it back on needs no code change.
+ */
+export const PAY_ON_DELIVERY_ENABLED = env.enablePayOnDelivery
+
+/**
  * Our own accounts, which keep seller access while signup is closed. Comma
  * separated in NEXT_PUBLIC_SELLER_EMAILS.
  *

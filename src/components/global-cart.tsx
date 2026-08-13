@@ -11,11 +11,21 @@ import { useCart } from "@/components/providers/cart-provider"
 import { RemoteImage } from "@/components/remote-image"
 import { BottomSheet, Button, Card } from "@/components/ui"
 import { PAYMENT_METHOD_META } from "@/lib/constants"
+import { PAY_ON_DELIVERY_ENABLED } from "@/lib/feature-flags"
 import { useLocale } from "@/components/providers/locale-provider"
 import { loadVendorDetail, placeOrder, saveUserProfile } from "@/lib/marketplace"
 import { getPrimaryProductImage } from "@/lib/product-images"
 import { queueOfflineOrder } from "@/lib/offline-orders"
 import { type PaymentMethod, type VendorDetail } from "@/lib/types"
+
+/**
+ * Direct payment is the only route while Pay on Delivery is switched off. The
+ * list drives both the buttons and the default, so the selected method can
+ * never be one the buyer was not shown.
+ */
+const PAYMENT_METHODS: PaymentMethod[] = PAY_ON_DELIVERY_ENABLED
+  ? ["pay_on_delivery", "vendor_transfer"]
+  : ["vendor_transfer"]
 
 export function GlobalCart() {
   const router = useRouter()
@@ -35,7 +45,9 @@ export function GlobalCart() {
   const [phone, setPhone] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [vendorData, setVendorData] = useState<VendorDetail | null>(null)
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pay_on_delivery")
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
+    PAYMENT_METHODS[0]
+  )
 
   useEffect(() => {
     if (!vendorId) {
@@ -252,9 +264,13 @@ export function GlobalCart() {
             ) : null}
 
             <div className="mt-4 space-y-3">
-              <p className="text-sm font-semibold text-ink">Choose how you want to pay</p>
+              <p className="text-sm font-semibold text-ink">
+                {PAYMENT_METHODS.length > 1
+                  ? "Choose how you want to pay"
+                  : "How you'll pay"}
+              </p>
               <div className="space-y-2">
-                {(["pay_on_delivery", "vendor_transfer"] as PaymentMethod[]).map((method) => {
+                {PAYMENT_METHODS.map((method) => {
                   const methodMeta = PAYMENT_METHOD_META[method]
                   const needsSellerDetails =
                     method === "vendor_transfer" && !vendorTransferReady

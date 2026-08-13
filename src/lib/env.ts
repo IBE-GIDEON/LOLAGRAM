@@ -11,7 +11,10 @@ export const env = {
   enableVendorDiscovery:
     process.env.NEXT_PUBLIC_ENABLE_VENDOR_DISCOVERY === "true",
   enableSellerSignup: process.env.NEXT_PUBLIC_ENABLE_SELLER_SIGNUP === "true",
-  sellerEmails: process.env.NEXT_PUBLIC_SELLER_EMAILS ?? ""
+  sellerEmails: process.env.NEXT_PUBLIC_SELLER_EMAILS ?? "",
+  // Optional: overrides the store's own number for the floating chat button.
+  supportWhatsapp: process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP ?? "",
+  enablePayOnDelivery: process.env.NEXT_PUBLIC_ENABLE_PAY_ON_DELIVERY === "true"
 }
 
 export const hasSupabase =

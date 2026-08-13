@@ -17,6 +17,7 @@ import { RemoteImage } from "@/components/remote-image"
 import { getPrimaryProductImage } from "@/lib/product-images"
 import { loadVendorDetail, peekCachedVendorDetail } from "@/lib/marketplace"
 import { buildProductUrl, shareLink } from "@/lib/share"
+import { buildWhatsAppUrl } from "@/lib/whatsapp"
 import { type Product, type VendorDetail } from "@/lib/types"
 
 export function VendorStoreClient({
@@ -179,7 +180,7 @@ export function VendorStoreClient({
                   Order
                 </Button>
                 <a
-                  href={`https://wa.me/${data.vendor.whatsappNumber}`}
+                  href={buildWhatsAppUrl(data.vendor.whatsappNumber) ?? "#"}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center justify-center gap-2 rounded-full border border-whatsapp/25 bg-surface px-4 py-3 text-sm font-semibold text-whatsapp transition hover:bg-whatsapp/5"

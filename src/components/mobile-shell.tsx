@@ -3,6 +3,7 @@ import type { PropsWithChildren } from "react"
 
 import { BottomNav } from "@/components/bottom-nav"
 import { DesktopNav } from "@/components/desktop-nav"
+import { FloatingWhatsApp } from "@/components/floating-whatsapp"
 
 // OfflineBanner: only visible when device is offline — skip from initial bundle
 const OfflineBanner = dynamic(
@@ -28,6 +29,7 @@ export function MobileShell({ children }: PropsWithChildren) {
           <DesktopNav />
           <OfflineBanner />
           <GlobalCart />
+          <FloatingWhatsApp />
           <div className="min-h-0 flex-1">{children}</div>
           <BottomNav />
         </main>
