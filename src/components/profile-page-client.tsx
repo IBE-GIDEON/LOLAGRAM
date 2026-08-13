@@ -116,7 +116,7 @@ export function ProfilePageClient() {
     if (isIos() && !isStandaloneWebApp()) {
       setPushStatus("install-required")
       toast.error(
-        "On iPhone, install GLOWGRAM to your Home Screen and open it from the app icon before enabling notifications."
+        "On iPhone, install Afunwa to your Home Screen and open it from the app icon before enabling notifications."
       )
       return
     }
@@ -694,11 +694,11 @@ function getPushStatusDescription(status: PushStatus) {
     case "enabling":
       return "We are connecting this device for order alerts now."
     case "blocked":
-      return "Notifications are blocked for GLOWGRAM on this device. Allow them in your browser or iPhone settings."
+      return "Notifications are blocked for Afunwa on this device. Allow them in your browser or iPhone settings."
     case "unsupported":
       return "This device or browser does not support web push notifications."
     case "install-required":
-      return "On iPhone, add GLOWGRAM to your Home Screen and open it from the app icon before enabling notifications."
+      return "On iPhone, add Afunwa to your Home Screen and open it from the app icon before enabling notifications."
     case "unconfigured":
       return "Push notifications are not configured on the server yet."
     case "checking":

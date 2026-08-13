@@ -1,14 +1,14 @@
 import type { MetadataRoute } from "next"
 
-const ICON_VERSION = "20260520-glowgram-logo"
+const ICON_VERSION = "20260813-afunwa-logo"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "GLOWGRAM",
-    short_name: "GLOWGRAM",
-    description: "Your local Nigerian marketplace",
-    theme_color: "#3A1226",
-    background_color: "#08131A",
+    name: "Afunwa Hairline Global",
+    short_name: "Afunwa",
+    description: "Wigs, bundles and closures delivered across Nigeria",
+    theme_color: "#401020",
+    background_color: "#401020",
     display: "standalone",
     display_override: ["standalone", "minimal-ui"],
     orientation: "portrait",

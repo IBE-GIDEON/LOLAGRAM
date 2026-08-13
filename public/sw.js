@@ -83,9 +83,9 @@ self.addEventListener("sync", (event) => {
 
 self.addEventListener("push", (event) => {
   const payload = readPushPayload(event)
-  const title = payload.title || "GLOWGRAM"
+  const title = payload.title || "Afunwa"
   const options = {
-    body: payload.body || "You have a new update on GLOWGRAM.",
+    body: payload.body || "You have a new update on Afunwa.",
     icon: "/pwa/icon-192.png",
     badge: "/pwa/icon-192.png",
     data: {

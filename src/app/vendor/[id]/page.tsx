@@ -20,7 +20,7 @@ export async function generateMetadata({
   const supabase = getSupabaseServerClient()
 
   if (!supabase) {
-    return { title: "Store — GLOWGRAM" }
+    return { title: "Store — Afunwa" }
   }
 
   const productId = searchParams?.product?.trim()
@@ -42,7 +42,7 @@ export async function generateMetadata({
   ])
 
   if (!vendor) {
-    return { title: "Store — GLOWGRAM" }
+    return { title: "Store — Afunwa" }
   }
 
   const storeUrl = `/vendor/${params.id}`
@@ -59,7 +59,7 @@ export async function generateMetadata({
       product.description?.trim() ||
       `${product.name} for ${price} from ${vendor.store_name}${
         vendor.city ? ` in ${vendor.city}` : ""
-      }. Order on GLOWGRAM.`
+      }. Order on Afunwa.`
 
     const image = photos[0] ?? vendor.store_photo_url ?? "/pwa/icon-512.png"
 
@@ -68,7 +68,7 @@ export async function generateMetadata({
       description,
       openGraph: {
         type: "website",
-        siteName: "GLOWGRAM",
+        siteName: "Afunwa",
         url: `${storeUrl}?product=${productId}`,
         title,
         description,
@@ -83,21 +83,21 @@ export async function generateMetadata({
     }
   }
 
-  const title = `${vendor.store_name} — GLOWGRAM`
+  const title = `${vendor.store_name} — Afunwa`
   const description =
     vendor.bio?.trim() ||
-    `Shop ${vendor.store_name} on GLOWGRAM${vendor.city ? ` · ${vendor.city}` : ""}.`
+    `Shop ${vendor.store_name} on Afunwa${vendor.city ? ` · ${vendor.city}` : ""}.`
 
   const ogImage = vendor.store_photo_url
     ? [{ url: vendor.store_photo_url, width: 800, height: 800, alt: vendor.store_name }]
-    : [{ url: "/pwa/icon-512.png", width: 512, height: 512, alt: "GLOWGRAM" }]
+    : [{ url: "/pwa/icon-512.png", width: 512, height: 512, alt: "Afunwa" }]
 
   return {
     title,
     description,
     openGraph: {
       type: "website",
-      siteName: "GLOWGRAM",
+      siteName: "Afunwa",
       url: storeUrl,
       title,
       description,

@@ -2006,7 +2006,7 @@ export async function loadVendorProfile(userId: string) {
 /** "ada.obi@mail.com" -> "Ada Obi". Mirrors the signup API's fallback name. */
 function deriveNameFromEmail(email: string) {
   const handle = email.split("@")[0]?.replace(/[._-]+/g, " ").trim()
-  if (!handle) return "GLOWGRAM User"
+  if (!handle) return "Afunwa Customer"
 
   return handle
     .split(" ")

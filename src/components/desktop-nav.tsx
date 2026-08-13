@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { FiHome, FiPackage, FiSearch, FiShoppingBag, FiUser } from "react-icons/fi"
 
-import { BrandLogo } from "@/components/brand-logo"
+import { BrandLockup } from "@/components/brand-logo"
 import { useAuth } from "@/components/providers/auth-provider"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Avatar } from "@/components/ui"
@@ -32,13 +32,11 @@ export function DesktopNav() {
   return (
     <header className="sticky top-0 z-40 hidden border-b border-border/70 bg-surface/85 backdrop-blur-xl lg:block">
       <div className="mx-auto flex h-[72px] w-full max-w-[1240px] items-center gap-6 px-6">
-        <Link href="/" className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-plum to-rose text-white">
-            <BrandLogo className="h-[22px] w-[22px]" />
-          </span>
-          <span className="text-[19px] font-bold tracking-[-0.03em] text-ink">
-            Glowgram
-          </span>
+        {/* The lockup carries the wordmark, so no text label beside it. Two
+            cuts because the burgundy artwork disappears on a dark surface. */}
+        <Link href="/" aria-label="Afunwa Hairline Global — home">
+          <BrandLockup className="h-9 dark:hidden" priority />
+          <BrandLockup tone="light" className="hidden h-9 dark:block" />
         </Link>
 
         <nav aria-label="Primary" className="flex items-center gap-1">

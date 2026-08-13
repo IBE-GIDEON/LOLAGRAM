@@ -86,7 +86,7 @@ export function SellerOnboardingClient() {
         <Card className="p-5">
           <p className="text-lg font-semibold text-ink">Sign in first</p>
           <p className="mt-2 text-sm text-muted">
-            Your seller onboarding is tied to the same GLOWGRAM account you use as
+            Your seller onboarding is tied to the same Afunwa account you use as
             a buyer.
           </p>
           <Link
@@ -404,7 +404,7 @@ export function SellerOnboardingClient() {
           <p className="text-2xl font-bold text-ink">
             {isEditingStore
               ? "Store updated"
-              : "Your store is live on GLOWGRAM"}
+              : "Your store is live on Afunwa"}
           </p>
           <p className="mt-3 text-sm leading-6 text-muted">
             You can now manage products, track store orders, and share your store

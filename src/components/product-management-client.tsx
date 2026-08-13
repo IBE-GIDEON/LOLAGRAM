@@ -47,7 +47,7 @@ export function ProductManagementClient() {
 
     const outcome = await shareLink({
       title: product.name,
-      text: `${product.name} — ${formatCurrency(product.price)} on GLOWGRAM`,
+      text: `${product.name} — ${formatCurrency(product.price)} on Afunwa`,
       url: buildProductUrl(vendorProfile.id, product.id)
     })
 
@@ -130,7 +130,7 @@ export function ProductManagementClient() {
         <Card className="p-5">
           <p className="text-lg font-semibold text-ink">Sign in first</p>
           <p className="mt-2 text-sm text-muted">
-            Your store is tied to the same GLOWGRAM account you use as a buyer.
+            Your store is tied to the same Afunwa account you use as a buyer.
           </p>
           <a
             href="/profile"

@@ -69,7 +69,7 @@ export function VendorStoreClient({
 
     const outcome = await shareLink({
       title: product.name,
-      text: `${product.name} — ${formatCurrency(product.price)} on GLOWGRAM`,
+      text: `${product.name} — ${formatCurrency(product.price)} on Afunwa`,
       url: buildProductUrl(vendorId, product.id)
     })
 

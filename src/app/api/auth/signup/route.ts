@@ -180,7 +180,7 @@ async function createSessionForCredentials(email: string, password: string) {
 
 function deriveNameFromEmail(email: string) {
   const handle = email.split("@")[0]?.replace(/[._-]+/g, " ").trim()
-  if (!handle) return "GLOWGRAM User"
+  if (!handle) return "Afunwa Customer"
 
   return handle
     .split(" ")
@@ -231,11 +231,11 @@ function toFriendlyAuthError(message?: string | null) {
   const text = message?.toLowerCase() ?? ""
 
   if (text.includes("users_phone_key")) {
-    return "That phone number is already on another GLOWGRAM account."
+    return "That phone number is already on another Afunwa account."
   }
 
   if (isDuplicateMessage(message)) {
-    return "This email already has a GLOWGRAM account. Sign in instead."
+    return "This email already has a Afunwa account. Sign in instead."
   }
 
   if (text.includes("password")) {

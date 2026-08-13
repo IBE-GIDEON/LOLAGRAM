@@ -21,7 +21,7 @@ export function SellerClosedNotice({
           Selling is not open yet
         </p>
         <p className="mt-2 text-sm leading-6 text-muted">
-          GLOWGRAM is running with a single store for now. We will open store
+          Afunwa is running with a single store for now. We will open store
           signups once buyers start asking for more sellers.
         </p>
         <Link

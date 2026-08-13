@@ -26,18 +26,18 @@ const inter = Inter({
   display: "swap"
 })
 
-const ICON_VERSION = "20260520-glowgram-logo"
+const ICON_VERSION = "20260813-afunwa-logo"
 
-const APP_TITLE = "GLOWGRAM — Your Local Marketplace"
+const APP_TITLE = "Afunwa Hairline Global — Wigs, Bundles & Closures"
 const APP_DESCRIPTION =
-  "Discover local vendors, shop products, and track your orders — all in one place. Nigeria's WhatsApp-style marketplace."
+  "Lace fronts, bone straight, curls, braids and closures — picked, checked and delivered across Nigeria."
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
-  title: "GLOWGRAM",
+  title: "Afunwa",
   description: APP_DESCRIPTION,
-  applicationName: "GLOWGRAM",
-  keywords: ["marketplace", "Nigeria", "vendors", "shop", "buy", "sell", "local"],
+  applicationName: "Afunwa",
+  keywords: ["wigs", "hair", "lace front", "closure", "frontal", "bundles", "Nigeria"],
   icons: {
     icon: [
       { url: `/favicon.ico?v=${ICON_VERSION}`, sizes: "any" },
@@ -56,11 +56,11 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "GLOWGRAM"
+    title: "Afunwa"
   },
   openGraph: {
     type: "website",
-    siteName: "GLOWGRAM",
+    siteName: "Afunwa Hairline Global",
     title: APP_TITLE,
     description: APP_DESCRIPTION,
     images: [
@@ -68,7 +68,7 @@ export const metadata: Metadata = {
         url: `${APP_URL}/pwa/icon-512.png`,
         width: 512,
         height: 512,
-        alt: "GLOWGRAM logo"
+        alt: "Afunwa Hairline Global logo"
       }
     ]
   },
@@ -85,7 +85,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#3A1226" },
+    { media: "(prefers-color-scheme: light)", color: "#401020" },
     { media: "(prefers-color-scheme: dark)", color: "#0B1419" }
   ]
 }

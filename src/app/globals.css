@@ -19,8 +19,9 @@
   --color-border: 223 229 224;
   --color-success: 58 107 74;
   --color-warning: 155 125 10;
-  /* Editorial accents */
-  --color-plum: 58 18 38;
+  /* Editorial accents. Plum is sampled straight off the logo artwork (#401020)
+     so the banner behind the lockup is the same burgundy as the mark. */
+  --color-plum: 64 16 32;
   --color-rose: 183 110 121;
   --color-gold: 197 160 74;
   --color-blush: 250 235 238;
@@ -42,7 +43,7 @@ html.dark {
   --color-success: 85 174 108;
   --color-warning: 215 180 81;
   /* Editorial accents */
-  --color-plum: 40 12 27;
+  --color-plum: 48 12 25;
   --color-rose: 214 143 154;
   --color-gold: 218 184 102;
   --color-blush: 60 32 42;

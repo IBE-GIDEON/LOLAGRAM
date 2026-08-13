@@ -102,7 +102,7 @@ export function SplashScreen() {
           lineHeight: 1
         }}
       >
-        GLOWGRAM
+        Afunwa
       </p>
 
       {/* Tagline */}
@@ -115,7 +115,7 @@ export function SplashScreen() {
           letterSpacing: "0.02em"
         }}
       >
-        Your local marketplace
+        Hairline Global
       </p>
     </div>
   )

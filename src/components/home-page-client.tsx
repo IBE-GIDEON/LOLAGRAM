@@ -12,6 +12,7 @@ import {
 } from "react"
 import { FiSearch } from "react-icons/fi"
 
+import { BrandLockup } from "@/components/brand-logo"
 import { CategoryRail, HeroBanner } from "@/components/hero-banner"
 import { ProductFeed } from "@/components/product-feed"
 import { useAuth } from "@/components/providers/auth-provider"
@@ -110,7 +111,7 @@ export function HomePageClient({
     setVisibleCount(INITIAL_PRODUCT_BATCH)
   }, [activeTab, deferredQuery])
 
-  const pageTitle = searchOnly ? "Search" : "Glowgram"
+  const pageTitle = searchOnly ? "Search" : "Afunwa"
   const displayedProducts = useMemo(
     () => products.slice(0, visibleCount),
     [products, visibleCount]
@@ -145,7 +146,7 @@ export function HomePageClient({
     >
       <div className="flex h-12 items-center justify-center">
         <span className="translate-y-1 text-sm font-semibold tracking-[-0.01em] text-ink opacity-0 transition duration-200 group-data-[compact=true]:translate-y-0 group-data-[compact=true]:opacity-100 dark:text-white">
-          Glowgram
+          Afunwa
         </span>
       </div>
     </div>
@@ -171,8 +172,16 @@ export function HomePageClient({
 
       <div className="relative mx-auto w-full max-w-[1240px]">
       <div className="flex items-center justify-between gap-3 lg:hidden">
-        <h1 className="text-[44px] font-bold leading-none tracking-[-0.05em] drop-shadow-sm">
-          {pageTitle}
+        {/* The lockup is the headline. As type it would have been 16 characters
+            at 44px next to an avatar — it never fit. */}
+        <h1 className="flex min-w-0">
+          {searchOnly ? (
+            <span className="text-[40px] font-bold leading-none tracking-[-0.04em] drop-shadow-sm">
+              {pageTitle}
+            </span>
+          ) : (
+            <BrandLockup tone="light" className="h-12 sm:h-14" priority />
+          )}
         </h1>
         <Link
           href="/profile"

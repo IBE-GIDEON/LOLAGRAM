@@ -18,7 +18,7 @@ export const BRAND = {
   warning: "#9B7D0A"
 } as const
 
-export const APP_NAME = "GLOWGRAM"
+export const APP_NAME = "Afunwa"
 export const DEMO_OTP = "123456"
 export const DEMO_STATE_KEY = "glowgram-demo-state"
 export const DEMO_USER_KEY = "glowgram-demo-user"
@@ -28,6 +28,9 @@ export const CART_KEY = "glowgram-cart"
 export const OFFLINE_DB_NAME = "glowgram-offline"
 export const OFFLINE_ORDER_STORE = "order-intents"
 export const THEME_KEY = "glowgram-theme"
+export const LANGUAGE_KEY = "glowgram-language"
+export const CURRENCY_KEY = "glowgram-currency"
+export const RATES_CACHE_KEY = "glowgram-fx-rates"
 
 export const CATEGORY_OPTIONS: Array<{
   label: string

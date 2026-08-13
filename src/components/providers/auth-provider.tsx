@@ -151,7 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fullName: String(
           user.user_metadata?.full_name ??
             user.email?.split("@")[0] ??
-            "GLOWGRAM User"
+            "Afunwa Customer"
         ),
         profilePhotoUrl:
           typeof user.user_metadata?.profile_photo_url === "string"
@@ -356,7 +356,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!error && data.user) {
           setSessionUserId(data.user.id)
           await ensureProfileForSessionUser(data.user)
-          toast.success("Account created. Welcome to GLOWGRAM.")
+          toast.success("Account created. Welcome to Afunwa.")
           return
         }
       }
@@ -380,7 +380,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setSessionUserId(data.user.id)
       await ensureProfileForSessionUser(data.user)
-      toast.success("Account created. Welcome to GLOWGRAM.")
+      toast.success("Account created. Welcome to Afunwa.")
     },
     [ensureProfileForSessionUser, isDemoMode, refreshProfile]
   )

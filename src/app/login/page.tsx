@@ -4,9 +4,9 @@ import { AuthRouteClient } from "@/components/auth-route-client"
 import { safeInternalPath } from "@/lib/utils"
 
 export const metadata: Metadata = {
-  title: "Sign in to GLOWGRAM",
+  title: "Sign in to Afunwa",
   description:
-    "Sign in to GLOWGRAM to track your orders, message vendors and pick up where you left off."
+    "Sign in to Afunwa to track your orders, message vendors and pick up where you left off."
 }
 
 export default function LoginPage({

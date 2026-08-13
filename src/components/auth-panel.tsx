@@ -6,7 +6,7 @@ import { useState } from "react"
 import toast from "react-hot-toast"
 import { FiEye, FiEyeOff, FiLoader } from "react-icons/fi"
 
-import { BrandLogo } from "@/components/brand-logo"
+import { BrandLockup } from "@/components/brand-logo"
 import { useAuth } from "@/components/providers/auth-provider"
 import { Button, Card, Input } from "@/components/ui"
 import { cn } from "@/lib/utils"
@@ -102,10 +102,7 @@ export function AuthPanel({
   return (
     <Card className="overflow-hidden border-border/60 p-0">
       <div className="bg-gradient-to-br from-plum via-plum/95 to-brand/70 px-5 pb-5 pt-6 text-white">
-        <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">
-          <BrandLogo className="h-5 w-5 text-white/85" />
-          GLOWGRAM
-        </p>
+        <BrandLockup tone="light" className="h-9 opacity-90" />
         <h1 className="mt-2 text-[26px] font-bold leading-tight tracking-[-0.02em]">
           {heading.title}
         </h1>

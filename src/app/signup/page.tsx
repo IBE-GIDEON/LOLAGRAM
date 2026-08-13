@@ -4,9 +4,9 @@ import { AuthRouteClient } from "@/components/auth-route-client"
 import { safeInternalPath } from "@/lib/utils"
 
 export const metadata: Metadata = {
-  title: "Create your GLOWGRAM account",
+  title: "Create your Afunwa account",
   description:
-    "Join GLOWGRAM in seconds with just an email and password, then shop wigs, hair and beauty delivered across Nigeria."
+    "Join Afunwa in seconds with just an email and password, then shop wigs, hair and beauty delivered across Nigeria."
 }
 
 export default function SignUpPage({
