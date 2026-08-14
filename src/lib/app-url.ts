@@ -1,4 +1,4 @@
-const FALLBACK_APP_URL = "https://glowgramshop.vercel.app"
+const FALLBACK_APP_URL = "https://afunwa-hairline.vercel.app"
 
 export function getAppUrl() {
   const vercelProductionUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL

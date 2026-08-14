@@ -10,4 +10,4 @@ Disallow: /seller/
 Disallow: /onboarding/
 Disallow: /order-confirmation
 
-Sitemap: https://glowgramshop.vercel.app/sitemap.xml
+Sitemap: https://afunwa-hairline.vercel.app/sitemap.xml

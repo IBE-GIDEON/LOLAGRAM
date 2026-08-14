@@ -1,4 +1,4 @@
-const APP_URL = "https://glowgramshop.vercel.app/";
+const APP_URL = "https://afunwa-hairline.vercel.app/";
 
 let deferredInstallPrompt = null;
 
