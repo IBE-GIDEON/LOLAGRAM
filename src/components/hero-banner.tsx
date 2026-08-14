@@ -73,7 +73,12 @@ export function HeroBanner() {
                   </p>
                   <Link
                     href={slide.href}
-                    className="mt-4 inline-flex w-fit items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-plum shadow-soft transition hover:bg-blush active:scale-[0.99]"
+                    // Literal hex, not bg-white/text-plum: globals.css rewrites
+                    // .bg-white to the dark surface in dark mode, and both plum
+                    // and blush go near-black there — the button rendered as
+                    // dark text on a dark pill. This sits on a photograph,
+                    // which is dark in either theme, so it stays light in both.
+                    className="mt-4 inline-flex w-fit items-center gap-2 rounded-full bg-[#FFFFFF] px-5 py-3 text-sm font-semibold text-[#401020] shadow-soft transition hover:bg-[#FAEBEE] active:scale-[0.99]"
                   >
                     {slide.ctaLabel}
                     <FiArrowRight aria-hidden="true" />
@@ -95,8 +100,10 @@ export function HeroBanner() {
                 onClick={() => setIndex(slideIndex)}
                 className={cn(
                   "pointer-events-auto h-1.5 rounded-full transition-all",
+                  // Same trap as the CTA: plain bg-white turns near-black in
+                  // dark mode, so the active dot vanished against the photo.
                   slideIndex === index
-                    ? "w-7 bg-white"
+                    ? "w-7 bg-[#FFFFFF]"
                     : "w-3 bg-white/45 hover:bg-white/70"
                 )}
               />
