@@ -29,6 +29,7 @@ import type { User } from "@supabase/supabase-js"
 
 interface AuthContextValue extends AuthSessionState {
   signIn: (values: SignInFormValues) => Promise<void>
+  signInWithGoogle: (nextPath?: string) => Promise<void>
   signUp: (values: SignUpFormValues) => Promise<void>
   requestPasswordReset: (email: string) => Promise<void>
   updatePassword: (nextPassword: string) => Promise<void>
@@ -138,7 +139,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loadVendorProfile(user.id)
       ])
 
+      // Google returns avatar_url/picture, our own signup writes
+      // profile_photo_url, and the database trigger that creates the row
+      // copies neither — so an existing profile gets its photo backfilled on
+      // the first OAuth sign in rather than staying blank forever.
+      const oauthPhoto =
+        typeof user.user_metadata?.avatar_url === "string"
+          ? user.user_metadata.avatar_url
+          : typeof user.user_metadata?.picture === "string"
+            ? user.user_metadata.picture
+            : typeof user.user_metadata?.profile_photo_url === "string"
+              ? user.user_metadata.profile_photo_url
+              : undefined
+
       if (existingProfile) {
+        if (oauthPhoto && !existingProfile.profilePhotoUrl?.trim()) {
+          const patched = await saveUserProfile({
+            ...existingProfile,
+            profilePhotoUrl: oauthPhoto
+          })
+          setProfile(patched)
+          setVendorProfile(nextVendor)
+          return patched
+        }
+
         setProfile(existingProfile)
         setVendorProfile(nextVendor)
         return existingProfile
@@ -150,13 +174,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         phone: String(user.user_metadata?.phone ?? ""),
         fullName: String(
           user.user_metadata?.full_name ??
+            user.user_metadata?.name ??
             user.email?.split("@")[0] ??
             "Afunwa Customer"
         ),
-        profilePhotoUrl:
-          typeof user.user_metadata?.profile_photo_url === "string"
-            ? user.user_metadata.profile_photo_url
-            : undefined,
+        profilePhotoUrl: oauthPhoto,
         accountType:
           (String(user.user_metadata?.account_type ?? "buyer") as AccountType) ??
           "buyer",
@@ -300,6 +322,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       toast.success("Welcome back.")
     },
     [ensureProfileForSessionUser, isDemoMode, refreshProfile]
+  )
+
+  const signInWithGoogle = useCallback(
+    async (nextPath = "/") => {
+      if (isDemoMode) {
+        throw new Error("Google sign-in needs Supabase, which is off in demo mode.")
+      }
+
+      const supabase = getSupabaseBrowserClient()
+      if (!supabase) {
+        throw new Error("Supabase is not configured")
+      }
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          // window.location.origin rather than env.appUrl: appUrl falls back to
+          // localhost:3000 when the variable is unset, which would bounce a
+          // live shopper to their own machine.
+          redirectTo: `${window.location.origin}${nextPath}`,
+          queryParams: { prompt: "select_account" }
+        }
+      })
+
+      if (error) {
+        throw error
+      }
+      // Nothing after this runs: the browser leaves for Google.
+    },
+    [isDemoMode]
   )
 
   const signUp = useCallback(
@@ -545,6 +597,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       isDemoMode,
       signIn,
+      signInWithGoogle,
       signUp,
       requestPasswordReset,
       updatePassword,
@@ -560,6 +613,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       isDemoMode,
       signIn,
+      signInWithGoogle,
       signUp,
       requestPasswordReset,
       updatePassword,

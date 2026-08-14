@@ -4,11 +4,13 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import toast from "react-hot-toast"
+import { FcGoogle } from "react-icons/fc"
 import { FiEye, FiEyeOff, FiLoader } from "react-icons/fi"
 
 import { BrandLockup } from "@/components/brand-logo"
 import { useAuth } from "@/components/providers/auth-provider"
 import { Button, Card, Input } from "@/components/ui"
+import { canUseDemoMode, hasSupabase } from "@/lib/env"
 import { cn } from "@/lib/utils"
 
 export type AuthMode = "signin" | "signup" | "forgot"
@@ -44,12 +46,14 @@ export function AuthPanel({
   showLinks?: boolean
 }) {
   const router = useRouter()
-  const { signIn, signUp, requestPasswordReset } = useAuth()
+  const { signIn, signInWithGoogle, signUp, requestPasswordReset } = useAuth()
   const [mode, setMode] = useState<AuthMode>(defaultMode)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [pending, setPending] = useState(false)
+  const [googlePending, setGooglePending] = useState(false)
+  const isDemoMode = canUseDemoMode
 
   const heading = HEADINGS[mode]
 
@@ -225,6 +229,48 @@ export function AuthPanel({
             )}
           </Button>
         </form>
+
+        {/* Hidden on the reset screen — there is no password to skip there.
+            Also hidden without Supabase, since OAuth cannot work in demo mode
+            and a button that only ever errors is worse than no button. */}
+        {mode !== "forgot" && hasSupabase && !isDemoMode ? (
+          <>
+            <div className="my-4 flex items-center gap-3">
+              <span className="h-px flex-1 bg-border" />
+              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+                or
+              </span>
+              <span className="h-px flex-1 bg-border" />
+            </div>
+
+            <button
+              type="button"
+              disabled={pending || googlePending}
+              onClick={async () => {
+                setGooglePending(true)
+                try {
+                  await signInWithGoogle(redirectTo ?? "/")
+                  // The browser leaves for Google, so this stays pending.
+                } catch (error) {
+                  setGooglePending(false)
+                  toast.error(
+                    error instanceof Error
+                      ? error.message
+                      : "Could not start Google sign-in."
+                  )
+                }
+              }}
+              className="inline-flex w-full items-center justify-center gap-3 rounded-full border border-border bg-surface px-4 py-3 text-sm font-semibold text-ink transition hover:bg-canvas disabled:opacity-60"
+            >
+              {googlePending ? (
+                <FiLoader className="animate-spin" aria-hidden="true" />
+              ) : (
+                <FcGoogle className="text-xl" aria-hidden="true" />
+              )}
+              {googlePending ? "Opening Google..." : "Continue with Google"}
+            </button>
+          </>
+        ) : null}
 
         <div className="mt-4 flex items-center justify-between gap-3 text-[13px]">
           {mode === "forgot" ? (
