@@ -1,6 +1,6 @@
 const STATIC_CACHE = "glowgram-static-v6"
 const VENDOR_CACHE = "glowgram-vendors-v1"
-const IMAGE_CACHE = "glowgram-images-v1"
+const IMAGE_CACHE = "glowgram-images-v2"
 const ORDER_DB = "glowgram-offline"
 const ORDER_STORE = "order-intents"
 
@@ -27,15 +27,23 @@ self.addEventListener("install", (event) => {
   self.skipWaiting()
 })
 
+const CURRENT_CACHES = [STATIC_CACHE, VENDOR_CACHE, IMAGE_CACHE]
+
 self.addEventListener("activate", (event) => {
-  // Delete any caches from previous versions
+  // Drop every cache this worker no longer owns.
+  //
+  // This used to filter on the "glowgram-static-" prefix alone, so bumping the
+  // image cache left the old one behind — and images are served cache first,
+  // which meant a replaced photo kept serving the previous version forever to
+  // anyone who had already visited. Matching on the whole prefix means a
+  // version bump on any cache actually clears it.
   event.waitUntil(
     caches
       .keys()
       .then((keys) =>
         Promise.all(
           keys
-            .filter((k) => k.startsWith("glowgram-static-") && k !== STATIC_CACHE)
+            .filter((k) => k.startsWith("glowgram-") && !CURRENT_CACHES.includes(k))
             .map((k) => caches.delete(k))
         )
       )
