@@ -51,11 +51,20 @@ export const CURRENCIES: Array<{
   { code: "SEK", name: "Swedish Krona", country: "Sweden", region: "SE" },
   { code: "NOK", name: "Norwegian Krone", country: "Norway", region: "NO" },
   { code: "PLN", name: "Polish Zloty", country: "Poland", region: "PL" }
-]
+  // Sorted here rather than by hand so a currency added later lands in the
+  // right place on its own instead of quietly breaking the order.
+].sort((a, b) => a.country.localeCompare(b.country, "en"))
 
 /** Lookup for the switcher trigger, which only has a code to work from. */
 export function getCurrencyMeta(code: string) {
-  return CURRENCIES.find((entry) => entry.code === code) ?? CURRENCIES[0]
+  // Falls back to naira explicitly, not to CURRENCIES[0]: the list is sorted
+  // alphabetically, so position zero is Australia — an unknown code would have
+  // rendered as an Australian flag on a Nigerian shop.
+  return (
+    CURRENCIES.find((entry) => entry.code === code) ??
+    CURRENCIES.find((entry) => entry.code === BASE_CURRENCY) ??
+    CURRENCIES[0]
+  )
 }
 
 export const SUPPORTED_CURRENCY_CODES = new Set(CURRENCIES.map((c) => c.code))

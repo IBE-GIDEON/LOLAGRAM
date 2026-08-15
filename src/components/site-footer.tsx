@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { FaFacebookF, FaInstagram, FaTiktok, FaXTwitter } from "react-icons/fa6"
+import { FaFacebookF, FaInstagram, FaTiktok } from "react-icons/fa6"
 import { FiCheck } from "react-icons/fi"
 
 import { BrandLockup } from "@/components/brand-logo"
@@ -13,8 +13,7 @@ import {
 const SOCIAL_ICONS = {
   facebook: FaFacebookF,
   instagram: FaInstagram,
-  tiktok: FaTiktok,
-  x: FaXTwitter
+  tiktok: FaTiktok
 } as const
 
 export function SiteFooter() {

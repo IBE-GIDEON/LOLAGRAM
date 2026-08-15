@@ -29,14 +29,22 @@ export const COMPANY_STATS: Array<{ value: string; label: string }> = [
  * ships as a dead icon that lands a customer on "page not found".
  */
 export const SOCIAL_LINKS: Array<{
-  id: "facebook" | "instagram" | "tiktok" | "x"
+  id: "facebook" | "instagram" | "tiktok"
   label: string
   href: string
 }> = [
-  { id: "facebook", label: "Facebook", href: "https://facebook.com/afunwahairline" },
-  { id: "instagram", label: "Instagram", href: "https://instagram.com/afunwahairline" },
-  { id: "tiktok", label: "TikTok", href: "https://tiktok.com/@afunwahairline" },
-  { id: "x", label: "X", href: "https://x.com/afunwahairline" }
+  // Blank until the real handles are confirmed. The guessed ones were wrong —
+  // the account is afunwa_hairline, with an underscore — and a wrong link is
+  // worse than a missing icon, so these stay hidden until they are filled in.
+  { id: "facebook", label: "Facebook", href: "" },
+  {
+    id: "instagram",
+    label: "Instagram",
+    // Share parameters (igsh, igsi) stripped: they are a referral token from
+    // whoever copied the link, not part of the profile address.
+    href: "https://www.instagram.com/afunwa_hairline"
+  },
+  { id: "tiktok", label: "TikTok", href: "" }
 ]
 
 /** Only routes that exist — a footer full of 404s costs more trust than it buys. */
