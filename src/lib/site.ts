@@ -31,18 +31,22 @@ export const SOCIAL_LINKS: Array<{
   label: string
   href: string
 }> = [
-  // Blank until the real handles are confirmed. The guessed ones were wrong —
-  // the account is afunwa_hairline, with an underscore — and a wrong link is
-  // worse than a missing icon, so these stay hidden until they are filled in.
-  { id: "facebook", label: "Facebook", href: "" },
+  // All three verified to resolve. Share and referral parameters are stripped
+  // throughout — igsh, is_from_website, rdid and the rest identify whoever
+  // copied the link, not the profile, and they do not belong on a live page.
+  {
+    id: "facebook",
+    label: "Facebook",
+    // The canonical page the /share/1Fu8zsxY2G/ link redirects to, used
+    // directly to skip the redirect hop.
+    href: "https://www.facebook.com/people/Afunwa-hairline/61565212166174/"
+  },
   {
     id: "instagram",
     label: "Instagram",
-    // Share parameters (igsh, igsi) stripped: they are a referral token from
-    // whoever copied the link, not part of the profile address.
     href: "https://www.instagram.com/afunwa_hairline"
   },
-  { id: "tiktok", label: "TikTok", href: "" }
+  { id: "tiktok", label: "TikTok", href: "https://www.tiktok.com/@afunwa_hairline" }
 ]
 
 /** Only routes that exist — a footer full of 404s costs more trust than it buys. */
