@@ -58,7 +58,9 @@ export function SiteFooter() {
         </div>
 
         {/* The reason someone scrolls this far and still buys. */}
-        <dl className="mt-6 grid grid-cols-2 gap-x-4 gap-y-5 border-y border-white/12 py-5 sm:grid-cols-4">
+        {/* Flex rather than a fixed grid: the strip holds two stats today and
+            should not leave dead columns if that changes. */}
+        <dl className="mt-6 flex flex-wrap gap-x-10 gap-y-5 border-y border-white/12 py-5">
           {COMPANY_STATS.map((stat) => (
             <div key={stat.label}>
               <dt className="text-[20px] font-bold leading-none tracking-[-0.02em] text-white lg:text-[24px]">
