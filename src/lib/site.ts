@@ -15,7 +15,7 @@ export const COMPANY_NAME = "Afunwa Hairline Inc"
  * representation about a business as an offence, not a matter of taste.
  */
 export const COMPANY_STATS: Array<{ value: string; label: string }> = [
-  { value: "₦1B+", label: "in annual sales" },
+  { value: "₦220.5M", label: "in annual sales" },
   { value: "50M+", label: "units supplied" },
   { value: "700+", label: "stylist partners" },
   { value: "No.1", label: "factory-direct prices" }
