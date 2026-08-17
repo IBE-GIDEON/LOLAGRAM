@@ -138,12 +138,18 @@ export function BottomSheet({
   open,
   onClose,
   title,
+  titleHidden = false,
   size = "md",
   children
 }: PropsWithChildren<{
   open: boolean
   onClose: () => void
   title?: string
+  /**
+   * Keeps the title as the dialog's accessible name but stops drawing it, for
+   * sheets whose content already leads with the same heading.
+   */
+  titleHidden?: boolean
   /** md suits forms and the cart; lg suits the two-column product detail. */
   size?: "md" | "lg"
 }>) {
@@ -188,8 +194,20 @@ export function BottomSheet({
       >
         {/* Drag handle reads as a sheet affordance — pointless on a dialog */}
         <div className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-border md:hidden" />
-        <div className="flex items-center justify-between px-5 py-4 md:px-6">
-          <h3 className="text-base font-semibold text-ink md:text-lg">{title}</h3>
+        <div
+          className={cn(
+            "flex items-center px-5 py-4 md:px-6",
+            titleHidden ? "justify-end" : "justify-between"
+          )}
+        >
+          <h3
+            className={cn(
+              "text-base font-semibold text-ink md:text-lg",
+              titleHidden && "sr-only"
+            )}
+          >
+            {title}
+          </h3>
           <button
             aria-label="Close"
             className="rounded-full p-2 text-muted transition hover:bg-canvas"

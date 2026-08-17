@@ -300,6 +300,8 @@ export function VendorStoreClient({
         open={Boolean(selectedProduct)}
         onClose={closeProduct}
         title={selectedProduct?.name}
+        // The panel already opens with the product name; the header repeated it.
+        titleHidden
         size="lg"
       >
         {selectedProduct ? (
