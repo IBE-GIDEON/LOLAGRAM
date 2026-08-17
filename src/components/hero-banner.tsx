@@ -31,8 +31,15 @@ export function HeroBanner() {
   return (
     <section
       className="relative overflow-hidden bg-plum"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
+      // Pointer, not mouse: a phone never fires mouseenter, so the carousel
+      // used to keep rotating under the reader's finger and the button they
+      // were aiming at became a different one mid-tap.
+      onPointerEnter={() => setPaused(true)}
+      onPointerLeave={() => setPaused(false)}
+      onPointerDown={() => setPaused(true)}
+      onPointerCancel={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={() => setPaused(false)}
       aria-roledescription="carousel"
       aria-label="Featured collections"
     >

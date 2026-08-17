@@ -25,7 +25,9 @@ export const HERO_SLIDES: HeroSlide[] = [
     title: "New arrivals",
     subtitle: "Fresh units added to the shelf, restocked as they come in.",
     ctaLabel: "See what's new",
-    href: "/"
+    // Was "/", which is the page the hero already sits on — the button looked
+    // dead because tapping it went nowhere.
+    href: "/search"
   },
   {
     id: "glow",
