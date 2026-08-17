@@ -8,10 +8,15 @@ import { SearchPageClient } from "@/components/search-page-client"
 export default function SearchPage({
   searchParams
 }: {
-  searchParams?: { q?: string | string[] }
+  searchParams?: { q?: string | string[]; category?: string | string[] }
 }) {
-  const raw = searchParams?.q
-  const initialQuery = (Array.isArray(raw) ? raw[0] : raw) ?? ""
+  const first = (value?: string | string[]) =>
+    (Array.isArray(value) ? value[0] : value) ?? ""
 
-  return <SearchPageClient initialQuery={initialQuery} />
+  return (
+    <SearchPageClient
+      initialQuery={first(searchParams?.q)}
+      initialCategory={first(searchParams?.category)}
+    />
+  )
 }

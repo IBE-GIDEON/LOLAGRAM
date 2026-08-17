@@ -495,6 +495,7 @@ export function saveProductDemo(input: ProductInput) {
     const existing = state.products.find((product) => product.id === input.id)
     if (existing) {
       existing.name = input.name
+      existing.category = input.category
       existing.description = input.description
       existing.price = input.price
       existing.photoUrl = input.photoUrls[0] ?? input.photoUrl
@@ -507,6 +508,7 @@ export function saveProductDemo(input: ProductInput) {
       id: createId("prod"),
       vendorId: input.vendorId,
       name: input.name,
+      category: input.category,
       description: input.description,
       price: input.price,
       photoUrl: input.photoUrls[0] ?? input.photoUrl,

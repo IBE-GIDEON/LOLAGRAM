@@ -13,11 +13,13 @@ import {
   StarRating
 } from "@/components/ui"
 import { CATEGORY_TILES } from "@/lib/banners"
+import { isProductCategory } from "@/lib/product-categories"
 import { VENDOR_DISCOVERY_ENABLED } from "@/lib/feature-flags"
 import { useLocale } from "@/components/providers/locale-provider"
 import { formatCategory } from "@/lib/format"
 import {
   loadMarketplaceSearch,
+  loadProductsByCategory,
   peekCachedMarketplaceSearch
 } from "@/lib/marketplace"
 import { getPrimaryProductImage } from "@/lib/product-images"
@@ -37,12 +39,17 @@ const emptyResults: MarketplaceSearchResults = {
 }
 
 export function SearchPageClient({
-  initialQuery = ""
+  initialQuery = "",
+  initialCategory = ""
 }: {
   initialQuery?: string
+  initialCategory?: string
 }) {
   const initialResults = peekCachedMarketplaceSearch(initialQuery)
   const [query, setQuery] = useState(initialQuery)
+  const [category, setCategory] = useState(
+    isProductCategory(initialCategory) ? initialCategory : ""
+  )
   const [mode, setMode] = useState<SearchMode>("all")
   const [results, setResults] = useState<MarketplaceSearchResults>(
     initialResults.products.length || initialResults.vendors.length
@@ -65,15 +72,15 @@ export function SearchPageClient({
    * via replaceState rather than the router — no server round trip, and the
    * results are already being fetched client-side.
    */
-  const selectCategory = (term: string) => {
-    setQuery(term)
+  const selectCategory = (next: string) => {
+    setCategory(next)
 
     if (typeof window === "undefined") return
     const url = new URL(window.location.href)
-    if (term) {
-      url.searchParams.set("q", term)
+    if (next) {
+      url.searchParams.set("category", next)
     } else {
-      url.searchParams.delete("q")
+      url.searchParams.delete("category")
     }
     window.history.replaceState(window.history.state, "", url.toString())
   }
@@ -93,7 +100,16 @@ export function SearchPageClient({
     let ignore = false
     setLoading(results.products.length === 0 && results.vendors.length === 0)
 
-    loadMarketplaceSearch(deferredQuery)
+    // A shelf narrows by class, the words narrow within it, and the two stack:
+    // "Closures and frontals" + "13x4" lands on exactly that closure.
+    const request = category
+      ? loadProductsByCategory(category, deferredQuery).then((products) => ({
+          products,
+          vendors: []
+        }))
+      : loadMarketplaceSearch(deferredQuery)
+
+    request
       .then((data) => {
         if (!ignore) {
           setResults(data)
@@ -108,7 +124,7 @@ export function SearchPageClient({
     return () => {
       ignore = true
     }
-  }, [deferredQuery])
+  }, [category, deferredQuery])
 
   return (
     <div className="pb-6 pt-0">
@@ -173,7 +189,7 @@ export function SearchPageClient({
               so a buyer can jump straight from one category to another. */}
           <div className="scrollbar-none mt-3 flex gap-2 overflow-x-auto pb-1">
             {CATEGORY_TILES.map((tile) => {
-              const active = query.trim().toLowerCase() === tile.term
+              const active = category === tile.term
               return (
                 <button
                   key={tile.id}

@@ -24,6 +24,7 @@ import {
 } from "@/lib/demo-store"
 import { canUseDemoMode, hasSupabase } from "@/lib/env"
 import { fetchWithRetry } from "@/lib/fetch-utils"
+import { normalizeProductCategory } from "@/lib/product-categories"
 import {
   normalizeProductPhotoUrls,
   serializeLegacyPhotoUrl
@@ -110,6 +111,7 @@ function mapProduct(row: Record<string, unknown>) {
     id: String(row.id),
     vendorId: String(row.vendor_id ?? row.vendorId ?? ""),
     name: String(row.name),
+    category: normalizeProductCategory(row.category),
     description: String(row.description ?? ""),
     price: Number(row.price ?? 0),
     photoUrl: photoUrls[0],
@@ -1431,6 +1433,77 @@ export async function loadMarketplaceSearch(
   })
 }
 
+/**
+ * Products on one shelf.
+ *
+ * Filters on products.category, not on whether the name happens to contain a
+ * word: "Body Wave Unit" is a wig whatever it is called, and the old keyword
+ * chips missed exactly that kind of listing.
+ */
+export async function loadProductsByCategory(
+  category: string,
+  query = ""
+): Promise<ProductSearchResult[]> {
+  const normalized = normalizeProductCategory(category)
+  const needle = query.trim().toLowerCase()
+
+  // Both filters apply together: the shelf narrows the set, the words narrow
+  // it further, so "closures" + "13x4" lands on exactly that closure.
+  const matchesQuery = (product: ProductSearchResult) =>
+    !needle ||
+    product.name.toLowerCase().includes(needle) ||
+    product.description.toLowerCase().includes(needle)
+
+  if (!hasSupabase) {
+    if (!canUseDemoMode) return []
+    return getProductFeed("")
+      .filter((product) => normalizeProductCategory(product.category) === normalized)
+      .filter(matchesQuery)
+  }
+
+  const cacheKey = `category:${normalized}:${needle}`
+  const cached = readHybridCache(
+    productFeedCache,
+    cacheKey,
+    persistedCacheKeys.productFeed(cacheKey)
+  )
+  if (cached) return cached
+
+  return deduplicatedFetch(`product-category:${normalized}`, async () => {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) return []
+
+    const { data: rows, error } = await supabase
+      .from("products")
+      .select("*, vendor_profiles!inner(*)")
+      .eq("vendor_profiles.is_active", true)
+      .eq("category", normalized)
+      .order("created_at", { ascending: false })
+      .limit(80)
+
+    if (error || !rows) return []
+
+    const results = rows
+      .map((row): ProductSearchResult | null => {
+        const vendorRow = (row as Record<string, unknown>).vendor_profiles
+        if (!vendorRow || typeof vendorRow !== "object") return null
+        const vendor = mapVendor(vendorRow as Record<string, unknown>)
+        return {
+          ...mapProduct(row as Record<string, unknown>),
+          vendor: { ...vendor, reviewCount: 0, productCount: 0 }
+        }
+      })
+      .filter((item): item is ProductSearchResult => Boolean(item))
+
+    return writeHybridCache(
+      productFeedCache,
+      cacheKey,
+      persistedCacheKeys.productFeed(cacheKey),
+      results.filter(matchesQuery)
+    )
+  })
+}
+
 export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]> {
   const normalized = query.trim()
 
@@ -2188,6 +2261,7 @@ export async function saveProduct(input: ProductInput) {
   const payload = {
     vendor_id: input.vendorId,
     name: input.name,
+    category: normalizeProductCategory(input.category),
     description: input.description,
     price: input.price,
     photo_url: input.photoUrls[0] ?? input.photoUrl ?? null,

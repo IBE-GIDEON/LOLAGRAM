@@ -1,3 +1,5 @@
+import { type ProductCategory } from "@/lib/product-categories"
+
 /**
  * Editorial imagery for the home feed.
  * Files live in /public/banners (Pexels licence — free for commercial use,
@@ -47,14 +49,17 @@ export type CategoryTile = {
   label: string
   caption: string
   /**
-   * The word this tile searches for. It drives both the tile link and the
-   * filter chips on /search, so the two can never drift apart.
+   * The product class this tile shows. Must be one of PRODUCT_CATEGORIES —
+   * it is matched against products.category, so a value that drifts from that
+   * list gives a tile that silently returns nothing.
    */
-  term: string
+  term: ProductCategory
 }
 
 export function categoryHref(tile: CategoryTile) {
-  return `/search?q=${encodeURIComponent(tile.term)}`
+  // ?category=, not ?q=: the shelf is a property of the product, not a word
+  // that has to appear in its name.
+  return `/search?category=${encodeURIComponent(tile.term)}`
 }
 
 /**
@@ -71,7 +76,7 @@ export const CATEGORY_TILES: CategoryTile[] = [
     image: "/banners/tile-wigs.jpg",
     label: "Wigs",
     caption: "Every length, every shade",
-    term: "wig"
+    term: "wigs"
   },
   {
     id: "futura",
@@ -85,7 +90,7 @@ export const CATEGORY_TILES: CategoryTile[] = [
     image: "/banners/tile-closures.jpg",
     label: "Closures and frontals",
     caption: "HD lace, 13x4 and 4x4",
-    term: "closure"
+    term: "closures"
   },
   {
     id: "essentials",
@@ -110,6 +115,6 @@ export const CATEGORY_TILES: CategoryTile[] = [
     image: "/banners/tile-bundles.jpg",
     label: "Bundles",
     caption: "Buy in bundles",
-    term: "bundle"
+    term: "bundles"
   }
 ]

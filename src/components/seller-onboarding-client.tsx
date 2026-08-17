@@ -17,6 +17,11 @@ import {
 } from "@/components/ui"
 import { CATEGORY_OPTIONS } from "@/lib/constants"
 import { canOpenStore } from "@/lib/feature-flags"
+import {
+  DEFAULT_PRODUCT_CATEGORY,
+  PRODUCT_CATEGORIES,
+  type ProductCategory
+} from "@/lib/product-categories"
 import { uploadImage, uploadImages } from "@/lib/image"
 import { saveProduct, saveSellerProfile } from "@/lib/marketplace"
 import { type VendorCategory } from "@/lib/types"
@@ -49,6 +54,9 @@ export function SellerOnboardingClient() {
   const [accountNumber, setAccountNumber] = useState(vendorProfile?.accountNumber ?? "")
   const [paymentNote, setPaymentNote] = useState(vendorProfile?.paymentNote ?? "")
   const [productName, setProductName] = useState("")
+  const [productCategory, setProductCategory] = useState<ProductCategory>(
+    DEFAULT_PRODUCT_CATEGORY
+  )
   const [productPrice, setProductPrice] = useState("")
   const [productDescription, setProductDescription] = useState("")
   const [productPhotoUrls, setProductPhotoUrls] = useState<string[]>([])
@@ -287,6 +295,22 @@ export function SellerOnboardingClient() {
             value={productName}
             onChange={(event) => setProductName(event.target.value)}
           />
+          <label className="block">
+            <span className="text-[12px] font-semibold text-muted">Category</span>
+            <select
+              className="mt-1.5 w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-ink outline-none focus:border-brand/40"
+              value={productCategory}
+              onChange={(event) =>
+                setProductCategory(event.target.value as ProductCategory)
+              }
+            >
+              {PRODUCT_CATEGORIES.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <Input
             placeholder="Price in Naira"
             value={productPrice}
@@ -373,6 +397,7 @@ export function SellerOnboardingClient() {
                     await saveProduct({
                       vendorId: vendor.id,
                       name: productName.trim(),
+                      category: productCategory,
                       description: productDescription.trim(),
                       price: Number(productPrice || 0),
                       photoUrl: productPhotoUrls[0],

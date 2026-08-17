@@ -17,6 +17,12 @@ import {
   Textarea
 } from "@/components/ui"
 import { canOpenStore } from "@/lib/feature-flags"
+import {
+  DEFAULT_PRODUCT_CATEGORY,
+  normalizeProductCategory,
+  PRODUCT_CATEGORIES,
+  type ProductCategory
+} from "@/lib/product-categories"
 import { formatCurrency } from "@/lib/format"
 import { uploadImages } from "@/lib/image"
 import { deleteProduct, loadSellerProducts, saveProduct } from "@/lib/marketplace"
@@ -28,6 +34,7 @@ const MAX_PRODUCT_IMAGES = 6
 
 const emptyForm = {
   name: "",
+  category: DEFAULT_PRODUCT_CATEGORY as ProductCategory,
   price: "",
   description: "",
   photoUrls: [] as string[],
@@ -79,6 +86,7 @@ export function ProductManagementClient() {
       product
         ? {
             name: product.name,
+            category: normalizeProductCategory(product.category),
             price: String(product.price),
             description: product.description,
             photoUrls:
@@ -302,6 +310,28 @@ export function ProductManagementClient() {
               setForm((current) => ({ ...current, name: event.target.value }))
             }
           />
+          {/* Which shelf this lands on. Buyers filter by this, so it is not
+              optional — a mislabelled product is one nobody browses to. */}
+          <label className="block">
+            <span className="text-[12px] font-semibold text-muted">Category</span>
+            <select
+              className="mt-1.5 w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-ink outline-none focus:border-brand/40"
+              value={form.category}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  category: event.target.value as ProductCategory
+                }))
+              }
+            >
+              {PRODUCT_CATEGORIES.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <Input
             placeholder="Price in Naira"
             value={form.price}
@@ -352,6 +382,7 @@ export function ProductManagementClient() {
                   id: editingProduct?.id,
                   vendorId: vendorProfile.id,
                   name: form.name.trim(),
+                  category: form.category,
                   description: form.description.trim(),
                   price: Number(form.price || 0),
                   photoUrl: form.photoUrls[0],

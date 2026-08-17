@@ -1,3 +1,5 @@
+import { type ProductCategory } from "@/lib/product-categories"
+
 export type AccountType = "buyer" | "seller" | "both"
 
 /**
@@ -67,6 +69,8 @@ export interface Product {
   id: string
   vendorId: string
   name: string
+  /** Which shelf it sits on. See lib/product-categories. */
+  category: ProductCategory
   description: string
   price: number
   photoUrl?: string
@@ -202,6 +206,7 @@ export interface ProductInput {
   id?: string
   vendorId: string
   name: string
+  category: ProductCategory
   description: string
   price: number
   photoUrl?: string

@@ -152,6 +152,7 @@ export function createInitialDemoState(): DemoState {
         id: "prod-1",
         vendorId: "vendor-zainab-luxe",
         name: "Bridal Glow Palette",
+        category: "essentials",
         description: "Warm shimmer palette with soft mattes for all-day bridal glam.",
         price: 32000,
         photoUrl:
@@ -168,6 +169,7 @@ export function createInitialDemoState(): DemoState {
         id: "prod-2",
         vendorId: "vendor-zainab-luxe",
         name: "Signature Lip Kit",
+        category: "essentials",
         description: "Longwear nude liner and velvet lipstick combo.",
         price: 14000,
         photoUrl:
@@ -183,6 +185,7 @@ export function createInitialDemoState(): DemoState {
         id: "prod-3",
         vendorId: "vendor-tosin-time",
         name: "Midnight Steel Watch",
+        category: "wigs",
         description: "Polished stainless wristwatch with clean black dial.",
         price: 68000,
         photoUrl:
@@ -198,6 +201,7 @@ export function createInitialDemoState(): DemoState {
         id: "prod-4",
         vendorId: "vendor-tosin-time",
         name: "Rose Gold Couple Set",
+        category: "combo",
         description: "Matching watch set with gift-ready box.",
         price: 92000,
         photoUrl:
@@ -212,6 +216,7 @@ export function createInitialDemoState(): DemoState {
         id: "prod-5",
         vendorId: "vendor-ify-threads",
         name: "Sunset Ankara Set",
+        category: "combo",
         description: "Two-piece relaxed set cut in a bold Ankara print.",
         price: 45000,
         photoUrl:
@@ -227,6 +232,7 @@ export function createInitialDemoState(): DemoState {
         id: "prod-6",
         vendorId: "vendor-ify-threads",
         name: "Silk Occasion Dress",
+        category: "wigs",
         description: "Elegant midi dress designed for receptions and dinners.",
         price: 72000,
         photoUrl:
@@ -243,6 +249,7 @@ export function createInitialDemoState(): DemoState {
         id: "prod-6b",
         vendorId: "vendor-ify-threads",
         name: "Mini Leather Bag",
+        category: "wigs",
         description: "Structured shoulder bag with gold hardware and easy day-to-night styling.",
         price: 38000,
         photoUrl:
@@ -259,6 +266,7 @@ export function createInitialDemoState(): DemoState {
         id: "prod-7",
         vendorId: "vendor-gold-room",
         name: "Layered Gold Chain",
+        category: "wigs",
         description: "Three-layer stainless piece with anti-tarnish finish.",
         price: 18000,
         photoUrl:
@@ -274,6 +282,7 @@ export function createInitialDemoState(): DemoState {
         id: "prod-8",
         vendorId: "vendor-lace-loft",
         name: "13x4 HD Closure Wig",
+        category: "closures",
         description: "Soft 22-inch straight wig with secure adjustable band.",
         price: 155000,
         photoUrl:
@@ -289,6 +298,7 @@ export function createInitialDemoState(): DemoState {
         id: "prod-9",
         vendorId: "vendor-lace-loft",
         name: "Body Wave Unit",
+        category: "wigs",
         description: "Voluminous body wave unit with natural density.",
         price: 132000,
         photoUrl:
