@@ -15,7 +15,7 @@ import {
 import { CATEGORY_TILES } from "@/lib/banners"
 import { isProductCategory } from "@/lib/product-categories"
 import { VENDOR_DISCOVERY_ENABLED } from "@/lib/feature-flags"
-import { useLocale } from "@/components/providers/locale-provider"
+import { PriceTag } from "@/components/price-tag"
 import { formatCategory } from "@/lib/format"
 import {
   loadMarketplaceSearch,
@@ -286,7 +286,6 @@ export function SearchPageClient({
 
 function ProductSearchCard({ product }: { product: ProductSearchResult }) {
   const primaryImage = getPrimaryProductImage(product)
-  const { money } = useLocale()
 
   return (
     <Link
@@ -310,9 +309,7 @@ function ProductSearchCard({ product }: { product: ProductSearchResult }) {
       </div>
       <div className="space-y-2 p-3">
         <p className="line-clamp-2 text-sm font-semibold text-ink">{product.name}</p>
-        <p className="text-base font-bold text-brand">
-          {money(product.price).text}
-        </p>
+        <PriceTag price={product.price} compareAtPrice={product.compareAtPrice} />
         <p className="text-xs text-muted">Sold by {product.vendor.storeName}</p>
         <div className="flex flex-wrap items-center gap-2">
           <Badge className="bg-canvas text-[11px]">

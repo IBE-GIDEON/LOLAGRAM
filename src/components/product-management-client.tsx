@@ -5,6 +5,7 @@ import toast from "react-hot-toast"
 import { FiShare2, FiTrash2 } from "react-icons/fi"
 
 import { useAuth } from "@/components/providers/auth-provider"
+import { PriceTag } from "@/components/price-tag"
 import { RemoteImage } from "@/components/remote-image"
 import { SellerClosedNotice } from "@/components/seller-closed-notice"
 import {
@@ -36,6 +37,7 @@ const emptyForm = {
   name: "",
   category: DEFAULT_PRODUCT_CATEGORY as ProductCategory,
   price: "",
+  compareAtPrice: "",
   description: "",
   photoUrls: [] as string[],
   inStock: true
@@ -88,6 +90,9 @@ export function ProductManagementClient() {
             name: product.name,
             category: normalizeProductCategory(product.category),
             price: String(product.price),
+            compareAtPrice: product.compareAtPrice
+              ? String(product.compareAtPrice)
+              : "",
             description: product.description,
             photoUrls:
               product.photoUrls.length > 0
@@ -332,13 +337,67 @@ export function ProductManagementClient() {
             </select>
           </label>
 
-          <Input
-            placeholder="Price in Naira"
-            value={form.price}
-            onChange={(event) =>
-              setForm((current) => ({ ...current, price: event.target.value }))
-            }
-          />
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-[12px] font-semibold text-muted">
+                Price (₦)
+              </span>
+              <Input
+                className="mt-1.5"
+                inputMode="decimal"
+                placeholder="120000"
+                value={form.price}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, price: event.target.value }))
+                }
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-[12px] font-semibold text-muted">
+                Old price (₦)
+              </span>
+              <Input
+                className="mt-1.5"
+                inputMode="decimal"
+                placeholder="Optional"
+                value={form.compareAtPrice}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    compareAtPrice: event.target.value
+                  }))
+                }
+              />
+            </label>
+          </div>
+
+          {/* Live preview of the slash, so a seller sees the saving a buyer
+              will see before saving — and sees nothing if it is not a saving. */}
+          {form.price ? (
+            <div className="rounded-[20px] bg-canvas px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                Buyers will see
+              </p>
+              <PriceTag
+                className="mt-1.5"
+                size="lg"
+                showBadge
+                price={Number(form.price || 0)}
+                compareAtPrice={
+                  form.compareAtPrice ? Number(form.compareAtPrice) : undefined
+                }
+              />
+              {form.compareAtPrice &&
+              Number(form.compareAtPrice) <= Number(form.price || 0) ? (
+                <p className="mt-2 text-xs leading-5 text-rose-600">
+                  The old price has to be higher than the current one, or there
+                  is no discount to show. It will be ignored.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           <Textarea
             placeholder="Description"
             value={form.description}
@@ -385,6 +444,9 @@ export function ProductManagementClient() {
                   category: form.category,
                   description: form.description.trim(),
                   price: Number(form.price || 0),
+                  compareAtPrice: form.compareAtPrice
+                    ? Number(form.compareAtPrice)
+                    : undefined,
                   photoUrl: form.photoUrls[0],
                   photoUrls: form.photoUrls,
                   inStock: form.inStock

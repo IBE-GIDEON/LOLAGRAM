@@ -24,6 +24,7 @@ import {
 } from "@/lib/demo-store"
 import { canUseDemoMode, hasSupabase } from "@/lib/env"
 import { fetchWithRetry } from "@/lib/fetch-utils"
+import { normalizeCompareAtPrice } from "@/lib/pricing"
 import { normalizeProductCategory } from "@/lib/product-categories"
 import {
   normalizeProductPhotoUrls,
@@ -113,6 +114,10 @@ function mapProduct(row: Record<string, unknown>) {
     name: String(row.name),
     category: normalizeProductCategory(row.category),
     description: String(row.description ?? ""),
+    compareAtPrice: normalizeCompareAtPrice(
+      row.compare_at_price ?? row.compareAtPrice,
+      Number(row.price ?? 0)
+    ),
     price: Number(row.price ?? 0),
     photoUrl: photoUrls[0],
     photoUrls,
@@ -2263,6 +2268,8 @@ export async function saveProduct(input: ProductInput) {
     name: input.name,
     category: normalizeProductCategory(input.category),
     description: input.description,
+    compare_at_price:
+      normalizeCompareAtPrice(input.compareAtPrice, input.price) ?? null,
     price: input.price,
     photo_url: input.photoUrls[0] ?? input.photoUrl ?? null,
     photo_urls: input.photoUrls,

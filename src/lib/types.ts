@@ -73,6 +73,8 @@ export interface Product {
   category: ProductCategory
   description: string
   price: number
+  /** Struck-through "was" price. Display only — never used to charge. */
+  compareAtPrice?: number
   photoUrl?: string
   photoUrls: string[]
   inStock: boolean
@@ -209,6 +211,7 @@ export interface ProductInput {
   category: ProductCategory
   description: string
   price: number
+  compareAtPrice?: number
   photoUrl?: string
   photoUrls: string[]
   inStock: boolean

@@ -13,6 +13,7 @@ import {
   formatCurrency,
   formatDate
 } from "@/lib/format"
+import { PriceTag } from "@/components/price-tag"
 import { RemoteImage } from "@/components/remote-image"
 import { getPrimaryProductImage } from "@/lib/product-images"
 import { loadVendorDetail, peekCachedVendorDetail } from "@/lib/marketplace"
@@ -243,9 +244,11 @@ export function VendorStoreClient({
                     <p className="line-clamp-2 text-sm font-semibold leading-5 text-ink">
                       {product.name}
                     </p>
-                    <p className="mt-1.5 text-base font-bold text-brand">
-                      {money(product.price).text}
-                    </p>
+                    <PriceTag
+                      className="mt-1.5"
+                      price={product.price}
+                      compareAtPrice={product.compareAtPrice}
+                    />
                   </div>
                 </button>
               )
@@ -361,9 +364,13 @@ export function VendorStoreClient({
               <p className="text-xl font-bold leading-tight text-ink md:text-2xl">
                 {selectedProduct.name}
               </p>
-              <p className="mt-2 text-lg font-bold text-brand md:text-xl">
-                {money(selectedProduct.price).text}
-              </p>
+              <PriceTag
+                className="mt-2"
+                size="lg"
+                showBadge
+                price={selectedProduct.price}
+                compareAtPrice={selectedProduct.compareAtPrice}
+              />
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
                 <span className="rounded-full bg-canvas px-2.5 py-1 font-medium">
                   {formatCategory(data.vendor.category)}

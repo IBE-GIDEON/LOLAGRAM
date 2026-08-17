@@ -58,6 +58,7 @@ export function SellerOnboardingClient() {
     DEFAULT_PRODUCT_CATEGORY
   )
   const [productPrice, setProductPrice] = useState("")
+  const [productComparePrice, setProductComparePrice] = useState("")
   const [productDescription, setProductDescription] = useState("")
   const [productPhotoUrls, setProductPhotoUrls] = useState<string[]>([])
 
@@ -311,11 +312,30 @@ export function SellerOnboardingClient() {
               ))}
             </select>
           </label>
-          <Input
-            placeholder="Price in Naira"
-            value={productPrice}
-            onChange={(event) => setProductPrice(event.target.value)}
-          />
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-[12px] font-semibold text-muted">Price (₦)</span>
+              <Input
+                className="mt-1.5"
+                inputMode="decimal"
+                placeholder="120000"
+                value={productPrice}
+                onChange={(event) => setProductPrice(event.target.value)}
+              />
+            </label>
+            <label className="block">
+              <span className="text-[12px] font-semibold text-muted">
+                Old price (₦)
+              </span>
+              <Input
+                className="mt-1.5"
+                inputMode="decimal"
+                placeholder="Optional"
+                value={productComparePrice}
+                onChange={(event) => setProductComparePrice(event.target.value)}
+              />
+            </label>
+          </div>
           <Textarea
             placeholder="Short product description"
             value={productDescription}
@@ -400,6 +420,9 @@ export function SellerOnboardingClient() {
                       category: productCategory,
                       description: productDescription.trim(),
                       price: Number(productPrice || 0),
+                      compareAtPrice: productComparePrice
+                        ? Number(productComparePrice)
+                        : undefined,
                       photoUrl: productPhotoUrls[0],
                       photoUrls: productPhotoUrls,
                       inStock: true
