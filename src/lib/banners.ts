@@ -75,7 +75,7 @@ export const CATEGORY_TILES: CategoryTile[] = [
     id: "futura",
     image: "/banners/tile-futura.jpg",
     label: "Futura wigs",
-    caption: "Heat friendly fibre",
+    caption: "High quality blend",
     term: "futura"
   },
   {
@@ -107,7 +107,7 @@ export const CATEGORY_TILES: CategoryTile[] = [
     id: "bundles",
     image: "/banners/tile-bundles.jpg",
     label: "Bundles",
-    caption: "Sold by the pack",
+    caption: "Buy in bundles",
     term: "bundle"
   }
 ]
