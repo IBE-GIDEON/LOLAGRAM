@@ -2274,6 +2274,37 @@ async function getAccessToken(): Promise<string | null> {
   return session?.access_token ?? null
 }
 
+/**
+ * Starts a Paystack checkout and returns the URL to send the buyer to.
+ *
+ * No retry: this creates an order row, and a retried POST would create a second
+ * one for the same cart.
+ */
+export async function startCardCheckout(
+  payload: CheckoutPayload
+): Promise<{ checkoutUrl: string; orderId: string }> {
+  const token = await getAccessToken()
+  const response = await fetch("/api/paystack/initialize", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify(payload)
+  })
+
+  const data = (await response.json().catch(() => null)) as
+    | { checkoutUrl?: string; orderId?: string; error?: string }
+    | null
+
+  if (!response.ok || !data?.checkoutUrl || !data.orderId) {
+    throw new Error(data?.error ?? "Could not start card checkout.")
+  }
+
+  clearOrderCaches()
+  return { checkoutUrl: data.checkoutUrl, orderId: data.orderId }
+}
+
 export async function placeOrder(
   payload: CheckoutPayload
 ): Promise<PlaceOrderResponse> {

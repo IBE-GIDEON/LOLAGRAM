@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { hasSupabaseAdmin } from "@/lib/env"
+import { priceCart } from "@/lib/order-pricing"
 import { sendPushNotification } from "@/lib/push"
 import { verifyAuthToken } from "@/lib/supabase/auth-guard"
 import { getSupabaseAdminClient } from "@/lib/supabase/server"
@@ -42,76 +43,12 @@ export async function POST(request: Request) {
       ? "vendor_transfer"
       : "pay_on_delivery"
 
-  // Collapse the cart to id -> quantity. Anything the request says about price
-  // is discarded: the browser is not allowed to decide what an order is worth.
-  const requested = new Map<string, number>()
-  for (const item of Array.isArray(payload.items) ? payload.items : []) {
-    const productId = String(item?.productId ?? "").trim()
-    const quantity = Math.floor(Number(item?.quantity ?? 0))
-
-    if (!productId || !Number.isFinite(quantity) || quantity < 1 || quantity > 99) {
-      return NextResponse.json(
-        { error: "That cart is not valid. Refresh and try again." },
-        { status: 400 }
-      )
-    }
-
-    requested.set(productId, (requested.get(productId) ?? 0) + quantity)
+  const priced = await priceCart(supabase, payload.items)
+  if (!priced.ok) {
+    return NextResponse.json({ error: priced.error }, { status: priced.status })
   }
 
-  if (requested.size === 0) {
-    return NextResponse.json({ error: "Your cart is empty." }, { status: 400 })
-  }
-
-  // Prices, names and the vendor all come from the database.
-  const { data: productRows, error: productError } = await supabase
-    .from("products")
-    .select("id, name, price, in_stock, vendor_id, vendor_profiles!inner(is_active)")
-    .eq("vendor_profiles.is_active", true)
-    .in("id", [...requested.keys()])
-
-  if (productError) {
-    return NextResponse.json({ error: productError.message }, { status: 500 })
-  }
-
-  if (!productRows || productRows.length !== requested.size) {
-    return NextResponse.json(
-      { error: "Something in your cart is no longer available. Refresh and try again." },
-      { status: 409 }
-    )
-  }
-
-  const outOfStock = productRows.find((row) => !row.in_stock)
-  if (outOfStock) {
-    return NextResponse.json(
-      { error: `${String(outOfStock.name)} just went out of stock.` },
-      { status: 409 }
-    )
-  }
-
-  // One cart, one store — the cart already enforces this client-side.
-  const vendorIds = new Set(productRows.map((row) => String(row.vendor_id)))
-  if (vendorIds.size !== 1) {
-    return NextResponse.json(
-      { error: "An order can only contain items from one store." },
-      { status: 400 }
-    )
-  }
-  const vendorId = [...vendorIds][0]
-
-  const items = productRows.map((row) => ({
-    productId: String(row.id),
-    name: String(row.name),
-    price: Number(row.price),
-    quantity: requested.get(String(row.id)) as number
-  }))
-
-  // numeric(12,2) in Postgres, so settle the rounding here rather than let the
-  // database truncate a floating point tail.
-  const totalAmount =
-    Math.round(
-      items.reduce((sum, item) => sum + item.price * item.quantity, 0) * 100
-    ) / 100
+  const { vendorId, items, totalAmount } = priced
 
   const { data, error } = await supabase
     .from("orders")

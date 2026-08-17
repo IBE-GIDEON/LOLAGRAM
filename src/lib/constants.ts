@@ -92,8 +92,12 @@ export const PAYMENT_METHOD_META: Record<
     helper: "Inspect the item first, then pay when it arrives."
   },
   vendor_transfer: {
-    label: "Pay Vendor Directly",
-    helper: "Pay the seller after they confirm your order."
+    label: "Bank Transfer",
+    helper: "Send the money to the account shown, then place your order."
+  },
+  paystack: {
+    label: "Pay with Card",
+    helper: "Card, bank or USSD through Paystack. Secure checkout."
   }
 }
 
@@ -120,6 +124,16 @@ export const PAYMENT_STATUS_META: Record<
     label: "Paid to Vendor",
     className: "bg-sky-100 text-sky-800",
     helper: "The seller marked your direct payment as received."
+  },
+  awaiting_card_payment: {
+    label: "Awaiting Card Payment",
+    className: "bg-amber-100 text-amber-800",
+    helper: "Finish the Paystack checkout to confirm this order."
+  },
+  paid_by_card: {
+    label: "Paid",
+    className: "bg-emerald-100 text-emerald-800",
+    helper: "Paystack confirmed this payment."
   }
 }
 
@@ -133,7 +147,9 @@ export function normalizeOrderStatus(value: unknown): OrderStatus {
 }
 
 export function normalizePaymentMethod(value: unknown): PaymentMethod {
-  return value === "vendor_transfer" ? "vendor_transfer" : "pay_on_delivery"
+  if (value === "vendor_transfer") return "vendor_transfer"
+  if (value === "paystack") return "paystack"
+  return "pay_on_delivery"
 }
 
 export function normalizePaymentStatus(
@@ -144,7 +160,9 @@ export function normalizePaymentStatus(
     value === "awaiting_seller_confirmation" ||
     value === "pay_on_delivery" ||
     value === "awaiting_vendor_payment" ||
-    value === "paid_to_vendor"
+    value === "paid_to_vendor" ||
+    value === "awaiting_card_payment" ||
+    value === "paid_by_card"
   ) {
     return value
   }
@@ -156,6 +174,8 @@ export function normalizePaymentStatus(
   if (value === "paid" || value === "paid_to_platform" || value === "payment_received") {
     return paymentMethod === "vendor_transfer" ? "paid_to_vendor" : "pay_on_delivery"
   }
+
+  if (paymentMethod === "paystack") return "awaiting_card_payment"
 
   return paymentMethod === "vendor_transfer"
     ? "awaiting_seller_confirmation"

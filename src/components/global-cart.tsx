@@ -12,8 +12,14 @@ import { RemoteImage } from "@/components/remote-image"
 import { BottomSheet, Button, Card } from "@/components/ui"
 import { PAYMENT_METHOD_META } from "@/lib/constants"
 import { PAY_ON_DELIVERY_ENABLED } from "@/lib/feature-flags"
+import { hasPaystack } from "@/lib/env"
 import { useLocale } from "@/components/providers/locale-provider"
-import { loadVendorDetail, placeOrder, saveUserProfile } from "@/lib/marketplace"
+import {
+  loadVendorDetail,
+  placeOrder,
+  saveUserProfile,
+  startCardCheckout
+} from "@/lib/marketplace"
 import { getPrimaryProductImage } from "@/lib/product-images"
 import { queueOfflineOrder } from "@/lib/offline-orders"
 import { type PaymentMethod, type VendorDetail } from "@/lib/types"
@@ -23,9 +29,12 @@ import { type PaymentMethod, type VendorDetail } from "@/lib/types"
  * list drives both the buttons and the default, so the selected method can
  * never be one the buyer was not shown.
  */
-const PAYMENT_METHODS: PaymentMethod[] = PAY_ON_DELIVERY_ENABLED
-  ? ["pay_on_delivery", "vendor_transfer"]
-  : ["vendor_transfer"]
+const PAYMENT_METHODS: PaymentMethod[] = [
+  // Card first: it is the only one that settles before the parcel moves.
+  ...(hasPaystack ? (["paystack"] as PaymentMethod[]) : []),
+  "vendor_transfer",
+  ...(PAY_ON_DELIVERY_ENABLED ? (["pay_on_delivery"] as PaymentMethod[]) : [])
+]
 
 export function GlobalCart() {
   const router = useRouter()
@@ -115,6 +124,11 @@ export function GlobalCart() {
       paymentMethod
     }
 
+    if (!navigator.onLine && paymentMethod === "paystack") {
+      toast.error("Card checkout needs a connection. Pick bank transfer to queue this order.")
+      return
+    }
+
     if (!navigator.onLine) {
       await queueOfflineOrder(payload)
       clearCart()
@@ -125,6 +139,14 @@ export function GlobalCart() {
 
     setSubmitting(true)
     try {
+      if (paymentMethod === "paystack") {
+        const { checkoutUrl } = await startCardCheckout(payload)
+        // Cart is deliberately left alone until Paystack confirms: if the
+        // buyer abandons the card page, their basket is still here.
+        window.location.href = checkoutUrl
+        return
+      }
+
       const response = await placeOrder(payload)
       clearCart()
       setOpen(false)
@@ -303,6 +325,56 @@ export function GlobalCart() {
                   )
                 })}
               </div>
+
+              {/* The account to pay into, at the moment the buyer decides to
+                  pay. It was only ever shown after the order was placed. */}
+              {paymentMethod === "vendor_transfer" && vendorTransferReady ? (
+                <div className="rounded-[22px] border border-border bg-canvas p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+                    Send payment to
+                  </p>
+                  <dl className="mt-3 space-y-2 text-sm">
+                    {(
+                      [
+                        ["Bank", vendorData?.vendor.bankName],
+                        ["Account name", vendorData?.vendor.accountName],
+                        ["Account number", vendorData?.vendor.accountNumber]
+                      ] as const
+                    ).map(([label, value]) => (
+                      <div key={label} className="flex items-center justify-between gap-3">
+                        <dt className="text-muted">{label}</dt>
+                        <dd
+                          className={
+                            label === "Account number"
+                              ? "select-all font-mono text-base font-bold tracking-wide text-ink"
+                              : "font-semibold text-ink"
+                          }
+                        >
+                          {value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+
+                  {vendorData?.vendor.paymentNote ? (
+                    <p className="mt-3 border-t border-border pt-3 text-xs leading-5 text-muted">
+                      {vendorData.vendor.paymentNote}
+                    </p>
+                  ) : null}
+
+                  {/* baseText, not text: this is a naira account at a Nigerian
+                      bank, so the figure to send is the naira one. Quoting the
+                      shopper's display currency here would have them transfer
+                      the wrong amount. */}
+                  <p className="mt-3 text-xs leading-5 text-muted">
+                    Transfer{" "}
+                    <span className="font-semibold text-ink">
+                      {money(subtotal).baseText}
+                    </span>
+                    , then place the order so the seller can match your payment.
+                  </p>
+                </div>
+              ) : null}
             </div>
 
             <div className="mt-4 flex items-center justify-between">

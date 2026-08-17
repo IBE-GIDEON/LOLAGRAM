@@ -23,12 +23,16 @@ export type OrderStatus =
   | "cancelled"
 
 export type OrderArchiveActor = "buyer" | "seller"
-export type PaymentMethod = "pay_on_delivery" | "vendor_transfer"
+export type PaymentMethod = "pay_on_delivery" | "vendor_transfer" | "paystack"
 export type PaymentStatus =
   | "awaiting_seller_confirmation"
   | "pay_on_delivery"
   | "awaiting_vendor_payment"
   | "paid_to_vendor"
+  /** Card paid through Paystack and confirmed by the webhook. */
+  | "paid_by_card"
+  /** Card checkout started, webhook not in yet. */
+  | "awaiting_card_payment"
 
 export interface UserProfile {
   id: string

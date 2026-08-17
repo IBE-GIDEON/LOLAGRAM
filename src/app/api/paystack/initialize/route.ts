@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 
-import { env, hasPaystack, hasSupabaseAdmin } from "@/lib/env"
+import { getAppUrl } from "@/lib/app-url"
+import { hasPaystack, hasSupabaseAdmin } from "@/lib/env"
+import { priceCart } from "@/lib/order-pricing"
 import { initializePaystackTransaction } from "@/lib/paystack"
 import { verifyAuthToken } from "@/lib/supabase/auth-guard"
 import { getSupabaseAdminClient } from "@/lib/supabase/server"
@@ -8,17 +10,14 @@ import { type CheckoutPayload } from "@/lib/types"
 import { createPaystackReference } from "@/lib/utils"
 
 /**
- * Paystack card checkout. The live cart currently orders through /api/orders
- * (vendor transfer / pay on delivery), so this route is dormant — but it is
- * publicly reachable and holds live payment keys, so it is guarded exactly
- * like /api/orders.
+ * Paystack card checkout.
  *
- * Before enabling card checkout: totalAmount below is taken from the client.
- * It MUST be recomputed from the products table first, or a buyer can pay any
- * amount they like for any item.
+ * The amount charged is priced from the products table, never from the request.
+ * This route previously took totalAmount off the client, which was safe only
+ * because nothing called it — with card checkout live, that would have let a
+ * buyer pay one naira for anything in the shop.
  */
 export async function POST(request: Request) {
-  // Require a valid Supabase session
   const user = await verifyAuthToken(request)
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -26,7 +25,7 @@ export async function POST(request: Request) {
 
   const payload = (await request.json().catch(() => null)) as CheckoutPayload | null
 
-  if (!payload?.buyerId || !payload.vendorId) {
+  if (!payload?.buyerId) {
     return NextResponse.json({ error: "Invalid checkout payload." }, { status: 400 })
   }
 
@@ -35,12 +34,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  if (!Number.isFinite(payload.totalAmount) || payload.totalAmount <= 0) {
-    return NextResponse.json({ error: "Invalid order total." }, { status: 400 })
+  const deliveryAddress = String(payload.deliveryAddress ?? "").trim()
+  if (!deliveryAddress) {
+    return NextResponse.json(
+      { error: "A delivery address is required." },
+      { status: 400 }
+    )
   }
 
   const supabase = getSupabaseAdminClient()
-  const reference = createPaystackReference()
 
   if (!hasSupabaseAdmin || !supabase) {
     return NextResponse.json(
@@ -56,14 +58,25 @@ export async function POST(request: Request) {
     )
   }
 
+  const priced = await priceCart(supabase, payload.items)
+  if (!priced.ok) {
+    return NextResponse.json({ error: priced.error }, { status: priced.status })
+  }
+
+  const reference = createPaystackReference()
+
   const { data: order, error } = await supabase
     .from("orders")
     .insert({
-      buyer_id: payload.buyerId,
-      vendor_id: payload.vendorId,
-      items: payload.items,
-      total_amount: payload.totalAmount,
-      delivery_address: payload.deliveryAddress,
+      buyer_id: user.id,
+      vendor_id: priced.vendorId,
+      items: priced.items,
+      total_amount: priced.totalAmount,
+      delivery_address: deliveryAddress,
+      payment_method: "paystack",
+      // Not paid until the webhook says so — the buyer has not reached
+      // Paystack's page yet, let alone completed anything on it.
+      payment_status: "awaiting_card_payment",
       status: "pending",
       paystack_reference: reference
     })
@@ -79,21 +92,39 @@ export async function POST(request: Request) {
     )
   }
 
-  const transaction = await initializePaystackTransaction({
-    amount: payload.totalAmount,
-    email: user.email ?? `buyer-${payload.buyerId.slice(0, 8)}@glowgram.app`,
-    reference,
-    callbackUrl: `${env.appUrl}/order-confirmation/${order.id}`,
-    metadata: {
-      order_id: order.id,
-      vendor_id: payload.vendorId,
-      buyer_id: payload.buyerId
-    }
-  })
+  try {
+    const transaction = await initializePaystackTransaction({
+      amount: priced.totalAmount,
+      email: user.email ?? `buyer-${user.id.slice(0, 8)}@afunwa.example`,
+      reference,
+      // getAppUrl, not env.appUrl: on Vercel this resolves from the deployment
+      // itself, so a missing NEXT_PUBLIC_APP_URL cannot send a paying customer
+      // back to localhost.
+      callbackUrl: `${getAppUrl()}/order-confirmation/${order.id}`,
+      metadata: {
+        order_id: order.id,
+        vendor_id: priced.vendorId,
+        buyer_id: user.id
+      }
+    })
 
-  return NextResponse.json({
-    checkoutUrl: transaction.data.authorization_url,
-    orderId: order.id,
-    reference
-  })
+    return NextResponse.json({
+      checkoutUrl: transaction.data.authorization_url,
+      orderId: order.id,
+      reference
+    })
+  } catch (paystackError) {
+    // The order row exists but no payment can reach it — cancel it rather than
+    // leave the seller staring at an order nobody can pay for.
+    await supabase
+      .from("orders")
+      .update({ status: "cancelled" })
+      .eq("id", order.id)
+
+    console.error("Paystack initialize failed", paystackError)
+    return NextResponse.json(
+      { error: "Card checkout could not be started. Try another payment method." },
+      { status: 502 }
+    )
+  }
 }
