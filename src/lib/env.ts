@@ -2,8 +2,10 @@ export const env = {
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
   supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
-  paystackPublicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY ?? "",
-  paystackSecretKey: process.env.PAYSTACK_SECRET_KEY ?? "",
+  flutterwavePublicKey: process.env.NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY ?? "",
+  flutterwaveSecretKey: process.env.FLUTTERWAVE_SECRET_KEY ?? "",
+  // Set the same value in the Flutterwave dashboard under Webhooks.
+  flutterwaveSecretHash: process.env.FLUTTERWAVE_SECRET_HASH ?? "",
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? "",
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? "",
   appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
@@ -23,8 +25,8 @@ export const hasSupabase =
 export const hasSupabaseAdmin =
   hasSupabase && Boolean(env.supabaseServiceRoleKey)
 
-export const hasPaystack =
-  Boolean(env.paystackPublicKey) && Boolean(env.paystackSecretKey)
+export const hasFlutterwave =
+  Boolean(env.flutterwavePublicKey) && Boolean(env.flutterwaveSecretKey)
 
 export const hasWebPush =
   Boolean(env.vapidPublicKey) && Boolean(env.vapidPrivateKey)

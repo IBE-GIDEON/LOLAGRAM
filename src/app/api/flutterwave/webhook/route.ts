@@ -1,36 +1,40 @@
 import { NextResponse } from "next/server"
 
+import {
+  verifyFlutterwaveSignature,
+  verifyFlutterwaveTransaction
+} from "@/lib/flutterwave"
 import { sendPushNotification } from "@/lib/push"
-import { verifyPaystackSignature } from "@/lib/paystack"
 import { getSupabaseAdminClient } from "@/lib/supabase/server"
 
 /**
- * Paystack payment notifications.
+ * Flutterwave payment notifications.
  *
- * This is the only thing that may mark an order paid. The buyer returning to
- * the callback URL proves nothing — they can reach that page by typing it — so
- * the signed webhook is the authority.
+ * The only thing that may mark an order paid. A buyer landing on the redirect
+ * URL proves nothing — anyone can type that address — so a signed event,
+ * re-confirmed against Flutterwave, is the authority.
  */
 export async function POST(request: Request) {
   const rawBody = await request.text()
-  const signature = request.headers.get("x-paystack-signature")
 
-  if (!verifyPaystackSignature(rawBody, signature)) {
+  if (!verifyFlutterwaveSignature(request.headers.get("verif-hash"))) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 })
   }
 
   const event = JSON.parse(rawBody) as {
-    event: string
+    event?: string
     data?: {
-      reference?: string
-      /** Kobo, not naira. */
-      amount?: number
+      id?: number | string
+      tx_ref?: string
       status?: string
-      metadata?: { order_id?: string }
+      amount?: number
+      currency?: string
+      meta?: { order_id?: string }
     }
   }
 
-  if (event.event !== "charge.success" || !event.data?.metadata?.order_id) {
+  const orderId = event.data?.meta?.order_id
+  if (event.event !== "charge.completed" || !orderId || !event.data?.id) {
     return NextResponse.json({ ok: true })
   }
 
@@ -42,27 +46,34 @@ export async function POST(request: Request) {
   const { data: order } = await supabase
     .from("orders")
     .select("*, vendor_profiles(user_id)")
-    .eq("id", event.data.metadata.order_id)
+    .eq("id", orderId)
     .maybeSingle()
 
   if (!order) {
     return NextResponse.json({ ok: true })
   }
 
-  // Paystack retries until it gets a 200, so the same success can arrive
-  // several times. Acknowledge and stop rather than notify the seller twice.
+  // Flutterwave retries until it gets a 200, so the same success arrives more
+  // than once. Acknowledge and stop rather than notify the seller twice.
   if (order.payment_status === "paid_by_card") {
     return NextResponse.json({ ok: true })
   }
 
-  // What was actually charged has to match what the order is worth. Without
-  // this, a payment created for one order could be pointed at a dearer one.
-  const paidKobo = Number(event.data.amount ?? 0)
-  const owedKobo = Math.round(Number(order.total_amount) * 100)
+  // Ask Flutterwave what actually happened rather than believing the body.
+  const verified = await verifyFlutterwaveTransaction(event.data.id)
 
-  if (!Number.isFinite(paidKobo) || paidKobo < owedKobo) {
+  if (!verified || verified.status !== "successful") {
+    console.error(`Flutterwave verify failed for order ${orderId}`)
+    return NextResponse.json({ ok: true })
+  }
+
+  const paid = Number(verified.amount ?? 0)
+  const owed = Number(order.total_amount)
+
+  // Naira on both sides here — Flutterwave reports the major unit.
+  if (verified.currency !== "NGN" || !Number.isFinite(paid) || paid < owed) {
     console.error(
-      `Paystack amount mismatch on order ${order.id}: paid ${paidKobo}, owed ${owedKobo}`
+      `Flutterwave amount mismatch on order ${orderId}: paid ${paid} ${verified.currency}, owed ${owed} NGN`
     )
     return NextResponse.json({ ok: true })
   }
@@ -70,7 +81,7 @@ export async function POST(request: Request) {
   await supabase
     .from("orders")
     .update({
-      paystack_reference: event.data.reference ?? order.paystack_reference,
+      payment_reference: verified.tx_ref ?? order.payment_reference,
       payment_status: "paid_by_card",
       // Money is in, so the seller is packing rather than deciding.
       status: order.status === "pending" ? "confirmed" : order.status

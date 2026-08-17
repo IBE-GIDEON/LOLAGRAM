@@ -95,9 +95,9 @@ export const PAYMENT_METHOD_META: Record<
     label: "Bank Transfer",
     helper: "Send the money to the account shown, then place your order."
   },
-  paystack: {
+  flutterwave: {
     label: "Pay with Card",
-    helper: "Card, bank or USSD through Paystack. Secure checkout."
+    helper: "Card, bank transfer or USSD through Flutterwave."
   }
 }
 
@@ -128,12 +128,12 @@ export const PAYMENT_STATUS_META: Record<
   awaiting_card_payment: {
     label: "Awaiting Card Payment",
     className: "bg-amber-100 text-amber-800",
-    helper: "Finish the Paystack checkout to confirm this order."
+    helper: "Finish the card checkout to confirm this order."
   },
   paid_by_card: {
     label: "Paid",
     className: "bg-emerald-100 text-emerald-800",
-    helper: "Paystack confirmed this payment."
+    helper: "Payment confirmed."
   }
 }
 
@@ -148,7 +148,8 @@ export function normalizeOrderStatus(value: unknown): OrderStatus {
 
 export function normalizePaymentMethod(value: unknown): PaymentMethod {
   if (value === "vendor_transfer") return "vendor_transfer"
-  if (value === "paystack") return "paystack"
+  // Legacy rows written before the move to Flutterwave.
+  if (value === "flutterwave" || value === "paystack") return "flutterwave"
   return "pay_on_delivery"
 }
 
@@ -175,7 +176,7 @@ export function normalizePaymentStatus(
     return paymentMethod === "vendor_transfer" ? "paid_to_vendor" : "pay_on_delivery"
   }
 
-  if (paymentMethod === "paystack") return "awaiting_card_payment"
+  if (paymentMethod === "flutterwave") return "awaiting_card_payment"
 
   return paymentMethod === "vendor_transfer"
     ? "awaiting_seller_confirmation"

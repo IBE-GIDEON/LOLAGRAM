@@ -1,21 +1,19 @@
 import { NextResponse } from "next/server"
 
 import { getAppUrl } from "@/lib/app-url"
-import { hasPaystack, hasSupabaseAdmin } from "@/lib/env"
+import { hasFlutterwave, hasSupabaseAdmin } from "@/lib/env"
+import { createFlutterwavePayment } from "@/lib/flutterwave"
 import { priceCart } from "@/lib/order-pricing"
-import { initializePaystackTransaction } from "@/lib/paystack"
 import { verifyAuthToken } from "@/lib/supabase/auth-guard"
 import { getSupabaseAdminClient } from "@/lib/supabase/server"
 import { type CheckoutPayload } from "@/lib/types"
-import { createPaystackReference } from "@/lib/utils"
+import { createPaymentReference } from "@/lib/utils"
 
 /**
- * Paystack card checkout.
+ * Flutterwave card checkout.
  *
- * The amount charged is priced from the products table, never from the request.
- * This route previously took totalAmount off the client, which was safe only
- * because nothing called it — with card checkout live, that would have let a
- * buyer pay one naira for anything in the shop.
+ * The amount charged is priced from the products table, never from the request,
+ * or a buyer could pay one naira for anything in the shop.
  */
 export async function POST(request: Request) {
   const user = await verifyAuthToken(request)
@@ -51,7 +49,7 @@ export async function POST(request: Request) {
     )
   }
 
-  if (!hasPaystack) {
+  if (!hasFlutterwave) {
     return NextResponse.json(
       { error: "Card checkout is not available yet." },
       { status: 503 }
@@ -63,7 +61,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: priced.error }, { status: priced.status })
   }
 
-  const reference = createPaystackReference()
+  const txRef = createPaymentReference()
 
   const { data: order, error } = await supabase
     .from("orders")
@@ -73,55 +71,55 @@ export async function POST(request: Request) {
       items: priced.items,
       total_amount: priced.totalAmount,
       delivery_address: deliveryAddress,
-      payment_method: "paystack",
-      // Not paid until the webhook says so — the buyer has not reached
-      // Paystack's page yet, let alone completed anything on it.
+      payment_method: "flutterwave",
+      // Not paid until the webhook confirms it against Flutterwave.
       payment_status: "awaiting_card_payment",
       status: "pending",
-      paystack_reference: reference
+      payment_reference: txRef
     })
     .select()
     .single()
 
   if (error || !order) {
     // Never echo Postgres errors back to the buyer.
-    console.error("Paystack order insert failed", error?.message)
+    console.error("Flutterwave order insert failed", error?.message)
     return NextResponse.json(
       { error: "We could not start this checkout. Please try again." },
       { status: 500 }
     )
   }
 
+  const { data: buyer } = await supabase
+    .from("users")
+    .select("full_name, phone")
+    .eq("id", user.id)
+    .maybeSingle()
+
   try {
-    const transaction = await initializePaystackTransaction({
+    const { checkoutUrl } = await createFlutterwavePayment({
+      // Naira, not kobo — Flutterwave takes the major unit.
       amount: priced.totalAmount,
       email: user.email ?? `buyer-${user.id.slice(0, 8)}@afunwa.example`,
-      reference,
-      // getAppUrl, not env.appUrl: on Vercel this resolves from the deployment
-      // itself, so a missing NEXT_PUBLIC_APP_URL cannot send a paying customer
-      // back to localhost.
-      callbackUrl: `${getAppUrl()}/order-confirmation/${order.id}`,
-      metadata: {
+      name: buyer?.full_name ? String(buyer.full_name) : undefined,
+      phone: buyer?.phone ? String(buyer.phone) : undefined,
+      txRef,
+      // getAppUrl, not env.appUrl: resolves from the deployment itself, so a
+      // missing NEXT_PUBLIC_APP_URL cannot strand a paying customer.
+      redirectUrl: `${getAppUrl()}/order-confirmation/${order.id}`,
+      meta: {
         order_id: order.id,
         vendor_id: priced.vendorId,
         buyer_id: user.id
       }
     })
 
-    return NextResponse.json({
-      checkoutUrl: transaction.data.authorization_url,
-      orderId: order.id,
-      reference
-    })
-  } catch (paystackError) {
-    // The order row exists but no payment can reach it — cancel it rather than
-    // leave the seller staring at an order nobody can pay for.
-    await supabase
-      .from("orders")
-      .update({ status: "cancelled" })
-      .eq("id", order.id)
+    return NextResponse.json({ checkoutUrl, orderId: order.id, reference: txRef })
+  } catch (flutterwaveError) {
+    // The order row exists but nothing can pay it — cancel rather than leave
+    // the seller an order no one can settle.
+    await supabase.from("orders").update({ status: "cancelled" }).eq("id", order.id)
 
-    console.error("Paystack initialize failed", paystackError)
+    console.error("Flutterwave initialize failed", flutterwaveError)
     return NextResponse.json(
       { error: "Card checkout could not be started. Try another payment method." },
       { status: 502 }

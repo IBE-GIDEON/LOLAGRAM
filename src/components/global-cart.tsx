@@ -12,7 +12,7 @@ import { RemoteImage } from "@/components/remote-image"
 import { BottomSheet, Button, Card } from "@/components/ui"
 import { PAYMENT_METHOD_META } from "@/lib/constants"
 import { PAY_ON_DELIVERY_ENABLED } from "@/lib/feature-flags"
-import { hasPaystack } from "@/lib/env"
+import { hasFlutterwave } from "@/lib/env"
 import { useLocale } from "@/components/providers/locale-provider"
 import {
   loadVendorDetail,
@@ -31,7 +31,7 @@ import { type PaymentMethod, type VendorDetail } from "@/lib/types"
  */
 const PAYMENT_METHODS: PaymentMethod[] = [
   // Card first: it is the only one that settles before the parcel moves.
-  ...(hasPaystack ? (["paystack"] as PaymentMethod[]) : []),
+  ...(hasFlutterwave ? (["flutterwave"] as PaymentMethod[]) : []),
   "vendor_transfer",
   ...(PAY_ON_DELIVERY_ENABLED ? (["pay_on_delivery"] as PaymentMethod[]) : [])
 ]
@@ -124,7 +124,7 @@ export function GlobalCart() {
       paymentMethod
     }
 
-    if (!navigator.onLine && paymentMethod === "paystack") {
+    if (!navigator.onLine && paymentMethod === "flutterwave") {
       toast.error("Card checkout needs a connection. Pick bank transfer to queue this order.")
       return
     }
@@ -139,9 +139,9 @@ export function GlobalCart() {
 
     setSubmitting(true)
     try {
-      if (paymentMethod === "paystack") {
+      if (paymentMethod === "flutterwave") {
         const { checkoutUrl } = await startCardCheckout(payload)
-        // Cart is deliberately left alone until Paystack confirms: if the
+        // Cart is deliberately left alone until the payment confirms: if the
         // buyer abandons the card page, their basket is still here.
         window.location.href = checkoutUrl
         return

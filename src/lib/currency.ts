@@ -1,8 +1,8 @@
 /**
  * Multi-currency display.
  *
- * Prices are stored and settled in NGN — vendors are paid in naira, Paystack
- * charges in naira. Everything here is a *display* conversion so a shopper in
+ * Prices are stored and settled in NGN — vendors are paid in naira and the
+ * card processor charges in naira. Everything here is a *display* conversion so a shopper in
  * London or Toronto understands the price. The naira figure stays visible
  * wherever money is committed, so nobody is surprised at checkout.
  */
