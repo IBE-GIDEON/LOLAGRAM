@@ -1,9 +1,10 @@
 import Link from "next/link"
 import { FaFacebookF, FaInstagram, FaTiktok } from "react-icons/fa6"
-import { FiCheck } from "react-icons/fi"
+import { FiCheck, FiMapPin } from "react-icons/fi"
 
 import { BrandLockup } from "@/components/brand-logo"
 import {
+  COMPANY_ADDRESS,
   COMPANY_NAME,
   COMPANY_STATS,
   FOOTER_LINKS,
@@ -88,7 +89,21 @@ export function SiteFooter() {
           ))}
         </nav>
 
-        <p className="mt-5 text-[11px] leading-5 text-white/45">
+        {/* A link, not plain text: this is a market address someone will want
+            to navigate to from their phone. */}
+        <a
+          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+            `${COMPANY_ADDRESS}, Lagos, Nigeria`
+          )}`}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-5 inline-flex items-start gap-2 text-[12px] leading-5 text-white/70 transition hover:text-white"
+        >
+          <FiMapPin aria-hidden="true" className="mt-0.5 shrink-0" />
+          <span>{COMPANY_ADDRESS}</span>
+        </a>
+
+        <p className="mt-3 text-[11px] leading-5 text-white/45">
           © {year} {COMPANY_NAME}. Wigs, closures, frontals and bundles,
           factory-direct across Nigeria.
         </p>

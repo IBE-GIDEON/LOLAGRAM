@@ -7,6 +7,10 @@
 
 export const COMPANY_NAME = "Afunwa Hairline Inc"
 
+/** Shop address, shown in the footer and used for the map link. */
+export const COMPANY_ADDRESS =
+  "No. 10 Alagbade Street, off Breadfruit, Balogun Market, Lagos Island"
+
 /**
  * The trust strip.
  *
