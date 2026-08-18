@@ -6,7 +6,7 @@ import { type ReactNode } from "react"
 import { RemoteImage } from "@/components/remote-image"
 import { Badge } from "@/components/ui"
 import { PriceTag } from "@/components/price-tag"
-import { formatCategory } from "@/lib/format"
+import { getProductCategoryLabel } from "@/lib/product-categories"
 import { getPrimaryProductImage } from "@/lib/product-images"
 import { type ProductSearchResult } from "@/lib/types"
 import { usePageScroll } from "@/lib/use-page-scroll"
@@ -138,7 +138,7 @@ function ProductFeedCard({ product }: { product: ProductSearchResult }) {
 
         <div className="flex flex-wrap items-center gap-2">
           <Badge className="bg-canvas text-[11px]">
-            {formatCategory(product.vendor.category)}
+            {getProductCategoryLabel(product.category)}
           </Badge>
           <span className="text-[11px] font-medium text-muted">{product.vendor.city}</span>
         </div>

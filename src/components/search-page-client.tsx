@@ -13,7 +13,10 @@ import {
   StarRating
 } from "@/components/ui"
 import { CATEGORY_TILES } from "@/lib/banners"
-import { isProductCategory } from "@/lib/product-categories"
+import {
+  getProductCategoryLabel,
+  isProductCategory
+} from "@/lib/product-categories"
 import { VENDOR_DISCOVERY_ENABLED } from "@/lib/feature-flags"
 import { PriceTag } from "@/components/price-tag"
 import { formatCategory } from "@/lib/format"
@@ -313,7 +316,7 @@ function ProductSearchCard({ product }: { product: ProductSearchResult }) {
         <p className="text-xs text-muted">Sold by {product.vendor.storeName}</p>
         <div className="flex flex-wrap items-center gap-2">
           <Badge className="bg-canvas text-[11px]">
-            {formatCategory(product.vendor.category)}
+            {getProductCategoryLabel(product.category)}
           </Badge>
           <span
             className={cn(

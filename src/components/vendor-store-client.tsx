@@ -15,6 +15,7 @@ import {
 } from "@/lib/format"
 import { PriceTag } from "@/components/price-tag"
 import { RemoteImage } from "@/components/remote-image"
+import { getProductCategoryLabel } from "@/lib/product-categories"
 import { getPrimaryProductImage } from "@/lib/product-images"
 import { loadVendorDetail, peekCachedVendorDetail } from "@/lib/marketplace"
 import { buildProductUrl, shareLink } from "@/lib/share"
@@ -373,7 +374,7 @@ export function VendorStoreClient({
               />
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
                 <span className="rounded-full bg-canvas px-2.5 py-1 font-medium">
-                  {formatCategory(data.vendor.category)}
+                  {getProductCategoryLabel(selectedProduct.category)}
                 </span>
                 <span className="rounded-full bg-canvas px-2.5 py-1 font-medium">
                   {data.vendor.city}
