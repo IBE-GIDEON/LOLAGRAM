@@ -18,6 +18,7 @@ import { RemoteImage } from "@/components/remote-image"
 import { getProductCategoryLabel } from "@/lib/product-categories"
 import { getPrimaryProductImage } from "@/lib/product-images"
 import { loadVendorDetail, peekCachedVendorDetail } from "@/lib/marketplace"
+import { useMarketplaceRefresh } from "@/lib/use-marketplace-refresh"
 import { buildProductUrl, shareLink } from "@/lib/share"
 import { buildWhatsAppUrl } from "@/lib/whatsapp"
 import { type Product, type VendorDetail } from "@/lib/types"
@@ -38,6 +39,7 @@ export function VendorStoreClient({
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [sharing, setSharing] = useState(false)
   const productRef = useRef<HTMLDivElement | null>(null)
+  const refreshToken = useMarketplaceRefresh()
 
   /**
    * Keeps ?product=<id> in the address bar in step with the open product, so
@@ -91,7 +93,8 @@ export function VendorStoreClient({
 
   useEffect(() => {
     loadVendorDetail(vendorId).then(setData)
-  }, [vendorId])
+    // refreshToken ticks when a background check finds this store changed.
+  }, [vendorId, refreshToken])
 
   useEffect(() => {
     if (!data || !initialProductId) return

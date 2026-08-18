@@ -27,6 +27,7 @@ import {
   peekCachedVendors
 } from "@/lib/marketplace"
 import { type ProductSearchResult, type VendorSnapshot } from "@/lib/types"
+import { useMarketplaceRefresh } from "@/lib/use-marketplace-refresh"
 import { cn } from "@/lib/utils"
 
 type HomeTab = "find" | "general"
@@ -46,6 +47,7 @@ export function HomePageClient({
   const [activeTab, setActiveTab] = useState<HomeTab>(initialTab)
   const [query, setQuery] = useState("")
   const deferredQuery = useDeferredValue(query)
+  const refreshToken = useMarketplaceRefresh()
   // With vendor discovery closed there is only one store to browse, so the feed
   // is always the product feed no matter what the tab state says.
   const isFindTab = VENDOR_DISCOVERY_ENABLED && (searchOnly || activeTab === "find")
@@ -106,7 +108,9 @@ export function HomePageClient({
     return () => {
       ignore = true
     }
-  }, [deferredQuery, isFindTab])
+    // refreshToken ticks when a background check finds the catalogue changed,
+    // which re-reads it here rather than leaving a stale copy on screen.
+  }, [deferredQuery, isFindTab, refreshToken])
 
   useEffect(() => {
     setVisibleCount(INITIAL_PRODUCT_BATCH)

@@ -695,6 +695,82 @@ function deduplicatedFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T
   return promise
 }
 
+/**
+ * Serve-then-refresh, and tell the screen when the answer changed.
+ *
+ * A buyer's browser keeps a copy of the catalogue so pages paint instantly,
+ * but that copy has no way of knowing the seller just edited a product. Every
+ * cached read therefore also refreshes behind itself, and a refresh that comes
+ * back different wakes each mounted view. Without this a buyer who visited in
+ * the last few minutes saw the old catalogue and made no request at all.
+ */
+type MarketplaceListener = () => void
+
+const marketplaceListeners = new Set<MarketplaceListener>()
+
+export function subscribeToMarketplaceUpdates(listener: MarketplaceListener) {
+  marketplaceListeners.add(listener)
+  return () => {
+    marketplaceListeners.delete(listener)
+  }
+}
+
+function announceMarketplaceUpdate() {
+  for (const listener of marketplaceListeners) {
+    try {
+      listener()
+    } catch {
+      // One broken listener must not stop the rest being told.
+    }
+  }
+}
+
+/** A floor on refresh traffic: at most one network check per key per window. */
+const REVALIDATE_INTERVAL_MS = 10_000
+const lastRevalidatedAt = new Map<string, number>()
+
+function revalidateInBackground<T>(
+  key: string,
+  refetch: () => Promise<T>,
+  cached: T
+) {
+  if (typeof window === "undefined") return
+
+  const last = lastRevalidatedAt.get(key) ?? 0
+  if (Date.now() - last < REVALIDATE_INTERVAL_MS) return
+  lastRevalidatedAt.set(key, Date.now())
+
+  refetch()
+    .then((fresh) => {
+      // Only repaint on a real difference, so an unchanged catalogue does not
+      // churn every view on a timer.
+      if (JSON.stringify(fresh) !== JSON.stringify(cached)) {
+        announceMarketplaceUpdate()
+      }
+    })
+    .catch(() => {
+      // Offline or the request failed — the cached copy stays on screen.
+    })
+}
+
+/**
+ * Coming back to the tab, or back onto the network, is the moment a buyer is
+ * most likely to be looking at something stale. Dropping the floor and asking
+ * the mounted views to re-read sends each of them through the refresh path
+ * above; the cached copy stays up meanwhile, so nothing flashes.
+ */
+if (typeof window !== "undefined") {
+  const refreshOnReturn = () => {
+    if (document.visibilityState !== "visible") return
+    lastRevalidatedAt.clear()
+    announceMarketplaceUpdate()
+  }
+
+  document.addEventListener("visibilitychange", refreshOnReturn)
+  window.addEventListener("online", refreshOnReturn)
+  window.addEventListener("pageshow", refreshOnReturn)
+}
+
 type SearchTokenGroup = {
   raw: string
   variants: string[]
@@ -875,6 +951,11 @@ function clearMarketplaceDiscoveryCaches() {
   clearPersistedCacheByPrefix("vendors:")
   clearPersistedCacheByPrefix("marketplace-search:")
   clearPersistedCacheByPrefix("product-feed:")
+  // The seller usually has the storefront open in another tab while editing.
+  // Dropping the caches alone would leave it showing the old copy until
+  // something happened to re-read; this repaints it straight away.
+  lastRevalidatedAt.clear()
+  announceMarketplaceUpdate()
 }
 
 function clearOrderCaches() {
@@ -1197,19 +1278,30 @@ export function peekCachedVendorDetail(vendorId: string): VendorDetail | null {
   )
 }
 
-export async function loadVendors(query = ""): Promise<VendorSnapshot[]> {
+export async function loadVendors(
+  query = "",
+  /** Internal: set by the background refresh so it reaches the network. */
+  skipCache = false
+): Promise<VendorSnapshot[]> {
   if (!hasSupabase) {
     return canUseDemoMode ? getVendorSnapshots(query) : []
   }
 
   const cacheKey = query.trim().toLowerCase()
-  const cached = readHybridCache(
-    vendorListCache,
-    cacheKey,
-    persistedCacheKeys.vendors(cacheKey)
-  )
-  if (cached) {
-    return cached
+  if (!skipCache) {
+    const cached = readHybridCache(
+      vendorListCache,
+      cacheKey,
+      persistedCacheKeys.vendors(cacheKey)
+    )
+    if (cached) {
+      revalidateInBackground(
+        `vendors:${cacheKey}`,
+        () => loadVendors(query, true),
+        cached
+      )
+      return cached
+    }
   }
 
   return deduplicatedFetch(`vendors:${cacheKey}`, async () => {
@@ -1247,7 +1339,9 @@ export async function loadVendors(query = ""): Promise<VendorSnapshot[]> {
 }
 
 export async function loadMarketplaceSearch(
-  query = ""
+  query = "",
+  /** Internal: set by the background refresh so it reaches the network. */
+  skipCache = false
 ): Promise<MarketplaceSearchResults> {
   if (!hasSupabase) {
     return canUseDemoMode
@@ -1267,13 +1361,18 @@ export async function loadMarketplaceSearch(
   const searchGroups = getSearchTokenGroups(normalized)
   const shouldCacheSearch = normalized.length === 0
 
-  if (shouldCacheSearch) {
+  if (shouldCacheSearch && !skipCache) {
     const cached = readHybridCache(
       marketplaceSearchCache,
       cacheKey,
       persistedCacheKeys.marketplaceSearch(cacheKey)
     )
     if (cached) {
+      revalidateInBackground(
+        `marketplace-search:${cacheKey}`,
+        () => loadMarketplaceSearch(query, true),
+        cached
+      )
       return cached
     }
   }
@@ -1383,12 +1482,17 @@ export async function loadMarketplaceSearch(
     }
 
     // --- EMPTY QUERY PATH (home/trending feed) ---
-    const cached = readHybridCache(
-      marketplaceSearchCache,
-      "",
-      persistedCacheKeys.marketplaceSearch("")
-    )
-    if (cached) return cached
+    // Second look at the cache, in case another caller filled it while this
+    // request was queued. The background refresh has to see past it, or it
+    // would answer itself from the very copy it was sent to replace.
+    if (!skipCache) {
+      const cached = readHybridCache(
+        marketplaceSearchCache,
+        "",
+        persistedCacheKeys.marketplaceSearch("")
+      )
+      if (cached) return cached
+    }
 
     const [{ data: vendorRows, error: vendorError }, { data: productRows, error: productError }] =
       await Promise.all([
@@ -1447,7 +1551,9 @@ export async function loadMarketplaceSearch(
  */
 export async function loadProductsByCategory(
   category: string,
-  query = ""
+  query = "",
+  /** Internal: set by the background refresh so it reaches the network. */
+  skipCache = false
 ): Promise<ProductSearchResult[]> {
   const normalized = normalizeProductCategory(category)
   const needle = query.trim().toLowerCase()
@@ -1467,14 +1573,27 @@ export async function loadProductsByCategory(
   }
 
   const cacheKey = `category:${normalized}:${needle}`
-  const cached = readHybridCache(
-    productFeedCache,
-    cacheKey,
-    persistedCacheKeys.productFeed(cacheKey)
-  )
-  if (cached) return cached
+  // The typed words belong in the dedupe key as well as the cache key. Keyed
+  // on the shelf alone, "13x4" typed while the empty-query request was still
+  // in flight was handed that request's answer — the wrong list, silently.
+  const dedupeKey = `product-category:${normalized}:${needle}`
+  if (!skipCache) {
+    const cached = readHybridCache(
+      productFeedCache,
+      cacheKey,
+      persistedCacheKeys.productFeed(cacheKey)
+    )
+    if (cached) {
+      revalidateInBackground(
+        dedupeKey,
+        () => loadProductsByCategory(category, query, true),
+        cached
+      )
+      return cached
+    }
+  }
 
-  return deduplicatedFetch(`product-category:${normalized}`, async () => {
+  return deduplicatedFetch(dedupeKey, async () => {
     const supabase = getSupabaseBrowserClient()
     if (!supabase) return []
 
@@ -1509,7 +1628,11 @@ export async function loadProductsByCategory(
   })
 }
 
-export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]> {
+export async function loadProductFeed(
+  query = "",
+  /** Internal: set by the background refresh so it reaches the network. */
+  skipCache = false
+): Promise<ProductSearchResult[]> {
   const normalized = query.trim()
 
   if (!hasSupabase) {
@@ -1517,18 +1640,25 @@ export async function loadProductFeed(query = ""): Promise<ProductSearchResult[]
   }
 
   if (normalized) {
-    const results = await loadMarketplaceSearch(query)
+    const results = await loadMarketplaceSearch(query, skipCache)
     return results.products
   }
 
   const cacheKey = normalized.toLowerCase()
-  const cached = readHybridCache(
-    productFeedCache,
-    cacheKey,
-    persistedCacheKeys.productFeed(cacheKey)
-  )
-  if (cached) {
-    return cached
+  if (!skipCache) {
+    const cached = readHybridCache(
+      productFeedCache,
+      cacheKey,
+      persistedCacheKeys.productFeed(cacheKey)
+    )
+    if (cached) {
+      revalidateInBackground(
+        `product-feed:${cacheKey}`,
+        () => loadProductFeed(query, true),
+        cached
+      )
+      return cached
+    }
   }
 
   return deduplicatedFetch(`product-feed:${cacheKey}`, async () => {
@@ -1657,21 +1787,31 @@ function syncProductStockToFeedCache(
   }
 }
 
-export async function loadVendorDetail(vendorId: string): Promise<VendorDetail | null> {
+export async function loadVendorDetail(
+  vendorId: string,
+  /** Internal: set by the background refresh so it reaches the network. */
+  skipCache = false
+): Promise<VendorDetail | null> {
   if (!hasSupabase) {
     return canUseDemoMode ? getVendorDetailDemo(vendorId) : null
   }
 
-  const cached =
-    readCache(vendorDetailCache, vendorId) ??
-    normalizeCachedVendorDetail(
-      readPersistedCache<VendorDetail>(persistedCacheKeys.vendorDetail(vendorId))
-    )
+  const cached = skipCache
+    ? null
+    : readCache(vendorDetailCache, vendorId) ??
+      normalizeCachedVendorDetail(
+        readPersistedCache<VendorDetail>(persistedCacheKeys.vendorDetail(vendorId))
+      )
   if (cached) {
     writeHybridCache(
       vendorDetailCache,
       vendorId,
       persistedCacheKeys.vendorDetail(vendorId),
+      cached
+    )
+    revalidateInBackground(
+      `vendor-detail:${vendorId}`,
+      () => loadVendorDetail(vendorId, true),
       cached
     )
     return cached

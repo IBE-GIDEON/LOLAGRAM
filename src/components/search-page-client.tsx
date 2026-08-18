@@ -26,6 +26,7 @@ import {
   peekCachedMarketplaceSearch
 } from "@/lib/marketplace"
 import { getPrimaryProductImage } from "@/lib/product-images"
+import { useMarketplaceRefresh } from "@/lib/use-marketplace-refresh"
 import { usePageScroll } from "@/lib/use-page-scroll"
 import {
   type MarketplaceSearchResults,
@@ -65,6 +66,7 @@ export function SearchPageClient({
   const stickyRef = useRef<HTMLDivElement | null>(null)
   const compactRef = useRef(false)
   const deferredQuery = useDeferredValue(query)
+  const refreshToken = useMarketplaceRefresh()
   const activeQuery = deferredQuery.trim()
   const showProducts = mode === "all" || mode === "products"
   const showVendors =
@@ -127,7 +129,8 @@ export function SearchPageClient({
     return () => {
       ignore = true
     }
-  }, [category, deferredQuery])
+    // refreshToken ticks when a background check finds the catalogue changed.
+  }, [category, deferredQuery, refreshToken])
 
   return (
     <div className="pb-6 pt-0">
