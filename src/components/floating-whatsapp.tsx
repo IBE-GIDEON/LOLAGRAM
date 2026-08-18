@@ -8,7 +8,7 @@ import { env } from "@/lib/env"
 import { loadVendors } from "@/lib/marketplace"
 import { buildWhatsAppUrl } from "@/lib/whatsapp"
 
-const GREETING = "Hi, welcome to Afunwa. How can we help you today? 🙂"
+const GREETING = "Hi, this is Afunwa Hairline. What kind of hairs do you need today?"
 const REPLY_TIME = "Typically replies within 10 minutes"
 
 type Store = {
