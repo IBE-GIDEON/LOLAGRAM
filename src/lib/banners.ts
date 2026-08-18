@@ -75,36 +75,40 @@ export const CATEGORY_TILES: CategoryTile[] = [
     id: "wigs",
     image: "/banners/tile-wigs.jpg",
     label: "Wigs",
-    caption: "Every length, every shade",
+    caption: "Every length, Every shade, Every style",
     term: "wigs"
   },
   {
     id: "futura",
     image: "/banners/tile-futura.jpg",
     label: "Futura wigs",
-    caption: "High quality blend",
+    caption: "High-quality blend wigs",
     term: "futura"
   },
   {
     id: "closures",
     image: "/banners/tile-closures.jpg",
     label: "Closures and frontals",
-    caption: "HD lace, 13x4 and 4x4",
+    // Sizes written the way buyers type them when searching: 13x6, not 13*6.
+    caption: "HD lace, Swiss lace, 13x6, 5x5, 2x6...",
     term: "closures"
   },
   {
     id: "essentials",
     image: "/banners/tile-essentials.jpg",
     label: "Hair essentials",
-    caption: "Caps, glue, combs, care",
+    caption: "Glue, Combs, Equipments & Accessories",
     term: "essentials"
   },
   {
     id: "combo",
-    image: "/banners/tile-combo.jpg",
+    // -v2 rather than replacing the old file: the service worker caches images
+    // cache-first, so reusing the path would keep serving returning buyers the
+    // previous picture.
+    image: "/banners/tile-combo-v2.jpg",
     label: "Combo deals",
     // Not "Bundle and save" — Bundles is now its own tile beside this one.
-    caption: "Buy more, pay less",
+    caption: "Buy more, Pay less",
     term: "combo"
   },
   // Sixth tile: five exactly fill the row, so without this there is nothing for
