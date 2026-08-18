@@ -4,7 +4,7 @@ import Link from "next/link"
 import { type ReactNode } from "react"
 
 import { RemoteImage } from "@/components/remote-image"
-import { Badge } from "@/components/ui"
+import { Badge, StarRating } from "@/components/ui"
 import { PriceTag } from "@/components/price-tag"
 import { getProductCategoryLabel } from "@/lib/product-categories"
 import { getPrimaryProductImage } from "@/lib/product-images"
@@ -140,7 +140,16 @@ function ProductFeedCard({ product }: { product: ProductSearchResult }) {
           <Badge className="bg-canvas text-[11px]">
             {getProductCategoryLabel(product.category)}
           </Badge>
-          <span className="text-[11px] font-medium text-muted">{product.vendor.city}</span>
+          {/* Before the first review a score would read as a flat 0.0, which
+              is worse than saying nothing — so say "New" until one lands. */}
+          {product.vendor.reviewCount > 0 ? (
+            <StarRating
+              rating={product.vendor.rating}
+              reviewCount={product.vendor.reviewCount}
+            />
+          ) : (
+            <span className="text-[11px] font-medium text-muted">New</span>
+          )}
         </div>
       </div>
     </Link>
