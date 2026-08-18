@@ -2203,20 +2203,27 @@ export async function saveSellerProfile(
 
   const { data, error } = await supabase
     .from("vendor_profiles")
-    .upsert({
-      user_id: userId,
-      store_name: input.storeName,
-      category: input.category,
-      store_photo_url: input.storePhotoUrl,
-      bio: input.bio,
-      city: input.city,
-      whatsapp_number: input.whatsappNumber,
-      bank_name: input.bankName,
-      account_name: input.accountName,
-      account_number: input.accountNumber,
-      payment_note: input.paymentNote,
-      is_active: true
-    })
+    .upsert(
+      {
+        user_id: userId,
+        store_name: input.storeName,
+        category: input.category,
+        store_photo_url: input.storePhotoUrl,
+        bio: input.bio,
+        city: input.city,
+        whatsapp_number: input.whatsappNumber,
+        bank_name: input.bankName,
+        account_name: input.accountName,
+        account_number: input.accountNumber,
+        payment_note: input.paymentNote,
+        is_active: true
+      },
+      // Conflict on user_id, not on the primary key. No id is sent here, so
+      // the default made every save an insert — fine the first time, and a
+      // "duplicate key value violates vendor_profiles_user_id_key" every time
+      // the store was edited afterwards.
+      { onConflict: "user_id" }
+    )
     .select()
     .single()
 
