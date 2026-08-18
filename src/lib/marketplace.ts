@@ -2443,27 +2443,46 @@ export async function saveProduct(input: ProductInput) {
     ? await supabase.from("products").update(payload).eq("id", input.id).select().single()
     : await supabase.from("products").insert(payload).select().single()
 
-  if (
-    response.error?.code === "PGRST204" ||
-    response.error?.message?.toLowerCase().includes("photo_urls")
-  ) {
-    const legacyPayload = {
-      vendor_id: input.vendorId,
-      name: input.name,
-      description: input.description,
-      price: input.price,
-      photo_url: serializeLegacyPhotoUrl(input.photoUrls) ?? input.photoUrl ?? null,
-      in_stock: input.inStock
+  // PGRST204 means the database has no such column — a migration that has not
+  // been run. Drop only the column PostgREST actually names and try again.
+  //
+  // The old behaviour fell back to a fixed legacy payload, which threw away
+  // the category, the compare-at price AND every photo but the first, then
+  // reported "Product updated." A seller missing one migration silently lost
+  // three fields on every save.
+  const retryPayload: Record<string, unknown> = { ...payload }
+  const droppedColumns: string[] = []
+
+  while (response.error?.code === "PGRST204") {
+    const missing = response.error.message?.match(/'([^']+)' column/)?.[1]
+    if (!missing || !(missing in retryPayload)) break
+
+    delete retryPayload[missing]
+    droppedColumns.push(missing)
+
+    // photo_urls is the one genuinely legacy shape: fold the extra photos back
+    // into the single photo_url column so they are not simply lost.
+    if (missing === "photo_urls" && "photo_url" in retryPayload) {
+      retryPayload.photo_url =
+        serializeLegacyPhotoUrl(input.photoUrls) ?? input.photoUrl ?? null
     }
 
     response = input.id
       ? await supabase
           .from("products")
-          .update(legacyPayload)
+          .update(retryPayload)
           .eq("id", input.id)
           .select()
           .single()
-      : await supabase.from("products").insert(legacyPayload).select().single()
+      : await supabase.from("products").insert(retryPayload).select().single()
+  }
+
+  if (droppedColumns.length && typeof console !== "undefined") {
+    console.warn(
+      `Saved without ${droppedColumns.join(", ")} — the database is missing ` +
+        `${droppedColumns.length > 1 ? "those columns" : "that column"}. ` +
+        "Run the SQL files in supabase/ to stop losing these fields."
+    )
   }
 
   if (response.error || !response.data) {

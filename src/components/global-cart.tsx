@@ -74,6 +74,22 @@ export function GlobalCart() {
     )
   }, [vendorData?.products])
 
+  // Item prices are captured when the item is added to the cart. If the seller
+  // edits one while it sits there, the stored figure goes stale. Card and
+  // pay-on-delivery are re-priced server-side by priceCart, so those charge
+  // correctly whatever we show — but a bank transfer is money the buyer sends
+  // by hand against the figure on this screen, so it has to be the live one.
+  const liveSubtotal = useMemo(() => {
+    if (productMap.size === 0) return subtotal
+    return items.reduce((total, item) => {
+      const product = productMap.get(item.productId)
+      return total + (product?.price ?? item.price) * item.quantity
+    }, 0)
+  }, [items, productMap, subtotal])
+
+  const priceChanged =
+    productMap.size > 0 && Math.abs(liveSubtotal - subtotal) > 0.005
+
   const vendorTransferReady = Boolean(
     vendorData?.vendor.bankName &&
       vendorData?.vendor.accountName &&
@@ -119,7 +135,9 @@ export function GlobalCart() {
       buyerId: profile.id,
       vendorId,
       items,
-      totalAmount: subtotal,
+      // The server re-prices this from the database and ignores the figure;
+      // send the live one anyway so the offline queue holds something honest.
+      totalAmount: liveSubtotal,
       deliveryAddress,
       paymentMethod
     }
@@ -369,7 +387,7 @@ export function GlobalCart() {
                   <p className="mt-3 text-xs leading-5 text-muted">
                     Transfer{" "}
                     <span className="font-semibold text-ink">
-                      {money(subtotal).baseText}
+                      {money(liveSubtotal).baseText}
                     </span>
                     , then place the order so the seller can match your payment.
                   </p>
@@ -377,10 +395,17 @@ export function GlobalCart() {
               ) : null}
             </div>
 
+            {priceChanged ? (
+              <p className="mt-4 rounded-2xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+                A price in your cart changed since you added it. The total below
+                is the current one.
+              </p>
+            ) : null}
+
             <div className="mt-4 flex items-center justify-between">
               <p className="text-sm text-muted">Subtotal</p>
               <p className="text-lg font-bold text-brand">
-                {money(subtotal).text}
+                {money(liveSubtotal).text}
               </p>
             </div>
             <Button
