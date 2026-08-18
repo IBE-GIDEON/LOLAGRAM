@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { hasSupabaseAdmin } from "@/lib/env"
+import { priceCart } from "@/lib/order-pricing"
 import { verifyAuthToken } from "@/lib/supabase/auth-guard"
 import { getSupabaseAdminClient } from "@/lib/supabase/server"
 import { type CheckoutPayload } from "@/lib/types"
@@ -28,15 +29,27 @@ export async function POST(request: Request) {
     )
   }
 
+  // Price the cart here rather than believing the queued copy. This runs with
+  // the service role, so RLS cannot catch a bad total either — and an order
+  // that sat in IndexedDB overnight may name a price that has since changed,
+  // a product now out of stock, or one the buyer simply edited by hand.
+  const priced = await priceCart(supabase, payload.items)
+  if (!priced.ok) {
+    return NextResponse.json({ error: priced.error }, { status: 400 })
+  }
+
+  const paymentMethod =
+    payload.paymentMethod === "vendor_transfer" ? "vendor_transfer" : "pay_on_delivery"
+
   const { error } = await supabase.from("orders").insert({
-    buyer_id: payload.buyerId,
-    vendor_id: payload.vendorId,
-    items: payload.items,
-    total_amount: payload.totalAmount,
+    buyer_id: user.id,
+    vendor_id: priced.vendorId,
+    items: priced.items,
+    total_amount: priced.totalAmount,
     delivery_address: payload.deliveryAddress,
-    payment_method: payload.paymentMethod,
+    payment_method: paymentMethod,
     payment_status:
-      payload.paymentMethod === "vendor_transfer"
+      paymentMethod === "vendor_transfer"
         ? "awaiting_seller_confirmation"
         : "pay_on_delivery",
     buyer_payment_note: payload.buyerPaymentNote ?? null,

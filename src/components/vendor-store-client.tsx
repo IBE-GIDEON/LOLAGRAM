@@ -96,14 +96,21 @@ export function VendorStoreClient({
     // refreshToken ticks when a background check finds this store changed.
   }, [vendorId, refreshToken])
 
+  // Open the shared ?product= link once and once only. This effect watches
+  // `data`, and `data` is now replaced whenever a background refresh finds the
+  // store changed — without the guard the sheet reopened itself under a buyer
+  // who had just closed it.
+  const deepLinkOpened = useRef(false)
+
   useEffect(() => {
-    if (!data || !initialProductId) return
+    if (!data || !initialProductId || deepLinkOpened.current) return
 
     const matchingProduct = data.products.find(
       (product) => product.id === initialProductId
     )
 
     if (matchingProduct) {
+      deepLinkOpened.current = true
       setSelectedProduct(matchingProduct)
     }
   }, [data, initialProductId])

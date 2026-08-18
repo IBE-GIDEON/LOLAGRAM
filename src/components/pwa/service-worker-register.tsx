@@ -69,9 +69,16 @@ export function ServiceWorkerRegister() {
       flushOfflineOrders().catch(() => undefined)
     }
 
+    // Background sync fires in the worker, which has no access to the session,
+    // so it asks us to do the flush instead.
+    const onWorkerMessage = (event: MessageEvent) => {
+      if (event.data?.type === "FLUSH_OFFLINE_ORDERS") flush()
+    }
+
     window.addEventListener("online", flush)
     window.addEventListener("focus", checkForUpdateFromFocus)
     document.addEventListener("visibilitychange", refreshWhenVisible)
+    navigator.serviceWorker.addEventListener("message", onWorkerMessage)
     flush()
 
     return () => {
@@ -82,6 +89,7 @@ export function ServiceWorkerRegister() {
         "controllerchange",
         reloadOnControllerChange
       )
+      navigator.serviceWorker.removeEventListener("message", onWorkerMessage)
       if (updateInterval) {
         clearInterval(updateInterval)
       }

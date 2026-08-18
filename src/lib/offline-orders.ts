@@ -3,6 +3,7 @@
 import { openDB } from "idb"
 
 import { OFFLINE_DB_NAME, OFFLINE_ORDER_STORE } from "@/lib/constants"
+import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { type CheckoutPayload } from "@/lib/types"
 
 /** Maximum number of offline order intents to keep queued. */
@@ -54,17 +55,37 @@ export async function queueOfflineOrder(payload: CheckoutPayload) {
 }
 
 export async function flushOfflineOrders() {
+  // /api/orders/sync requires a bearer token. Without one every queued order
+  // answered 401 and stayed in the queue forever, so an order placed offline
+  // never reached the seller and the buyer was never told.
+  const supabase = getSupabaseBrowserClient()
+  const token = supabase
+    ? (await supabase.auth.getSession()).data.session?.access_token
+    : undefined
+
+  if (!token) {
+    // Signed out, or the session has not rehydrated yet. Leave the queue
+    // alone and try again on the next flush rather than dropping orders.
+    return
+  }
+
   const db = await getDb()
   const allEntries = await db.getAll(OFFLINE_ORDER_STORE)
 
   for (const entry of allEntries) {
     const response = await fetch("/api/orders/sync", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
       body: JSON.stringify(entry.payload)
     })
 
-    if (response.ok) {
+    // 400 is priceCart refusing the cart outright — stock gone, product
+    // deleted. That will never succeed, so drop it rather than retry forever
+    // and fill the queue. A 401 or a 5xx may well recover, so those stay.
+    if (response.ok || response.status === 400) {
       await db.delete(OFFLINE_ORDER_STORE, entry.id)
     }
   }

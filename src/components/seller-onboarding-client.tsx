@@ -429,12 +429,24 @@ export function SellerOnboardingClient() {
                     })
                   }
 
-                  if (profile.accountType === "buyer") {
-                    await upgradeAccountType("both")
-                  }
-
-                  await refreshProfile(profile.id)
+                  // Past this line the store, and its first product, exist.
+                  // What follows is tidy-up. Leaving it inside the same try
+                  // reported a completed launch as a failure whenever it
+                  // hiccuped, and the seller's retry added the product again,
+                  // since a new product carries no id and so inserts.
                   setStep(4)
+
+                  try {
+                    if (profile.accountType === "buyer") {
+                      await upgradeAccountType("both")
+                    }
+
+                    await refreshProfile(profile.id)
+                  } catch {
+                    toast.error(
+                      "Your store is live, but we could not finish switching your account to a seller one. Reload the page and check your seller view."
+                    )
+                  }
                 } catch (error) {
                   toast.error(
                     error instanceof Error

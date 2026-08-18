@@ -50,6 +50,9 @@ export function ProductManagementClient() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [uploadingImages, setUploadingImages] = useState(false)
+  // Without this a second tap on a slow connection runs saveProduct twice, and
+  // an add (no id) inserts rather than updates — two identical listings.
+  const [saving, setSaving] = useState(false)
 
   async function shareProductLink(product: Product) {
     if (!vendorProfile) return
@@ -420,7 +423,10 @@ export function ProductManagementClient() {
           </label>
           <Button
             className="w-full"
+            disabled={saving || uploadingImages}
             onClick={async () => {
+              if (saving) return
+
               if (!form.name.trim()) {
                 toast.error("Add a product name first.")
                 return
@@ -436,6 +442,7 @@ export function ProductManagementClient() {
                 return
               }
 
+              setSaving(true)
               try {
                 await saveProduct({
                   id: editingProduct?.id,
@@ -458,10 +465,16 @@ export function ProductManagementClient() {
                 refreshProducts()
               } catch (error) {
                 toast.error(error instanceof Error ? error.message : "Could not save product.")
+              } finally {
+                setSaving(false)
               }
             }}
           >
-            {editingProduct ? "Save changes" : "Add product"}
+            {saving
+              ? "Saving..."
+              : editingProduct
+                ? "Save changes"
+                : "Add product"}
           </Button>
           {editingProduct ? (
             <Button

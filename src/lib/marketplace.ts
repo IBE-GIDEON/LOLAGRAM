@@ -725,6 +725,20 @@ function announceMarketplaceUpdate() {
   }
 }
 
+/** JSON with object keys sorted, so two equal values always serialise alike. */
+function stableStringify(value: unknown): string {
+  return JSON.stringify(value, (_key, val) => {
+    if (val && typeof val === "object" && !Array.isArray(val)) {
+      return Object.fromEntries(
+        Object.entries(val as Record<string, unknown>).sort(([a], [b]) =>
+          a < b ? -1 : a > b ? 1 : 0
+        )
+      )
+    }
+    return val
+  })
+}
+
 /** A floor on refresh traffic: at most one network check per key per window. */
 const REVALIDATE_INTERVAL_MS = 10_000
 const lastRevalidatedAt = new Map<string, number>()
@@ -743,8 +757,10 @@ function revalidateInBackground<T>(
   refetch()
     .then((fresh) => {
       // Only repaint on a real difference, so an unchanged catalogue does not
-      // churn every view on a timer.
-      if (JSON.stringify(fresh) !== JSON.stringify(cached)) {
+      // churn every view. Keys are sorted first: a value rehydrated from
+      // localStorage carries its own key order, so a plain JSON.stringify
+      // called every refresh a change even when nothing had moved.
+      if (stableStringify(fresh) !== stableStringify(cached)) {
         announceMarketplaceUpdate()
       }
     })
@@ -2563,18 +2579,17 @@ export async function placeOrder(
   }
 
   const token = await getAccessToken()
-  const response = await fetchWithRetry(
-    "/api/orders",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
-      body: JSON.stringify(payload)
+  // Deliberately not fetchWithRetry: creating an order is not idempotent, and
+  // a retry after a slow-but-successful POST bills the buyer for two orders.
+  // startCardCheckout takes the same care.
+  const response = await fetch("/api/orders", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
     },
-    { timeout: 15_000, retries: 1 }
-  )
+    body: JSON.stringify(payload)
+  })
 
   if (!response.ok) {
     const data = (await response.json().catch(() => null)) as

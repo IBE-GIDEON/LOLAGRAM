@@ -140,8 +140,13 @@ async function cacheFirst(request, cacheName, limit) {
 
   try {
     const response = await fetch(request)
-    await cache.put(request, response.clone())
-    await trimCache(cacheName, limit)
+    // Only keep a good answer. Caching a 404 or a 500 here pinned the failure
+    // permanently, because the next request is served cache-first and never
+    // reaches the network again.
+    if (response.ok) {
+      await cache.put(request, response.clone())
+      await trimCache(cacheName, limit)
+    }
     return response
   } catch (error) {
     return cached || Response.error()
@@ -204,20 +209,15 @@ async function deleteQueuedOrder(id) {
 }
 
 async function flushOrders() {
-  const entries = await getQueuedOrders()
-  for (const entry of entries) {
-    try {
-      const response = await fetch("/api/orders/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(entry.payload)
-      })
-      if (response.ok) {
-        await deleteQueuedOrder(entry.id)
-      }
-    } catch (error) {
-      return
-    }
+  // /api/orders/sync needs the buyer's bearer token, and the session lives in
+  // localStorage — which a service worker cannot read. Posting from here was
+  // always answered 401, so the queue never drained.
+  //
+  // Hand the job to an open page instead, which does have the session. With no
+  // page open there is nothing to do: the app flushes on load and on "online".
+  const windows = await clients.matchAll({ type: "window", includeUncontrolled: true })
+  for (const client of windows) {
+    client.postMessage({ type: "FLUSH_OFFLINE_ORDERS" })
   }
 }
 

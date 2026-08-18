@@ -140,13 +140,13 @@ function ProductFeedCard({ product }: { product: ProductSearchResult }) {
           <Badge className="bg-canvas text-[11px]">
             {getProductCategoryLabel(product.category)}
           </Badge>
-          {/* Before the first review a score would read as a flat 0.0, which
-              is worse than saying nothing — so say "New" until one lands. */}
-          {product.vendor.reviewCount > 0 ? (
-            <StarRating
-              rating={product.vendor.rating}
-              reviewCount={product.vendor.reviewCount}
-            />
+          {/* Keyed on rating, not reviewCount: the feed mappers hardcode
+              reviewCount to 0, so a count-based test would say "New" forever.
+              rating is maintained by the update_vendor_rating trigger and is
+              0 until the first review, which is exactly the test we want —
+              and before then a flat 0.0 reads worse than saying nothing. */}
+          {product.vendor.rating > 0 ? (
+            <StarRating rating={product.vendor.rating} />
           ) : (
             <span className="text-[11px] font-medium text-muted">New</span>
           )}
