@@ -46,6 +46,7 @@ export async function POST(request: Request) {
     vendor_id: priced.vendorId,
     items: priced.items,
     total_amount: priced.totalAmount,
+    delivery_fee: priced.deliveryFee,
     delivery_address: payload.deliveryAddress,
     payment_method: paymentMethod,
     payment_status:

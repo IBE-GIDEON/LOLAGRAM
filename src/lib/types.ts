@@ -59,6 +59,12 @@ export interface VendorProfile {
   accountName?: string
   accountNumber?: string
   paymentNote?: string
+  /** Flat delivery charge in naira. See lib/delivery. */
+  deliveryFee?: number
+  /** Items over this and delivery is free. */
+  freeDeliveryOver?: number
+  /** The seller's promise, e.g. "2 to 4 working days, nationwide". */
+  deliveryNote?: string
   isActive: boolean
   totalSales: number
   rating: number
@@ -202,6 +208,9 @@ export interface SellerProfileInput {
   accountName?: string
   accountNumber?: string
   paymentNote?: string
+  deliveryFee?: number
+  freeDeliveryOver?: number
+  deliveryNote?: string
 }
 
 export interface ProductInput {

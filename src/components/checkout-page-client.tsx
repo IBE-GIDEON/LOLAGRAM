@@ -14,6 +14,7 @@ import { RemoteImage } from "@/components/remote-image"
 import { Button, Card, Input, PAGE_WIDTH } from "@/components/ui"
 import { PAYMENT_METHOD_META } from "@/lib/constants"
 import { PAYMENT_METHODS } from "@/lib/payment-methods"
+import { amountToFreeDelivery, computeDeliveryFee } from "@/lib/delivery"
 import {
   EMPTY_CHECKOUT_ADDRESS,
   addressSummary,
@@ -25,8 +26,10 @@ import {
   type CheckoutAddress
 } from "@/lib/checkout-address"
 import {
+  loadBuyerDeliveryAddress,
   loadVendorDetail,
   placeOrder,
+  saveBuyerDeliveryAddress,
   saveUserProfile,
   startCardCheckout
 } from "@/lib/marketplace"
@@ -62,6 +65,19 @@ export function CheckoutPageClient() {
       setSavedAddress(stored)
       setStep(2)
     } else if (profile) {
+      // Nothing on this device — but the account may remember it from another.
+      loadBuyerDeliveryAddress(profile.id)
+        .then((remote) => {
+          if (!remote || typeof remote !== "object") return
+          const merged = { ...EMPTY_CHECKOUT_ADDRESS, ...(remote as CheckoutAddress) }
+          if (validateAddress(merged) !== null) return
+          persistAddress(merged)
+          setAddress(merged)
+          setSavedAddress(merged)
+          setStep(2)
+        })
+        .catch(() => undefined)
+
       const [firstName = "", ...rest] = (profile.fullName ?? "").trim().split(/\s+/)
       setAddress((current) => ({
         ...current,
@@ -95,6 +111,17 @@ export function CheckoutPageClient() {
       return total + (product?.price ?? item.price) * item.quantity
     }, 0)
   }, [items, productMap, subtotal])
+
+  const deliveryTerms = {
+    fee: vendorData?.vendor.deliveryFee,
+    freeOver: vendorData?.vendor.freeDeliveryOver,
+    note: vendorData?.vendor.deliveryNote
+  }
+  // computeDeliveryFee is the same function priceCart runs on the server, so
+  // the figure shown here is the figure charged.
+  const deliveryFee = computeDeliveryFee(liveSubtotal, deliveryTerms)
+  const missingForFreeDelivery = amountToFreeDelivery(liveSubtotal, deliveryTerms)
+  const orderTotal = Math.round((liveSubtotal + deliveryFee) * 100) / 100
 
   const vendorTransferReady = Boolean(
     vendorData?.vendor.bankName &&
@@ -139,6 +166,9 @@ export function CheckoutPageClient() {
     }
 
     persistAddress(normalized)
+    // Onto the account too, so the next device already knows it. Best effort:
+    // the local copy and the order itself both carry it regardless.
+    if (profile) void saveBuyerDeliveryAddress(profile.id, normalized)
     setAddress(normalized)
     setSavedAddress(normalized)
     setStep(2)
@@ -174,7 +204,7 @@ export function CheckoutPageClient() {
       items,
       // The server re-prices this and ignores the figure; send the live one so
       // an order sitting in the offline queue holds something honest.
-      totalAmount: liveSubtotal,
+      totalAmount: orderTotal,
       deliveryAddress: composeDeliveryAddress(savedAddress),
       paymentMethod
     }
@@ -271,11 +301,22 @@ export function CheckoutPageClient() {
                   <div className="flex items-start gap-3">
                     <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-4 border-brand" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-ink">Door delivery</p>
+                      <div className="flex flex-wrap items-baseline gap-2">
+                        <p className="text-sm font-semibold text-ink">Door delivery</p>
+                        <span className="text-sm font-semibold text-brand">
+                          {deliveryFee > 0 ? money(deliveryFee).text : "Free"}
+                        </span>
+                      </div>
                       <p className="mt-1 text-sm leading-6 text-muted">
-                        {vendorData?.vendor.storeName ?? "The seller"} will confirm
-                        your delivery window on WhatsApp.
+                        {deliveryTerms.note ||
+                          `${vendorData?.vendor.storeName ?? "The seller"} will confirm your delivery window on WhatsApp.`}
                       </p>
+                      {missingForFreeDelivery > 0 ? (
+                        <p className="mt-1 text-xs leading-5 text-success">
+                          Add {money(missingForFreeDelivery).text} more for free
+                          delivery.
+                        </p>
+                      ) : null}
                     </div>
                     <FiTruck className="mt-0.5 shrink-0 text-muted" />
                   </div>
@@ -411,7 +452,7 @@ export function CheckoutPageClient() {
                     <p className="mt-3 text-xs leading-5 text-muted">
                       Transfer{" "}
                       <span className="font-semibold text-ink">
-                        {money(liveSubtotal).baseText}
+                        {money(orderTotal).baseText}
                       </span>
                       , then confirm the order so the seller can match it.
                     </p>
@@ -424,7 +465,9 @@ export function CheckoutPageClient() {
 
         <OrderSummary
           itemCount={itemCount}
-          total={liveSubtotal}
+          itemsTotal={liveSubtotal}
+          deliveryFee={deliveryFee}
+          total={orderTotal}
           money={money}
           canConfirm={canConfirm}
           submitting={submitting}
@@ -669,6 +712,8 @@ function AddressForm({
 
 function OrderSummary({
   itemCount,
+  itemsTotal,
+  deliveryFee,
   total,
   money,
   canConfirm,
@@ -676,6 +721,8 @@ function OrderSummary({
   onConfirm
 }: {
   itemCount: number
+  itemsTotal: number
+  deliveryFee: number
   total: number
   money: (amount: number) => { text: string }
   canConfirm: boolean
@@ -691,17 +738,14 @@ function OrderSummary({
       <div className="space-y-2.5 px-4 py-4 text-sm">
         <div className="flex items-center justify-between gap-3">
           <span className="text-muted">Item&apos;s total ({itemCount})</span>
-          <span className="font-semibold text-ink">{money(total).text}</span>
+          <span className="font-semibold text-ink">{money(itemsTotal).text}</span>
         </div>
 
-        {/*
-          No delivery-fee row until there is a delivery fee. Showing one the
-          server does not charge would quote the buyer a number they are not
-          billed — the same trap as the stale cart subtotal.
-        */}
         <div className="flex items-center justify-between gap-3">
           <span className="text-muted">Delivery fees</span>
-          <span className="text-xs text-muted">Confirmed by the seller</span>
+          <span className={deliveryFee > 0 ? "font-semibold text-ink" : "font-semibold text-success"}>
+            {deliveryFee > 0 ? money(deliveryFee).text : "Free"}
+          </span>
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-border pt-3">

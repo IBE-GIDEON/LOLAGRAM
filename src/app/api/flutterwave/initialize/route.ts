@@ -70,6 +70,7 @@ export async function POST(request: Request) {
       vendor_id: priced.vendorId,
       items: priced.items,
       total_amount: priced.totalAmount,
+      delivery_fee: priced.deliveryFee,
       delivery_address: deliveryAddress,
       payment_method: "flutterwave",
       // Not paid until the webhook confirms it against Flutterwave.

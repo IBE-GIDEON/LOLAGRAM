@@ -1,9 +1,20 @@
 import { type SupabaseClient } from "@supabase/supabase-js"
 
+import { computeDeliveryFee } from "@/lib/delivery"
 import { type OrderItem } from "@/lib/types"
 
 export type PricedCart =
-  | { ok: true; vendorId: string; items: OrderItem[]; totalAmount: number }
+  | {
+      ok: true
+      vendorId: string
+      items: OrderItem[]
+      /** The goods alone. */
+      itemsTotal: number
+      /** What the seller charges to deliver this order, priced here. */
+      deliveryFee: number
+      /** itemsTotal + deliveryFee — what the buyer is actually charged. */
+      totalAmount: number
+    }
   | { ok: false; status: number; error: string }
 
 /**
@@ -47,7 +58,9 @@ export async function priceCart(
 
   const { data: rows, error } = await supabase
     .from("products")
-    .select("id, name, price, in_stock, vendor_id, vendor_profiles!inner(is_active)")
+    .select(
+      "id, name, price, in_stock, vendor_id, vendor_profiles!inner(is_active, delivery_fee, free_delivery_over)"
+    )
     .eq("vendor_profiles.is_active", true)
     .in("id", [...requested.keys()])
 
@@ -90,10 +103,30 @@ export async function priceCart(
 
   // numeric(12,2) in Postgres — settle the rounding here rather than let the
   // database truncate a floating point tail.
-  const totalAmount =
+  const itemsTotal =
     Math.round(
       items.reduce((sum, item) => sum + item.price * item.quantity, 0) * 100
     ) / 100
 
-  return { ok: true, vendorId: [...vendorIds][0], items, totalAmount }
+  // Read off the joined store, through the same function the checkout page
+  // uses to display it, so the quoted figure and the charged one cannot drift.
+  const vendor = (rows[0] as Record<string, unknown>).vendor_profiles as
+    | { delivery_fee?: unknown; free_delivery_over?: unknown }
+    | undefined
+
+  const deliveryFee = computeDeliveryFee(itemsTotal, {
+    fee: Number(vendor?.delivery_fee ?? 0),
+    freeOver: Number(vendor?.free_delivery_over ?? 0)
+  })
+
+  const totalAmount = Math.round((itemsTotal + deliveryFee) * 100) / 100
+
+  return {
+    ok: true,
+    vendorId: [...vendorIds][0],
+    items,
+    itemsTotal,
+    deliveryFee,
+    totalAmount
+  }
 }

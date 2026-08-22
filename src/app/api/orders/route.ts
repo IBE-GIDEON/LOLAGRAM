@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: priced.error }, { status: priced.status })
   }
 
-  const { vendorId, items, totalAmount } = priced
+  const { vendorId, items, totalAmount, deliveryFee } = priced
 
   const { data, error } = await supabase
     .from("orders")
@@ -57,6 +57,7 @@ export async function POST(request: Request) {
       vendor_id: vendorId,
       items,
       total_amount: totalAmount,
+      delivery_fee: deliveryFee,
       delivery_address: deliveryAddress,
       payment_method: paymentMethod,
       payment_status:

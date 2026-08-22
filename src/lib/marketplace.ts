@@ -87,6 +87,12 @@ function mapVendor(row: Record<string, unknown>): VendorProfile {
     accountName: row.account_name ? String(row.account_name) : undefined,
     accountNumber: row.account_number ? String(row.account_number) : undefined,
     paymentNote: row.payment_note ? String(row.payment_note) : undefined,
+    // Absent until supabase/delivery-and-saved-address.sql has been run, which
+    // reads as "no delivery charge" rather than as an error.
+    deliveryFee: row.delivery_fee != null ? Number(row.delivery_fee) : undefined,
+    freeDeliveryOver:
+      row.free_delivery_over != null ? Number(row.free_delivery_over) : undefined,
+    deliveryNote: row.delivery_note ? String(row.delivery_note) : undefined,
     isActive: Boolean(row.is_active),
     totalSales: Number(row.total_sales ?? 0),
     rating: Number(row.rating ?? 0),
@@ -2372,6 +2378,9 @@ export async function saveSellerProfile(
         account_name: input.accountName,
         account_number: input.accountNumber,
         payment_note: input.paymentNote,
+        delivery_fee: input.deliveryFee ?? 0,
+        free_delivery_over: input.freeDeliveryOver ?? null,
+        delivery_note: input.deliveryNote ?? null,
         is_active: true
       },
       // Conflict on user_id, not on the primary key. No id is sent here, so
@@ -2392,6 +2401,15 @@ export async function saveSellerProfile(
       message.includes("payment_note")
     ) {
       throw new Error("Run the latest Supabase seller-payment SQL patch, then try again.")
+    }
+    if (
+      message.includes("delivery_fee") ||
+      message.includes("free_delivery_over") ||
+      message.includes("delivery_note")
+    ) {
+      throw new Error(
+        "Run supabase/delivery-and-saved-address.sql in Supabase, then save again."
+      )
     }
     throw new Error(error?.message ?? "Unable to save seller profile")
   }
@@ -2771,4 +2789,53 @@ export async function saveReview(input: {
   clearPersistedCacheByPrefix("store-analytics:")
 
   return response.data
+}
+
+/**
+ * Keeps the buyer's delivery address on their account.
+ *
+ * It also lives in localStorage, which remembers it on the phone it was typed
+ * on and nowhere else. This is what carries it to their next device, so
+ * somebody who ordered on a laptop is not made to type it all again.
+ *
+ * Deliberately quiet on failure: the address is already saved locally and is
+ * carried on the order itself, so a missing column or a dropped connection
+ * must never be what stops an order going through.
+ */
+export async function saveBuyerDeliveryAddress(userId: string, address: unknown) {
+  if (!hasSupabase) return false
+
+  const supabase = getSupabaseBrowserClient()
+  if (!supabase) return false
+
+  const { error } = await supabase
+    .from("users")
+    .update({ delivery_address: address })
+    .eq("id", userId)
+
+  if (error) {
+    // Almost certainly delivery-and-saved-address.sql not yet run.
+    return false
+  }
+
+  deletePersistedCache(persistedCacheKeys.userProfile(userId))
+  userProfileCache.delete(userId)
+  return true
+}
+
+/** The address saved against the account, or null when there is not one. */
+export async function loadBuyerDeliveryAddress(userId: string) {
+  if (!hasSupabase) return null
+
+  const supabase = getSupabaseBrowserClient()
+  if (!supabase) return null
+
+  const { data, error } = await supabase
+    .from("users")
+    .select("delivery_address")
+    .eq("id", userId)
+    .maybeSingle()
+
+  if (error || !data) return null
+  return (data as { delivery_address?: unknown }).delivery_address ?? null
 }

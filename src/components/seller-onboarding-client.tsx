@@ -53,6 +53,13 @@ export function SellerOnboardingClient() {
   const [accountName, setAccountName] = useState(vendorProfile?.accountName ?? "")
   const [accountNumber, setAccountNumber] = useState(vendorProfile?.accountNumber ?? "")
   const [paymentNote, setPaymentNote] = useState(vendorProfile?.paymentNote ?? "")
+  const [deliveryFee, setDeliveryFee] = useState(
+    vendorProfile?.deliveryFee ? String(vendorProfile.deliveryFee) : ""
+  )
+  const [freeDeliveryOver, setFreeDeliveryOver] = useState(
+    vendorProfile?.freeDeliveryOver ? String(vendorProfile.freeDeliveryOver) : ""
+  )
+  const [deliveryNote, setDeliveryNote] = useState(vendorProfile?.deliveryNote ?? "")
   const [productName, setProductName] = useState("")
   const [productCategory, setProductCategory] = useState<ProductCategory>(
     DEFAULT_PRODUCT_CATEGORY
@@ -216,6 +223,39 @@ export function SellerOnboardingClient() {
                 placeholder="Optional payment note for buyers"
                 value={paymentNote}
                 onChange={(event) => setPaymentNote(event.target.value)}
+              />
+            </div>
+
+            {/* Whatever is set here is what checkout quotes AND what the buyer
+                is charged — the server prices delivery from these same
+                numbers, so the two can never disagree. */}
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-semibold text-ink">Delivery</p>
+                <p className="mt-1 text-xs leading-5 text-muted">
+                  Leave the fee blank or zero and delivery shows as free.
+                </p>
+              </div>
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                placeholder="Delivery fee (₦)"
+                value={deliveryFee}
+                onChange={(event) => setDeliveryFee(event.target.value)}
+              />
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                placeholder="Free delivery on orders over (₦) — optional"
+                value={freeDeliveryOver}
+                onChange={(event) => setFreeDeliveryOver(event.target.value)}
+              />
+              <Input
+                placeholder="Delivery promise, e.g. 2 to 4 working days nationwide"
+                value={deliveryNote}
+                onChange={(event) => setDeliveryNote(event.target.value)}
               />
             </div>
           </div>
@@ -410,7 +450,11 @@ export function SellerOnboardingClient() {
                     bankName: bankName.trim() || undefined,
                     accountName: accountName.trim() || undefined,
                     accountNumber: accountNumber.trim() || undefined,
-                    paymentNote: paymentNote.trim() || undefined
+                    paymentNote: paymentNote.trim() || undefined,
+                    deliveryFee: Number(deliveryFee) > 0 ? Number(deliveryFee) : 0,
+                    freeDeliveryOver:
+                      Number(freeDeliveryOver) > 0 ? Number(freeDeliveryOver) : undefined,
+                    deliveryNote: deliveryNote.trim() || undefined
                   })
 
                   if (savingProduct) {
