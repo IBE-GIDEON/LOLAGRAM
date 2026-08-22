@@ -16,7 +16,11 @@ export const env = {
   sellerEmails: process.env.NEXT_PUBLIC_SELLER_EMAILS ?? "",
   // Optional: overrides the store's own number for the floating chat button.
   supportWhatsapp: process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP ?? "",
-  enablePayOnDelivery: process.env.NEXT_PUBLIC_ENABLE_PAY_ON_DELIVERY === "true"
+  enablePayOnDelivery: process.env.NEXT_PUBLIC_ENABLE_PAY_ON_DELIVERY === "true",
+  // Server-side only, deliberately. A Google Maps browser key would ship in
+  // the bundle for anyone to lift; the address lookup is proxied through
+  // /api/places instead so the key never leaves the server.
+  googlePlacesApiKey: process.env.GOOGLE_PLACES_API_KEY ?? ""
 }
 
 export const hasSupabase =
@@ -27,6 +31,8 @@ export const hasSupabaseAdmin =
 
 export const hasFlutterwave =
   Boolean(env.flutterwavePublicKey) && Boolean(env.flutterwaveSecretKey)
+
+export const hasGooglePlaces = Boolean(env.googlePlacesApiKey)
 
 export const hasWebPush =
   Boolean(env.vapidPublicKey) && Boolean(env.vapidPrivateKey)

@@ -9,6 +9,7 @@ import { FiCheck, FiChevronRight, FiMapPin, FiTruck } from "react-icons/fi"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useCart } from "@/components/providers/cart-provider"
 import { useLocale } from "@/components/providers/locale-provider"
+import { PlaceAutocomplete } from "@/components/place-autocomplete"
 import { RemoteImage } from "@/components/remote-image"
 import { Button, Card, Input, PAGE_WIDTH } from "@/components/ui"
 import { PAYMENT_METHOD_META } from "@/lib/constants"
@@ -38,7 +39,12 @@ import { cn } from "@/lib/utils"
 
 type Step = 1 | 2 | 3
 
-export function CheckoutPageClient() {
+export function CheckoutPageClient({
+  placesEnabled = false
+}: {
+  /** Whether GOOGLE_PLACES_API_KEY is set, resolved on the server. */
+  placesEnabled?: boolean
+}) {
   const router = useRouter()
   const { profile, refreshProfile } = useAuth()
   const { money } = useLocale()
@@ -235,6 +241,7 @@ export function CheckoutPageClient() {
                 onChange={setAddress}
                 onSave={saveAddressStep}
                 onCancel={savedAddress ? () => setStep(2) : undefined}
+                placesEnabled={placesEnabled}
               />
             ) : summary ? (
               <div className="flex items-start gap-3 rounded-2xl border border-border p-4">
@@ -515,11 +522,13 @@ function AddressForm({
   address,
   onChange,
   onSave,
-  onCancel
+  onCancel,
+  placesEnabled
 }: {
   address: CheckoutAddress
   onChange: (next: CheckoutAddress) => void
   onSave: () => void
+  placesEnabled: boolean
   onCancel?: () => void
 }) {
   const set = <K extends keyof CheckoutAddress>(key: K, value: CheckoutAddress[K]) =>
@@ -555,7 +564,15 @@ function AddressForm({
         </Field>
 
         <Field label={isNigeria ? "State" : "State or province"}>
-          {isNigeria ? (
+          {placesEnabled ? (
+            <PlaceAutocomplete
+              value={address.region}
+              onChange={(next) => set("region", next)}
+              country={address.country}
+              kind="region"
+              placeholder={isNigeria ? "Start typing a state" : "State or province"}
+            />
+          ) : isNigeria ? (
             <select
               className={selectClass}
               value={address.region}
@@ -569,7 +586,7 @@ function AddressForm({
               ))}
             </select>
           ) : (
-            // Only Nigeria has a built-in list, so anywhere else is typed.
+            // No lookup and no built-in list for anywhere but Nigeria.
             <Input
               value={address.region}
               placeholder="State or province"
@@ -579,11 +596,28 @@ function AddressForm({
         </Field>
 
         <Field label="City">
-          <Input
-            value={address.city}
-            placeholder={isNigeria ? "Calabar Municipal" : "City"}
-            onChange={(event) => set("city", event.target.value)}
-          />
+          {placesEnabled ? (
+            <PlaceAutocomplete
+              value={address.city}
+              onChange={(next) => set("city", next)}
+              country={address.country}
+              kind="city"
+              placeholder="Start typing a city"
+              // A city's suggestion carries its state, so picking one fills
+              // the field above: "Calabar" arrives knowing it is Cross River.
+              onSelect={(suggestion) => {
+                const parentState = suggestion.secondary.split(",")[0]?.trim()
+                if (!parentState) return
+                onChange({ ...address, city: suggestion.text, region: parentState })
+              }}
+            />
+          ) : (
+            <Input
+              value={address.city}
+              placeholder={isNigeria ? "Calabar Municipal" : "City"}
+              onChange={(event) => set("city", event.target.value)}
+            />
+          )}
         </Field>
 
         <Field label="First name">
