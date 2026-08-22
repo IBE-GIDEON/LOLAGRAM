@@ -29,17 +29,30 @@ const CartContext = createContext<CartContextValue | null>(null)
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<CartState>({ vendorId: null, items: [] })
+  // The saved cart cannot be read during render without breaking hydration —
+  // the server has no localStorage — so it arrives one pass later. Until it
+  // does, writing would persist the empty state we started with and destroy
+  // the very cart we are about to load. That is not theoretical: it emptied
+  // the basket on every refresh.
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     const existing = window.localStorage.getItem(CART_KEY)
     if (existing) {
-      setState(JSON.parse(existing) as CartState)
+      try {
+        setState(JSON.parse(existing) as CartState)
+      } catch {
+        // Corrupt entry: start empty rather than trapping the buyer on a
+        // basket that throws every time the app boots.
+      }
     }
+    setLoaded(true)
   }, [])
 
   useEffect(() => {
+    if (!loaded) return
     window.localStorage.setItem(CART_KEY, JSON.stringify(state))
-  }, [state])
+  }, [state, loaded])
 
   const value = useMemo<CartContextValue>(() => {
     return {
