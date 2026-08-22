@@ -43,12 +43,12 @@ export async function POST(request: Request) {
       ? "vendor_transfer"
       : "pay_on_delivery"
 
-  const priced = await priceCart(supabase, payload.items)
+  const priced = await priceCart(supabase, payload.items, payload.shippingMethod)
   if (!priced.ok) {
     return NextResponse.json({ error: priced.error }, { status: priced.status })
   }
 
-  const { vendorId, items, totalAmount, deliveryFee } = priced
+  const { vendorId, items, totalAmount, deliveryFee, shippingMethod } = priced
 
   const { data, error } = await supabase
     .from("orders")
@@ -58,6 +58,7 @@ export async function POST(request: Request) {
       items,
       total_amount: totalAmount,
       delivery_fee: deliveryFee,
+      shipping_method: shippingMethod,
       delivery_address: deliveryAddress,
       payment_method: paymentMethod,
       payment_status:

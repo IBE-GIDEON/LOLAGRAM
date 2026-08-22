@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const priced = await priceCart(supabase, payload.items)
+  const priced = await priceCart(supabase, payload.items, payload.shippingMethod)
   if (!priced.ok) {
     return NextResponse.json({ error: priced.error }, { status: priced.status })
   }
@@ -71,6 +71,7 @@ export async function POST(request: Request) {
       items: priced.items,
       total_amount: priced.totalAmount,
       delivery_fee: priced.deliveryFee,
+      shipping_method: priced.shippingMethod,
       delivery_address: deliveryAddress,
       payment_method: "flutterwave",
       // Not paid until the webhook confirms it against Flutterwave.

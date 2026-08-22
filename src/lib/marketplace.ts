@@ -26,6 +26,7 @@ import { canUseDemoMode, hasSupabase } from "@/lib/env"
 import { fetchWithRetry } from "@/lib/fetch-utils"
 import { normalizeCompareAtPrice } from "@/lib/pricing"
 import { normalizeProductCategory } from "@/lib/product-categories"
+import { parseShippingRates } from "@/lib/shipping"
 import {
   normalizeProductPhotoUrls,
   serializeLegacyPhotoUrl
@@ -93,6 +94,7 @@ function mapVendor(row: Record<string, unknown>): VendorProfile {
     freeDeliveryOver:
       row.free_delivery_over != null ? Number(row.free_delivery_over) : undefined,
     deliveryNote: row.delivery_note ? String(row.delivery_note) : undefined,
+    shippingRates: parseShippingRates(row.shipping_rates),
     isActive: Boolean(row.is_active),
     totalSales: Number(row.total_sales ?? 0),
     rating: Number(row.rating ?? 0),
@@ -2381,6 +2383,7 @@ export async function saveSellerProfile(
         delivery_fee: input.deliveryFee ?? 0,
         free_delivery_over: input.freeDeliveryOver ?? null,
         delivery_note: input.deliveryNote ?? null,
+        shipping_rates: input.shippingRates ?? {},
         is_active: true
       },
       // Conflict on user_id, not on the primary key. No id is sent here, so
@@ -2405,10 +2408,11 @@ export async function saveSellerProfile(
     if (
       message.includes("delivery_fee") ||
       message.includes("free_delivery_over") ||
-      message.includes("delivery_note")
+      message.includes("delivery_note") ||
+      message.includes("shipping_rates")
     ) {
       throw new Error(
-        "Run supabase/delivery-and-saved-address.sql in Supabase, then save again."
+        "Run the latest Supabase shipping SQL patches, then save again."
       )
     }
     throw new Error(error?.message ?? "Unable to save seller profile")

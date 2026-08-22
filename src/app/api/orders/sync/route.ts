@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   // the service role, so RLS cannot catch a bad total either — and an order
   // that sat in IndexedDB overnight may name a price that has since changed,
   // a product now out of stock, or one the buyer simply edited by hand.
-  const priced = await priceCart(supabase, payload.items)
+  const priced = await priceCart(supabase, payload.items, payload.shippingMethod)
   if (!priced.ok) {
     return NextResponse.json({ error: priced.error }, { status: 400 })
   }
@@ -47,6 +47,7 @@ export async function POST(request: Request) {
     items: priced.items,
     total_amount: priced.totalAmount,
     delivery_fee: priced.deliveryFee,
+    shipping_method: priced.shippingMethod,
     delivery_address: payload.deliveryAddress,
     payment_method: paymentMethod,
     payment_status:

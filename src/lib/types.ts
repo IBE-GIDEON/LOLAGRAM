@@ -65,6 +65,8 @@ export interface VendorProfile {
   freeDeliveryOver?: number
   /** The seller's promise, e.g. "2 to 4 working days, nationwide". */
   deliveryNote?: string
+  /** Per-courier prices, keyed by shipping method id. See lib/shipping. */
+  shippingRates?: Record<string, number>
   isActive: boolean
   totalSales: number
   rating: number
@@ -211,6 +213,7 @@ export interface SellerProfileInput {
   deliveryFee?: number
   freeDeliveryOver?: number
   deliveryNote?: string
+  shippingRates?: Record<string, number>
 }
 
 export interface ProductInput {
@@ -227,6 +230,8 @@ export interface ProductInput {
 }
 
 export interface CheckoutPayload {
+  /** Which shipping method the buyer picked. Priced on the server. */
+  shippingMethod?: string
   buyerId: string
   vendorId: string
   items: OrderItem[]

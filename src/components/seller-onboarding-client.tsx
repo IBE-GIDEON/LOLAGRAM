@@ -24,6 +24,7 @@ import {
 } from "@/lib/product-categories"
 import { uploadImage, uploadImages } from "@/lib/image"
 import { saveProduct, saveSellerProfile } from "@/lib/marketplace"
+import { COURIER_METHODS } from "@/lib/shipping"
 import { type VendorCategory } from "@/lib/types"
 
 const MAX_PRODUCT_IMAGES = 6
@@ -60,6 +61,18 @@ export function SellerOnboardingClient() {
     vendorProfile?.freeDeliveryOver ? String(vendorProfile.freeDeliveryOver) : ""
   )
   const [deliveryNote, setDeliveryNote] = useState(vendorProfile?.deliveryNote ?? "")
+  // One entry per courier, as typed. Blank means "no rate set", which shows at
+  // checkout as the seller confirming the cost rather than as free.
+  const [courierRates, setCourierRates] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      COURIER_METHODS.map((method) => [
+        method.id,
+        vendorProfile?.shippingRates?.[method.id]
+          ? String(vendorProfile.shippingRates[method.id])
+          : ""
+      ])
+    )
+  )
   const [productName, setProductName] = useState("")
   const [productCategory, setProductCategory] = useState<ProductCategory>(
     DEFAULT_PRODUCT_CATEGORY
@@ -257,6 +270,32 @@ export function SellerOnboardingClient() {
                 value={deliveryNote}
                 onChange={(event) => setDeliveryNote(event.target.value)}
               />
+
+              <div className="space-y-3 border-t border-border pt-3">
+                <div>
+                  <p className="text-sm font-semibold text-ink">Couriers</p>
+                  <p className="mt-1 text-xs leading-5 text-muted">
+                    Leave one blank and checkout tells the buyer you will confirm
+                    that courier&apos;s cost. Customer pickup is always free.
+                  </p>
+                </div>
+                {COURIER_METHODS.map((method) => (
+                  <Input
+                    key={method.id}
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    placeholder={`${method.label} rate (₦)`}
+                    value={courierRates[method.id] ?? ""}
+                    onChange={(event) =>
+                      setCourierRates((current) => ({
+                        ...current,
+                        [method.id]: event.target.value
+                      }))
+                    }
+                  />
+                ))}
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -454,7 +493,12 @@ export function SellerOnboardingClient() {
                     deliveryFee: Number(deliveryFee) > 0 ? Number(deliveryFee) : 0,
                     freeDeliveryOver:
                       Number(freeDeliveryOver) > 0 ? Number(freeDeliveryOver) : undefined,
-                    deliveryNote: deliveryNote.trim() || undefined
+                    deliveryNote: deliveryNote.trim() || undefined,
+                    shippingRates: Object.fromEntries(
+                      Object.entries(courierRates)
+                        .map(([id, raw]) => [id, Number(raw)] as const)
+                        .filter(([, amount]) => Number.isFinite(amount) && amount > 0)
+                    )
                   })
 
                   if (savingProduct) {

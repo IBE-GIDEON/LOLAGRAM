@@ -14,7 +14,13 @@ import { RemoteImage } from "@/components/remote-image"
 import { Button, Card, Input, PAGE_WIDTH } from "@/components/ui"
 import { PAYMENT_METHOD_META } from "@/lib/constants"
 import { PAYMENT_METHODS } from "@/lib/payment-methods"
-import { amountToFreeDelivery, computeDeliveryFee } from "@/lib/delivery"
+import { amountToFreeDelivery } from "@/lib/delivery"
+import {
+  DEFAULT_SHIPPING_METHOD,
+  SHIPPING_METHODS,
+  resolveShippingFee,
+  type ShippingMethod
+} from "@/lib/shipping"
 import {
   EMPTY_CHECKOUT_ADDRESS,
   addressSummary,
@@ -53,6 +59,8 @@ export function CheckoutPageClient() {
   const [step, setStep] = useState<Step>(1)
   const [deliveryConfirmed, setDeliveryConfirmed] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PAYMENT_METHODS[0])
+  const [shippingMethod, setShippingMethod] =
+    useState<ShippingMethod>(DEFAULT_SHIPPING_METHOD)
   const [submitting, setSubmitting] = useState(false)
   const [hydrated, setHydrated] = useState(false)
 
@@ -117,10 +125,18 @@ export function CheckoutPageClient() {
     freeOver: vendorData?.vendor.freeDeliveryOver,
     note: vendorData?.vendor.deliveryNote
   }
-  // computeDeliveryFee is the same function priceCart runs on the server, so
-  // the figure shown here is the figure charged.
-  const deliveryFee = computeDeliveryFee(liveSubtotal, deliveryTerms)
-  const missingForFreeDelivery = amountToFreeDelivery(liveSubtotal, deliveryTerms)
+  const shippingRates = vendorData?.vendor.shippingRates as
+    | Record<ShippingMethod, number>
+    | undefined
+  // resolveShippingFee is the same function priceCart runs on the server, so
+  // the price on the button is the price charged.
+  const deliveryFee = resolveShippingFee(
+    shippingMethod,
+    liveSubtotal,
+    deliveryTerms,
+    shippingRates
+  )
+  const missingForFreeShipping = amountToFreeDelivery(liveSubtotal, deliveryTerms)
   const orderTotal = Math.round((liveSubtotal + deliveryFee) * 100) / 100
 
   const vendorTransferReady = Boolean(
@@ -206,6 +222,7 @@ export function CheckoutPageClient() {
       // an order sitting in the offline queue holds something honest.
       totalAmount: orderTotal,
       deliveryAddress: composeDeliveryAddress(savedAddress),
+      shippingMethod,
       paymentMethod
     }
 
@@ -290,36 +307,76 @@ export function CheckoutPageClient() {
           >
             {step === 2 && savedAddress ? (
               <div className="space-y-4">
-                {/*
-                  Deliberately the plain case: one shipment, delivered to the
-                  door, no fee quoted. Anything else — pickup stations, zone
-                  rates, split shipments — belongs here, and has to be priced
-                  server-side alongside priceCart so the figure in the summary
-                  is the figure that gets charged.
-                */}
-                <div className="rounded-2xl border border-brand/40 bg-brand/5 p-4">
-                  <div className="flex items-start gap-3">
-                    <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-4 border-brand" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-baseline gap-2">
-                        <p className="text-sm font-semibold text-ink">Door-to-door</p>
-                        <span className="text-sm font-semibold text-brand">
-                          {deliveryFee > 0 ? money(deliveryFee).text : "Free"}
+                <div className="space-y-2">
+                  {SHIPPING_METHODS.map((method) => {
+                    const fee = resolveShippingFee(
+                      method.id,
+                      liveSubtotal,
+                      deliveryTerms,
+                      shippingRates
+                    )
+                    const chosen = shippingMethod === method.id
+                    // Local shipping is the one that reads out a country,
+                    // because it is one price for the whole of it.
+                    const label =
+                      method.id === "local" ? `${method.label} — Nigeria` : method.label
+
+                    return (
+                      <button
+                        key={method.id}
+                        type="button"
+                        aria-pressed={chosen}
+                        onClick={() => setShippingMethod(method.id)}
+                        className={cn(
+                          "flex w-full items-start gap-3 rounded-2xl border p-4 text-left transition",
+                          chosen
+                            ? "border-brand/40 bg-brand/5"
+                            : "border-border bg-surface hover:border-brand/40"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "mt-0.5 flex h-4 w-4 shrink-0 rounded-full",
+                            chosen ? "border-4 border-brand" : "border border-border"
+                          )}
+                        />
+
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-semibold text-ink">
+                              {label}
+                            </span>
+                            <span
+                              className={cn(
+                                "text-sm font-semibold",
+                                fee > 0 ? "text-brand" : "text-success"
+                              )}
+                            >
+                              {fee > 0 ? money(fee).text : "Free"}
+                            </span>
+                          </span>
+                          <span className="mt-1 block text-sm leading-6 text-muted">
+                            {method.id === "local" && deliveryTerms.note
+                              ? deliveryTerms.note
+                              : method.helper}
+                          </span>
+                          {method.id === "local" && missingForFreeShipping > 0 ? (
+                            <span className="mt-1 block text-xs leading-5 text-success">
+                              Add {money(missingForFreeShipping).text} more for free
+                              shipping.
+                            </span>
+                          ) : null}
+                          {method.brand && fee === 0 ? (
+                            <span className="mt-1 block text-xs leading-5 text-muted">
+                              The seller confirms this courier&apos;s cost with you.
+                            </span>
+                          ) : null}
                         </span>
-                      </div>
-                      <p className="mt-1 text-sm leading-6 text-muted">
-                        {deliveryTerms.note ||
-                          `${vendorData?.vendor.storeName ?? "The seller"} will confirm your shipping window on WhatsApp.`}
-                      </p>
-                      {missingForFreeDelivery > 0 ? (
-                        <p className="mt-1 text-xs leading-5 text-success">
-                          Add {money(missingForFreeDelivery).text} more for free
-                          shipping.
-                        </p>
-                      ) : null}
-                    </div>
-                    <FiTruck className="mt-0.5 shrink-0 text-muted" />
-                  </div>
+
+                        <CarrierMark method={method} />
+                      </button>
+                    )
+                  })}
                 </div>
 
                 <div className="rounded-2xl border border-border">
@@ -769,5 +826,51 @@ function OrderSummary({
         ) : null}
       </div>
     </Card>
+  )
+}
+
+/**
+ * The courier's badge on its own colours.
+ *
+ * A real logo file at /public/carriers/<id>.svg is used when one is there, and
+ * a coloured wordmark stands in when it is not. Drawn this way on purpose:
+ * shipping a carrier's artwork we have no licence for is their decision to
+ * grant, not ours to assume, and the wordmark is honest in the meantime.
+ */
+function CarrierMark({
+  method
+}: {
+  method: (typeof SHIPPING_METHODS)[number]
+}) {
+  const [logoFailed, setLogoFailed] = useState(false)
+
+  if (!method.brand) {
+    return <FiTruck aria-hidden="true" className="mt-0.5 shrink-0 text-muted" />
+  }
+
+  if (!logoFailed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={`/carriers/${method.id}.svg`}
+        alt=""
+        aria-hidden="true"
+        className="mt-0.5 h-6 w-auto max-w-[72px] shrink-0 object-contain"
+        onError={() => setLogoFailed(true)}
+      />
+    )
+  }
+
+  return (
+    <span
+      aria-hidden="true"
+      className="mt-0.5 shrink-0 rounded-md px-2 py-1 text-[11px] font-bold tracking-wide"
+      style={{
+        backgroundColor: method.brand.background,
+        color: method.brand.foreground
+      }}
+    >
+      {method.label.toUpperCase()}
+    </span>
   )
 }

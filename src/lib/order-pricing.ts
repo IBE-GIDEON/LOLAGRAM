@@ -1,6 +1,11 @@
 import { type SupabaseClient } from "@supabase/supabase-js"
 
-import { computeDeliveryFee } from "@/lib/delivery"
+import {
+  normalizeShippingMethod,
+  parseShippingRates,
+  resolveShippingFee,
+  type ShippingMethod
+} from "@/lib/shipping"
 import { type OrderItem } from "@/lib/types"
 
 export type PricedCart =
@@ -10,7 +15,9 @@ export type PricedCart =
       items: OrderItem[]
       /** The goods alone. */
       itemsTotal: number
-      /** What the seller charges to deliver this order, priced here. */
+      /** How the buyer chose to receive it. */
+      shippingMethod: ShippingMethod
+      /** What that choice costs, priced here rather than taken on trust. */
       deliveryFee: number
       /** itemsTotal + deliveryFee — what the buyer is actually charged. */
       totalAmount: number
@@ -31,7 +38,8 @@ export type PricedCart =
  */
 export async function priceCart(
   supabase: SupabaseClient,
-  rawItems: unknown
+  rawItems: unknown,
+  rawShippingMethod?: unknown
 ): Promise<PricedCart> {
   const requested = new Map<string, number>()
 
@@ -59,7 +67,7 @@ export async function priceCart(
   const { data: rows, error } = await supabase
     .from("products")
     .select(
-      "id, name, price, in_stock, vendor_id, vendor_profiles!inner(is_active, delivery_fee, free_delivery_over)"
+      "id, name, price, in_stock, vendor_id, vendor_profiles!inner(is_active, delivery_fee, free_delivery_over, shipping_rates)"
     )
     .eq("vendor_profiles.is_active", true)
     .in("id", [...requested.keys()])
@@ -111,13 +119,26 @@ export async function priceCart(
   // Read off the joined store, through the same function the checkout page
   // uses to display it, so the quoted figure and the charged one cannot drift.
   const vendor = (rows[0] as Record<string, unknown>).vendor_profiles as
-    | { delivery_fee?: unknown; free_delivery_over?: unknown }
+    | {
+        delivery_fee?: unknown
+        free_delivery_over?: unknown
+        shipping_rates?: unknown
+      }
     | undefined
 
-  const deliveryFee = computeDeliveryFee(itemsTotal, {
-    fee: Number(vendor?.delivery_fee ?? 0),
-    freeOver: Number(vendor?.free_delivery_over ?? 0)
-  })
+  // The browser says which method; what it costs is decided here. Anything
+  // unrecognised falls back to local rather than to free.
+  const shippingMethod = normalizeShippingMethod(rawShippingMethod)
+
+  const deliveryFee = resolveShippingFee(
+    shippingMethod,
+    itemsTotal,
+    {
+      fee: Number(vendor?.delivery_fee ?? 0),
+      freeOver: Number(vendor?.free_delivery_over ?? 0)
+    },
+    parseShippingRates(vendor?.shipping_rates)
+  )
 
   const totalAmount = Math.round((itemsTotal + deliveryFee) * 100) / 100
 
@@ -126,6 +147,7 @@ export async function priceCart(
     vendorId: [...vendorIds][0],
     items,
     itemsTotal,
+    shippingMethod,
     deliveryFee,
     totalAmount
   }
