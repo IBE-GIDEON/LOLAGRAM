@@ -63,6 +63,12 @@ export function SellerOnboardingClient() {
   const [deliveryNote, setDeliveryNote] = useState(vendorProfile?.deliveryNote ?? "")
   // One entry per courier, as typed. Blank means "no rate set", which shows at
   // checkout as the seller confirming the cost rather than as free.
+  const [originCity, setOriginCity] = useState(vendorProfile?.originCity ?? "")
+  const [originState, setOriginState] = useState(vendorProfile?.originState ?? "")
+  const [originAddress, setOriginAddress] = useState(vendorProfile?.originAddress ?? "")
+  const [defaultItemWeight, setDefaultItemWeight] = useState(
+    vendorProfile?.defaultItemWeightKg ? String(vendorProfile.defaultItemWeightKg) : ""
+  )
   const [courierRates, setCourierRates] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       COURIER_METHODS.map((method) => [
@@ -270,6 +276,42 @@ export function SellerOnboardingClient() {
                 value={deliveryNote}
                 onChange={(event) => setDeliveryNote(event.target.value)}
               />
+
+              {/* A courier cannot price a parcel without knowing where it
+                  leaves from and what it weighs. Missing either and checkout
+                  quietly uses the flat rate below instead. */}
+              <div className="space-y-3 border-t border-border pt-3">
+                <div>
+                  <p className="text-sm font-semibold text-ink">Pickup address</p>
+                  <p className="mt-1 text-xs leading-5 text-muted">
+                    Where couriers collect from, and what they quote against.
+                  </p>
+                </div>
+                <Input
+                  placeholder="Street address"
+                  value={originAddress}
+                  onChange={(event) => setOriginAddress(event.target.value)}
+                />
+                <Input
+                  placeholder="City"
+                  value={originCity}
+                  onChange={(event) => setOriginCity(event.target.value)}
+                />
+                <Input
+                  placeholder="State"
+                  value={originState}
+                  onChange={(event) => setOriginState(event.target.value)}
+                />
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  placeholder="Default item weight in kg — used when a product has none"
+                  value={defaultItemWeight}
+                  onChange={(event) => setDefaultItemWeight(event.target.value)}
+                />
+              </div>
 
               <div className="space-y-3 border-t border-border pt-3">
                 <div>
@@ -494,6 +536,11 @@ export function SellerOnboardingClient() {
                     freeDeliveryOver:
                       Number(freeDeliveryOver) > 0 ? Number(freeDeliveryOver) : undefined,
                     deliveryNote: deliveryNote.trim() || undefined,
+                    originAddress: originAddress.trim() || undefined,
+                    originCity: originCity.trim() || undefined,
+                    originState: originState.trim() || undefined,
+                    defaultItemWeightKg:
+                      Number(defaultItemWeight) > 0 ? Number(defaultItemWeight) : undefined,
                     shippingRates: Object.fromEntries(
                       Object.entries(courierRates)
                         .map(([id, raw]) => [id, Number(raw)] as const)

@@ -61,6 +61,14 @@ export function CheckoutPageClient() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PAYMENT_METHODS[0])
   const [shippingMethod, setShippingMethod] =
     useState<ShippingMethod>(DEFAULT_SHIPPING_METHOD)
+  // A courier's own price for this parcel, once we know where it is going.
+  // Null means we are still on the seller's flat rate.
+  const [carrierQuote, setCarrierQuote] = useState<{
+    method: ShippingMethod
+    fee: number
+    serviceName: string | null
+  } | null>(null)
+  const [quoting, setQuoting] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [hydrated, setHydrated] = useState(false)
 
@@ -130,14 +138,69 @@ export function CheckoutPageClient() {
     | undefined
   // resolveShippingFee is the same function priceCart runs on the server, so
   // the price on the button is the price charged.
-  const deliveryFee = resolveShippingFee(
+  const flatShippingFee = resolveShippingFee(
     shippingMethod,
     liveSubtotal,
     deliveryTerms,
     shippingRates
   )
+  const deliveryFee =
+    carrierQuote?.method === shippingMethod ? carrierQuote.fee : flatShippingFee
   const missingForFreeShipping = amountToFreeDelivery(liveSubtotal, deliveryTerms)
   const orderTotal = Math.round((liveSubtotal + deliveryFee) * 100) / 100
+
+  // Ask the server for the courier's own price once we know the destination.
+  // Only for couriers: pickup and local are the seller's own arrangement.
+  useEffect(() => {
+    const isCourier = shippingMethod !== "pickup" && shippingMethod !== "local"
+    if (!isCourier || !savedAddress || items.length === 0) {
+      setCarrierQuote(null)
+      return
+    }
+
+    let ignore = false
+    setQuoting(true)
+
+    fetch("/api/shipping/quote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items,
+        shippingMethod,
+        destination: {
+          countryCode: savedAddress.country,
+          city: savedAddress.city,
+          region: savedAddress.region
+        }
+      })
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { fee?: number; source?: string; serviceName?: string } | null) => {
+        if (ignore) return
+        // Only a real carrier answer replaces the flat rate. "flat" coming
+        // back means the courier could not price it, and the seller's own
+        // rate already covers that case.
+        if (data?.source === "carrier" && Number.isFinite(data.fee)) {
+          setCarrierQuote({
+            method: shippingMethod,
+            fee: Number(data.fee),
+            serviceName: data.serviceName ?? null
+          })
+        } else {
+          setCarrierQuote(null)
+        }
+      })
+      .catch(() => {
+        if (!ignore) setCarrierQuote(null)
+      })
+      .finally(() => {
+        if (!ignore) setQuoting(false)
+      })
+
+    return () => {
+      ignore = true
+    }
+  }, [shippingMethod, savedAddress, items])
 
   const vendorTransferReady = Boolean(
     vendorData?.vendor.bankName &&
@@ -223,6 +286,13 @@ export function CheckoutPageClient() {
       totalAmount: orderTotal,
       deliveryAddress: composeDeliveryAddress(savedAddress),
       shippingMethod,
+      // In parts as well as in prose, so the carrier can be asked again when
+      // the order is written rather than trusting the figure on screen.
+      shippingDestination: {
+        countryCode: savedAddress.country,
+        city: savedAddress.city,
+        region: savedAddress.region
+      },
       paymentMethod
     }
 
@@ -309,12 +379,17 @@ export function CheckoutPageClient() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   {SHIPPING_METHODS.map((method) => {
-                    const fee = resolveShippingFee(
+                    const flat = resolveShippingFee(
                       method.id,
                       liveSubtotal,
                       deliveryTerms,
                       shippingRates
                     )
+                    const quoted =
+                      carrierQuote?.method === method.id ? carrierQuote.fee : null
+                    const fee = quoted ?? flat
+                    const waitingForRate =
+                      quoting && shippingMethod === method.id && Boolean(method.brand)
                     const chosen = shippingMethod === method.id
                     // Local shipping is the one that reads out a country,
                     // because it is one price for the whole of it.
@@ -352,13 +427,24 @@ export function CheckoutPageClient() {
                                 fee > 0 ? "text-brand" : "text-success"
                               )}
                             >
-                              {fee > 0 ? money(fee).text : "Free"}
+                              {waitingForRate
+                                ? "Checking rate..."
+                                : fee > 0
+                                  ? money(fee).text
+                                  : "Free"}
                             </span>
+                            {quoted !== null ? (
+                              <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">
+                                Live rate
+                              </span>
+                            ) : null}
                           </span>
                           <span className="mt-1 block text-sm leading-6 text-muted">
                             {method.id === "local" && deliveryTerms.note
                               ? deliveryTerms.note
-                              : method.helper}
+                              : quoted !== null && carrierQuote?.serviceName
+                                ? carrierQuote.serviceName
+                                : method.helper}
                           </span>
                           {method.id === "local" && missingForFreeShipping > 0 ? (
                             <span className="mt-1 block text-xs leading-5 text-success">
@@ -366,7 +452,7 @@ export function CheckoutPageClient() {
                               shipping.
                             </span>
                           ) : null}
-                          {method.brand && fee === 0 ? (
+                          {method.brand && fee === 0 && !waitingForRate ? (
                             <span className="mt-1 block text-xs leading-5 text-muted">
                               The seller confirms this courier&apos;s cost with you.
                             </span>

@@ -67,6 +67,12 @@ export interface VendorProfile {
   deliveryNote?: string
   /** Per-courier prices, keyed by shipping method id. See lib/shipping. */
   shippingRates?: Record<string, number>
+  /** Where couriers collect from, and quote against. */
+  originAddress?: string
+  originCity?: string
+  originState?: string
+  /** Used for any product with no weight of its own. */
+  defaultItemWeightKg?: number
   isActive: boolean
   totalSales: number
   rating: number
@@ -83,6 +89,8 @@ export interface Product {
   price: number
   /** Struck-through "was" price. Display only — never used to charge. */
   compareAtPrice?: number
+  /** Kilograms. What a carrier needs before it can price a parcel. */
+  weightKg?: number
   photoUrl?: string
   photoUrls: string[]
   inStock: boolean
@@ -214,11 +222,16 @@ export interface SellerProfileInput {
   freeDeliveryOver?: number
   deliveryNote?: string
   shippingRates?: Record<string, number>
+  originAddress?: string
+  originCity?: string
+  originState?: string
+  defaultItemWeightKg?: number
 }
 
 export interface ProductInput {
   id?: string
   vendorId: string
+  weightKg?: number
   name: string
   category: ProductCategory
   description: string
@@ -232,6 +245,16 @@ export interface ProductInput {
 export interface CheckoutPayload {
   /** Which shipping method the buyer picked. Priced on the server. */
   shippingMethod?: string
+  /**
+   * Where it is going, in parts, so the carrier can be re-asked at order time.
+   * deliveryAddress stays the human-readable line the seller reads.
+   */
+  shippingDestination?: {
+    countryCode?: string
+    city?: string
+    region?: string
+    postalCode?: string
+  }
   buyerId: string
   vendorId: string
   items: OrderItem[]

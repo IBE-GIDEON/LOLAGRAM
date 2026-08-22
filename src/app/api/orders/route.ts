@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { hasSupabaseAdmin } from "@/lib/env"
-import { priceCart } from "@/lib/order-pricing"
+import { priceCart, toRateAddress } from "@/lib/order-pricing"
 import { sendPushNotification } from "@/lib/push"
 import { verifyAuthToken } from "@/lib/supabase/auth-guard"
 import { getSupabaseAdminClient } from "@/lib/supabase/server"
@@ -43,7 +43,12 @@ export async function POST(request: Request) {
       ? "vendor_transfer"
       : "pay_on_delivery"
 
-  const priced = await priceCart(supabase, payload.items, payload.shippingMethod)
+  const priced = await priceCart(
+    supabase,
+    payload.items,
+    payload.shippingMethod,
+    toRateAddress(payload.shippingDestination)
+  )
   if (!priced.ok) {
     return NextResponse.json({ error: priced.error }, { status: priced.status })
   }
@@ -59,6 +64,7 @@ export async function POST(request: Request) {
       total_amount: totalAmount,
       delivery_fee: deliveryFee,
       shipping_method: shippingMethod,
+      shipping_quote_source: priced.shippingQuoteSource,
       delivery_address: deliveryAddress,
       payment_method: paymentMethod,
       payment_status:

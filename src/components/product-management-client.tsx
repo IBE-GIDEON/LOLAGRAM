@@ -38,6 +38,7 @@ const emptyForm = {
   category: DEFAULT_PRODUCT_CATEGORY as ProductCategory,
   price: "",
   compareAtPrice: "",
+  weightKg: "",
   description: "",
   photoUrls: [] as string[],
   inStock: true
@@ -96,6 +97,7 @@ export function ProductManagementClient() {
             compareAtPrice: product.compareAtPrice
               ? String(product.compareAtPrice)
               : "",
+            weightKg: product.weightKg ? String(product.weightKg) : "",
             description: product.description,
             photoUrls:
               product.photoUrls.length > 0
@@ -375,6 +377,25 @@ export function ProductManagementClient() {
             </label>
           </div>
 
+          {/* Weight is what a courier prices on. Without it DHL and the rest
+              cannot quote at all, and checkout falls back to the flat rate. */}
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-medium text-muted">
+              Weight in kg — needed for live courier rates
+            </span>
+            <Input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="0.01"
+              placeholder="e.g. 0.4"
+              value={form.weightKg}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, weightKg: event.target.value }))
+              }
+            />
+          </label>
+
           {/* Live preview of the slash, so a seller sees the saving a buyer
               will see before saving — and sees nothing if it is not a saving. */}
           {form.price ? (
@@ -454,6 +475,7 @@ export function ProductManagementClient() {
                   compareAtPrice: form.compareAtPrice
                     ? Number(form.compareAtPrice)
                     : undefined,
+                  weightKg: form.weightKg ? Number(form.weightKg) : undefined,
                   photoUrl: form.photoUrls[0],
                   photoUrls: form.photoUrls,
                   inStock: form.inStock

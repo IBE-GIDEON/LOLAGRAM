@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import { getAppUrl } from "@/lib/app-url"
 import { hasFlutterwave, hasSupabaseAdmin } from "@/lib/env"
 import { createFlutterwavePayment } from "@/lib/flutterwave"
-import { priceCart } from "@/lib/order-pricing"
+import { priceCart, toRateAddress } from "@/lib/order-pricing"
 import { verifyAuthToken } from "@/lib/supabase/auth-guard"
 import { getSupabaseAdminClient } from "@/lib/supabase/server"
 import { type CheckoutPayload } from "@/lib/types"
@@ -56,7 +56,12 @@ export async function POST(request: Request) {
     )
   }
 
-  const priced = await priceCart(supabase, payload.items, payload.shippingMethod)
+  const priced = await priceCart(
+    supabase,
+    payload.items,
+    payload.shippingMethod,
+    toRateAddress(payload.shippingDestination)
+  )
   if (!priced.ok) {
     return NextResponse.json({ error: priced.error }, { status: priced.status })
   }
@@ -72,6 +77,7 @@ export async function POST(request: Request) {
       total_amount: priced.totalAmount,
       delivery_fee: priced.deliveryFee,
       shipping_method: priced.shippingMethod,
+      shipping_quote_source: priced.shippingQuoteSource,
       delivery_address: deliveryAddress,
       payment_method: "flutterwave",
       // Not paid until the webhook confirms it against Flutterwave.

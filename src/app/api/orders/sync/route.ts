@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { hasSupabaseAdmin } from "@/lib/env"
-import { priceCart } from "@/lib/order-pricing"
+import { priceCart, toRateAddress } from "@/lib/order-pricing"
 import { verifyAuthToken } from "@/lib/supabase/auth-guard"
 import { getSupabaseAdminClient } from "@/lib/supabase/server"
 import { type CheckoutPayload } from "@/lib/types"
@@ -33,7 +33,12 @@ export async function POST(request: Request) {
   // the service role, so RLS cannot catch a bad total either — and an order
   // that sat in IndexedDB overnight may name a price that has since changed,
   // a product now out of stock, or one the buyer simply edited by hand.
-  const priced = await priceCart(supabase, payload.items, payload.shippingMethod)
+  const priced = await priceCart(
+    supabase,
+    payload.items,
+    payload.shippingMethod,
+    toRateAddress(payload.shippingDestination)
+  )
   if (!priced.ok) {
     return NextResponse.json({ error: priced.error }, { status: 400 })
   }
@@ -48,6 +53,7 @@ export async function POST(request: Request) {
     total_amount: priced.totalAmount,
     delivery_fee: priced.deliveryFee,
     shipping_method: priced.shippingMethod,
+    shipping_quote_source: priced.shippingQuoteSource,
     delivery_address: payload.deliveryAddress,
     payment_method: paymentMethod,
     payment_status:

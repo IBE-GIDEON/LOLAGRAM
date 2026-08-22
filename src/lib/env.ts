@@ -16,7 +16,17 @@ export const env = {
   sellerEmails: process.env.NEXT_PUBLIC_SELLER_EMAILS ?? "",
   // Optional: overrides the store's own number for the floating chat button.
   supportWhatsapp: process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP ?? "",
-  enablePayOnDelivery: process.env.NEXT_PUBLIC_ENABLE_PAY_ON_DELIVERY === "true"
+  enablePayOnDelivery: process.env.NEXT_PUBLIC_ENABLE_PAY_ON_DELIVERY === "true",
+
+  // Carrier rate APIs. Server-side only, every one of them — a courier key in
+  // the browser bundle is anyone's to spend.
+  dhlApiKey: process.env.DHL_API_KEY ?? "",
+  dhlApiSecret: process.env.DHL_API_SECRET ?? "",
+  dhlAccountNumber: process.env.DHL_ACCOUNT_NUMBER ?? "",
+  /** DHL ships a sandbox; point at it while testing credentials. */
+  dhlUseTestEnvironment: process.env.DHL_TEST_MODE === "true",
+  topshipApiKey: process.env.TOPSHIP_API_KEY ?? "",
+  gigApiKey: process.env.GIG_API_KEY ?? ""
 }
 
 export const hasSupabase =

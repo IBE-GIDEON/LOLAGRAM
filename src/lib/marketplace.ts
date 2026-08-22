@@ -95,6 +95,13 @@ function mapVendor(row: Record<string, unknown>): VendorProfile {
       row.free_delivery_over != null ? Number(row.free_delivery_over) : undefined,
     deliveryNote: row.delivery_note ? String(row.delivery_note) : undefined,
     shippingRates: parseShippingRates(row.shipping_rates),
+    originAddress: row.origin_address ? String(row.origin_address) : undefined,
+    originCity: row.origin_city ? String(row.origin_city) : undefined,
+    originState: row.origin_state ? String(row.origin_state) : undefined,
+    defaultItemWeightKg:
+      row.default_item_weight_kg != null
+        ? Number(row.default_item_weight_kg)
+        : undefined,
     isActive: Boolean(row.is_active),
     totalSales: Number(row.total_sales ?? 0),
     rating: Number(row.rating ?? 0),
@@ -127,6 +134,7 @@ function mapProduct(row: Record<string, unknown>) {
       Number(row.price ?? 0)
     ),
     price: Number(row.price ?? 0),
+    weightKg: row.weight_kg != null ? Number(row.weight_kg) : undefined,
     photoUrl: photoUrls[0],
     photoUrls,
     inStock: normalizeBoolean(row.in_stock ?? row.inStock, true),
@@ -2384,6 +2392,10 @@ export async function saveSellerProfile(
         free_delivery_over: input.freeDeliveryOver ?? null,
         delivery_note: input.deliveryNote ?? null,
         shipping_rates: input.shippingRates ?? {},
+        origin_address: input.originAddress ?? null,
+        origin_city: input.originCity ?? null,
+        origin_state: input.originState ?? null,
+        default_item_weight_kg: input.defaultItemWeightKg ?? null,
         is_active: true
       },
       // Conflict on user_id, not on the primary key. No id is sent here, so
@@ -2455,6 +2467,8 @@ export async function saveProduct(input: ProductInput) {
     description: input.description,
     compare_at_price:
       normalizeCompareAtPrice(input.compareAtPrice, input.price) ?? null,
+    weight_kg:
+      Number(input.weightKg) > 0 ? Number(input.weightKg) : null,
     price: input.price,
     photo_url: input.photoUrls[0] ?? input.photoUrl ?? null,
     photo_urls: input.photoUrls,
