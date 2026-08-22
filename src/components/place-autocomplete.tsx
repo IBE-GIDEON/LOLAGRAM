@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useId, useRef, useState } from "react"
+import { FiChevronDown } from "react-icons/fi"
 
 import { Input } from "@/components/ui"
 import { cn } from "@/lib/utils"
@@ -48,21 +49,21 @@ export function PlaceAutocomplete({
   const containerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
+    // Nothing to fetch for a field nobody is looking at.
+    if (!open) return
+
     if (justPicked.current) {
       justPicked.current = false
       return
     }
 
     const query = value.trim()
-    if (query.length < 2) {
-      setSuggestions([])
-      return
-    }
+    // Opening the list is a click and should feel like one; typing gets a
+    // pause so a word costs one request rather than one per letter.
+    const delay = query ? 200 : 0
 
-    // One request per pause in typing, not one per keystroke — each is a
-    // billed Google call.
+    const controller = new AbortController()
     const timer = window.setTimeout(() => {
-      const controller = new AbortController()
       fetch(
         `/api/places?input=${encodeURIComponent(query)}&country=${encodeURIComponent(
           country
@@ -74,11 +75,14 @@ export function PlaceAutocomplete({
           setSuggestions(data.suggestions ?? [])
           setActiveIndex(-1)
         })
-        .catch(() => setSuggestions([]))
-    }, 250)
+        .catch(() => undefined)
+    }, delay)
 
-    return () => window.clearTimeout(timer)
-  }, [value, country, kind])
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
+    }
+  }, [value, country, kind, open])
 
   // Changing country invalidates whatever was on offer for the old one.
   useEffect(() => {
@@ -108,6 +112,7 @@ export function PlaceAutocomplete({
   return (
     <div ref={containerRef} className="relative">
       <Input
+        className="pr-10"
         value={value}
         placeholder={placeholder}
         autoComplete={autoComplete ?? "off"}
@@ -120,6 +125,9 @@ export function PlaceAutocomplete({
           setOpen(true)
         }}
         onFocus={() => setOpen(true)}
+        // Focus alone does not fire again once the field already has it, so a
+        // click after Escape would otherwise never reopen the list.
+        onClick={() => setOpen(true)}
         onKeyDown={(event) => {
           if (!visible) return
 
@@ -140,6 +148,16 @@ export function PlaceAutocomplete({
             setOpen(false)
           }
         }}
+      />
+
+      {/* The one thing that says "this is a dropdown". Without it the control
+          reads as a plain text box and nobody thinks to click it. */}
+      <FiChevronDown
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-muted transition-transform",
+          visible && "rotate-180"
+        )}
       />
 
       {visible ? (

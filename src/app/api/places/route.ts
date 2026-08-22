@@ -11,10 +11,16 @@ const DATA: Record<"region" | "city", Record<string, string[]>> = {
 
 type Kind = keyof typeof DATA
 
-/** Below two characters every query matches half a country. */
-const MIN_INPUT = 2
 const MAX_INPUT = 120
-const MAX_RESULTS = 6
+/** Typed queries stay tight. */
+const SEARCH_LIMIT = 8
+/**
+ * An empty query means the field was merely clicked, so answer with the start
+ * of the list. Without this the control looked like a plain text box and gave
+ * nothing back until two characters were typed — there was no way to tell it
+ * was a dropdown at all.
+ */
+const BROWSE_LIMIT = 60
 
 /**
  * Region and city suggestions for the delivery address.
@@ -35,12 +41,7 @@ export async function GET(request: Request) {
   const country = (searchParams.get("country") ?? "").trim().toUpperCase()
   const kind = (searchParams.get("kind") ?? "") as Kind
 
-  if (
-    input.length < MIN_INPUT ||
-    input.length > MAX_INPUT ||
-    !isCountryCode(country) ||
-    !(kind in DATA)
-  ) {
+  if (input.length > MAX_INPUT || !isCountryCode(country) || !(kind in DATA)) {
     return NextResponse.json({ suggestions: [] })
   }
 
@@ -49,24 +50,30 @@ export async function GET(request: Request) {
     return NextResponse.json({ suggestions: [] })
   }
 
-  const needle = fold(input)
-  const startsWith: string[] = []
-  const contains: string[] = []
+  let names: string[]
 
-  for (const name of pool) {
-    const folded = fold(name)
-    if (folded.startsWith(needle)) {
-      startsWith.push(name)
-      // Enough prefix matches means nothing weaker will be shown anyway.
-      if (startsWith.length >= MAX_RESULTS) break
-    } else if (contains.length < MAX_RESULTS && folded.includes(needle)) {
-      contains.push(name)
+  if (input.length === 0) {
+    names = pool.slice(0, BROWSE_LIMIT)
+  } else {
+    const needle = fold(input)
+    const startsWith: string[] = []
+    const contains: string[] = []
+
+    for (const name of pool) {
+      const folded = fold(name)
+      if (folded.startsWith(needle)) {
+        startsWith.push(name)
+        // Enough prefix matches means nothing weaker will be shown anyway.
+        if (startsWith.length >= SEARCH_LIMIT) break
+      } else if (contains.length < SEARCH_LIMIT && folded.includes(needle)) {
+        contains.push(name)
+      }
     }
-  }
 
-  // Prefix before substring, so "lag" leads with Lagos rather than with
-  // somewhere that merely has those letters in the middle.
-  const names = [...startsWith, ...contains].slice(0, MAX_RESULTS)
+    // Prefix before substring, so "lag" leads with Lagos rather than with
+    // somewhere that merely has those letters in the middle.
+    names = [...startsWith, ...contains].slice(0, SEARCH_LIMIT)
+  }
 
   const suggestions = names.map((name) => ({
     text: name,
