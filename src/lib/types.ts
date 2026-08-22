@@ -25,7 +25,11 @@ export type OrderStatus =
   | "cancelled"
 
 export type OrderArchiveActor = "buyer" | "seller"
-export type PaymentMethod = "pay_on_delivery" | "vendor_transfer" | "flutterwave"
+export type PaymentMethod =
+  | "pay_on_delivery"
+  | "vendor_transfer"
+  | "flutterwave"
+  | "paypal"
 export type PaymentStatus =
   | "awaiting_seller_confirmation"
   | "pay_on_delivery"

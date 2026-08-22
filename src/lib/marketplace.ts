@@ -2580,10 +2580,12 @@ async function getAccessToken(): Promise<string | null> {
  * one for the same cart.
  */
 export async function startCardCheckout(
-  payload: CheckoutPayload
+  payload: CheckoutPayload,
+  /** Which hosted checkout to open. Both return the same shape. */
+  provider: "flutterwave" | "paypal" = "flutterwave"
 ): Promise<{ checkoutUrl: string; orderId: string }> {
   const token = await getAccessToken()
-  const response = await fetch("/api/flutterwave/initialize", {
+  const response = await fetch(`/api/${provider}/initialize`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

@@ -307,7 +307,10 @@ export function CheckoutPageClient() {
       paymentMethod
     }
 
-    if (!navigator.onLine && paymentMethod === "flutterwave") {
+    const isHostedCheckout =
+      paymentMethod === "flutterwave" || paymentMethod === "paypal"
+
+    if (!navigator.onLine && isHostedCheckout) {
       toast.error("Card checkout needs a connection. Pick bank transfer to queue this order.")
       return
     }
@@ -322,8 +325,8 @@ export function CheckoutPageClient() {
 
     setSubmitting(true)
     try {
-      if (paymentMethod === "flutterwave") {
-        const { checkoutUrl } = await startCardCheckout(payload)
+      if (isHostedCheckout) {
+        const { checkoutUrl } = await startCardCheckout(payload, paymentMethod)
         // Cart deliberately left alone: an abandoned card page should not cost
         // the buyer their basket.
         window.location.href = checkoutUrl

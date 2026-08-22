@@ -26,7 +26,16 @@ export const env = {
   /** DHL ships a sandbox; point at it while testing credentials. */
   dhlUseTestEnvironment: process.env.DHL_TEST_MODE === "true",
   topshipApiKey: process.env.TOPSHIP_API_KEY ?? "",
-  gigApiKey: process.env.GIG_API_KEY ?? ""
+  gigApiKey: process.env.GIG_API_KEY ?? "",
+
+  // PayPal. Server-side only; the client id is not secret but there is no
+  // reason to ship it when every call is made from here anyway.
+  paypalClientId: process.env.PAYPAL_CLIENT_ID ?? "",
+  paypalClientSecret: process.env.PAYPAL_CLIENT_SECRET ?? "",
+  /** "live" or "sandbox". Anything but sandbox means live. */
+  paypalEnvironment: process.env.PAYPAL_ENVIRONMENT ?? "live",
+  /** From the webhook you create in the PayPal dashboard. */
+  paypalWebhookId: process.env.PAYPAL_WEBHOOK_ID ?? ""
 }
 
 export const hasSupabase =
@@ -37,6 +46,9 @@ export const hasSupabaseAdmin =
 
 export const hasFlutterwave =
   Boolean(env.flutterwavePublicKey) && Boolean(env.flutterwaveSecretKey)
+
+export const hasPayPal =
+  Boolean(env.paypalClientId) && Boolean(env.paypalClientSecret)
 
 export const hasWebPush =
   Boolean(env.vapidPublicKey) && Boolean(env.vapidPrivateKey)

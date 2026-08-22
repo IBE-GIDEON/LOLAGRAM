@@ -1,4 +1,4 @@
-import { hasFlutterwave } from "@/lib/env"
+import { hasFlutterwave, hasPayPal } from "@/lib/env"
 import { PAY_ON_DELIVERY_ENABLED } from "@/lib/feature-flags"
 import { type PaymentMethod } from "@/lib/types"
 
@@ -12,6 +12,7 @@ import { type PaymentMethod } from "@/lib/types"
 export const PAYMENT_METHODS: PaymentMethod[] = [
   // Card first: it is the only one that settles before the parcel moves.
   ...(hasFlutterwave ? (["flutterwave"] as PaymentMethod[]) : []),
+  ...(hasPayPal ? (["paypal"] as PaymentMethod[]) : []),
   "vendor_transfer",
   ...(PAY_ON_DELIVERY_ENABLED ? (["pay_on_delivery"] as PaymentMethod[]) : [])
 ]

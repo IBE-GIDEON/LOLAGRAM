@@ -98,6 +98,10 @@ export const PAYMENT_METHOD_META: Record<
   flutterwave: {
     label: "Pay with Card",
     helper: "Card, bank transfer or USSD through Flutterwave."
+  },
+  paypal: {
+    label: "PayPal",
+    helper: "Pay with your PayPal balance or a card, charged in US dollars."
   }
 }
 
