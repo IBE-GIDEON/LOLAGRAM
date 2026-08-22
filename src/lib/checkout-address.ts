@@ -1,3 +1,8 @@
+import {
+  DEFAULT_COUNTRY_CODE,
+  getCountryName,
+  isCountryCode
+} from "@/lib/countries"
 import { formatNigerianPhone, normalizeNigerianPhone } from "@/lib/nigeria"
 
 /**
@@ -11,6 +16,8 @@ import { formatNigerianPhone, normalizeNigerianPhone } from "@/lib/nigeria"
 export interface CheckoutAddress {
   firstName: string
   lastName: string
+  /** ISO 3166-1 alpha-2. */
+  country: string
   region: string
   city: string
   phone: string
@@ -22,6 +29,7 @@ export interface CheckoutAddress {
 export const EMPTY_CHECKOUT_ADDRESS: CheckoutAddress = {
   firstName: "",
   lastName: "",
+  country: DEFAULT_COUNTRY_CODE,
   region: "",
   city: "",
   phone: "",
@@ -54,17 +62,45 @@ export function persistAddress(address: CheckoutAddress) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(address))
 }
 
+/**
+ * Nigeria gets the local-format handling — 0803… becomes +234803…. Anywhere
+ * else is taken as typed, because assuming a Nigerian country code for a Ghana
+ * number would rewrite it into one the seller cannot call.
+ */
+export function normalizeAddressPhone(raw: string, country: string) {
+  if (country === DEFAULT_COUNTRY_CODE) return normalizeNigerianPhone(raw)
+
+  const compact = raw.trim().replace(/[\s()-]/g, "")
+  return /^\+?\d{7,15}$/.test(compact) ? compact : ""
+}
+
+export function formatAddressPhone(phone: string, country: string) {
+  return country === DEFAULT_COUNTRY_CODE
+    ? formatNigerianPhone(phone)
+    : phone.trim()
+}
+
 /** The first thing wrong with the address, or null when it is usable. */
 export function validateAddress(address: CheckoutAddress): string | null {
   if (!address.firstName.trim()) return "Add your first name."
   if (!address.lastName.trim()) return "Add your last name."
-  if (!address.region.trim()) return "Choose your region."
+  if (!isCountryCode(address.country)) return "Choose your country."
+  if (!address.region.trim()) {
+    return address.country === DEFAULT_COUNTRY_CODE
+      ? "Choose your state."
+      : "Add your state or province."
+  }
   if (!address.city.trim()) return "Add your city or area."
   if (!address.address.trim()) return "Add the delivery address."
-  if (!normalizeNigerianPhone(address.phone)) {
-    return "Add a valid phone number, like 0803 000 0000."
+  if (!normalizeAddressPhone(address.phone, address.country)) {
+    return address.country === DEFAULT_COUNTRY_CODE
+      ? "Add a valid phone number, like 0803 000 0000."
+      : "Add a valid phone number, with its country code."
   }
-  if (address.additionalPhone.trim() && !normalizeNigerianPhone(address.additionalPhone)) {
+  if (
+    address.additionalPhone.trim() &&
+    !normalizeAddressPhone(address.additionalPhone, address.country)
+  ) {
     return "Check the additional phone number, or clear it."
   }
   return null
@@ -86,7 +122,12 @@ export function addressSummary(address: CheckoutAddress) {
 
   return {
     name: getFullName(address),
-    detail: [place, region, formatNigerianPhone(address.phone)]
+    detail: [
+      place,
+      region,
+      getCountryName(address.country),
+      formatAddressPhone(address.phone, address.country)
+    ]
       .filter(Boolean)
       .join(" | ")
   }
@@ -105,11 +146,12 @@ export function composeDeliveryAddress(address: CheckoutAddress) {
     address.address.trim(),
     address.landmark.trim() ? `near ${address.landmark.trim()}` : "",
     address.city.trim(),
-    address.region.trim()
+    address.region.trim(),
+    getCountryName(address.country)
   ].filter(Boolean)
 
   const phones = [address.phone, address.additionalPhone]
-    .map((value) => formatNigerianPhone(value))
+    .map((value) => formatAddressPhone(value, address.country))
     .filter(Boolean)
 
   const contact = phones.length > 1 ? `${phones[0]} or ${phones[1]}` : phones[0] ?? ""

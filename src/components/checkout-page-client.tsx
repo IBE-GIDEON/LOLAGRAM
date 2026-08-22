@@ -16,6 +16,7 @@ import { PAYMENT_METHODS } from "@/lib/payment-methods"
 import {
   EMPTY_CHECKOUT_ADDRESS,
   addressSummary,
+  normalizeAddressPhone,
   composeDeliveryAddress,
   loadSavedAddress,
   persistAddress,
@@ -28,7 +29,8 @@ import {
   saveUserProfile,
   startCardCheckout
 } from "@/lib/marketplace"
-import { NIGERIAN_STATES, normalizeNigerianPhone } from "@/lib/nigeria"
+import { COUNTRIES, DEFAULT_COUNTRY_CODE } from "@/lib/countries"
+import { NIGERIAN_STATES } from "@/lib/nigeria"
 import { getPrimaryProductImage } from "@/lib/product-images"
 import { queueOfflineOrder } from "@/lib/offline-orders"
 import { type PaymentMethod, type VendorDetail } from "@/lib/types"
@@ -130,9 +132,9 @@ export function CheckoutPageClient() {
 
     const normalized: CheckoutAddress = {
       ...address,
-      phone: normalizeNigerianPhone(address.phone),
+      phone: normalizeAddressPhone(address.phone, address.country),
       additionalPhone: address.additionalPhone.trim()
-        ? normalizeNigerianPhone(address.additionalPhone)
+        ? normalizeAddressPhone(address.additionalPhone, address.country)
         : ""
     }
 
@@ -490,6 +492,10 @@ function StepCard({
   )
 }
 
+/** Matches Input, which is a styled <input> and cannot dress a <select>. */
+const selectClass =
+  "w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-ink outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/10"
+
 function Field({
   label,
   children
@@ -519,6 +525,8 @@ function AddressForm({
   const set = <K extends keyof CheckoutAddress>(key: K, value: CheckoutAddress[K]) =>
     onChange({ ...address, [key]: value })
 
+  const isNigeria = address.country === DEFAULT_COUNTRY_CODE
+
   return (
     <form
       className="space-y-4"
@@ -528,25 +536,52 @@ function AddressForm({
       }}
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Region">
+        <Field label="Country">
           <select
-            className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-ink outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/10"
-            value={address.region}
-            onChange={(event) => set("region", event.target.value)}
+            className={selectClass}
+            value={address.country}
+            onChange={(event) =>
+              // The state list below only applies to Nigeria, so a country
+              // change clears whatever state was picked for the old one.
+              onChange({ ...address, country: event.target.value, region: "" })
+            }
           >
-            <option value="">Choose a region</option>
-            {NIGERIAN_STATES.map((state) => (
-              <option key={state} value={state}>
-                {state}
+            {COUNTRIES.map((country) => (
+              <option key={country.code} value={country.code}>
+                {country.name}
               </option>
             ))}
           </select>
         </Field>
 
+        <Field label={isNigeria ? "State" : "State or province"}>
+          {isNigeria ? (
+            <select
+              className={selectClass}
+              value={address.region}
+              onChange={(event) => set("region", event.target.value)}
+            >
+              <option value="">Choose a state</option>
+              {NIGERIAN_STATES.map((state) => (
+                <option key={state} value={state}>
+                  {state}
+                </option>
+              ))}
+            </select>
+          ) : (
+            // Only Nigeria has a built-in list, so anywhere else is typed.
+            <Input
+              value={address.region}
+              placeholder="State or province"
+              onChange={(event) => set("region", event.target.value)}
+            />
+          )}
+        </Field>
+
         <Field label="City">
           <Input
             value={address.city}
-            placeholder="Calabar Municipal"
+            placeholder={isNigeria ? "Calabar Municipal" : "City"}
             onChange={(event) => set("city", event.target.value)}
           />
         </Field>
@@ -567,16 +602,20 @@ function AddressForm({
           />
         </Field>
 
+        {/* The +234 chip is Nigeria's alone. Showing it beside a Ghanaian
+            number would say we are about to dial the wrong country. */}
         <Field label="Phone number">
           <div className="flex items-center gap-2">
-            <span className="shrink-0 rounded-2xl border border-border bg-canvas px-3 py-3 text-sm text-muted">
-              +234
-            </span>
+            {isNigeria ? (
+              <span className="shrink-0 rounded-2xl border border-border bg-canvas px-3 py-3 text-sm text-muted">
+                +234
+              </span>
+            ) : null}
             <Input
               type="tel"
               inputMode="tel"
               autoComplete="tel"
-              placeholder="803 000 0000"
+              placeholder={isNigeria ? "803 000 0000" : "+233 20 000 0000"}
               value={address.phone}
               onChange={(event) => set("phone", event.target.value)}
             />
@@ -585,13 +624,15 @@ function AddressForm({
 
         <Field label="Additional phone number (optional)">
           <div className="flex items-center gap-2">
-            <span className="shrink-0 rounded-2xl border border-border bg-canvas px-3 py-3 text-sm text-muted">
-              +234
-            </span>
+            {isNigeria ? (
+              <span className="shrink-0 rounded-2xl border border-border bg-canvas px-3 py-3 text-sm text-muted">
+                +234
+              </span>
+            ) : null}
             <Input
               type="tel"
               inputMode="tel"
-              placeholder="803 000 0000"
+              placeholder={isNigeria ? "803 000 0000" : "+233 20 000 0000"}
               value={address.additionalPhone}
               onChange={(event) => set("additionalPhone", event.target.value)}
             />
