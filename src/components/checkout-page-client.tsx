@@ -281,7 +281,7 @@ export function CheckoutPageClient() {
 
           <StepCard
             index={2}
-            title="Delivery details"
+            title="Shipping method"
             done={deliveryConfirmed && step !== 2}
             locked={!savedAddress}
             onChange={
@@ -302,19 +302,19 @@ export function CheckoutPageClient() {
                     <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-4 border-brand" />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-baseline gap-2">
-                        <p className="text-sm font-semibold text-ink">Door delivery</p>
+                        <p className="text-sm font-semibold text-ink">Door-to-door</p>
                         <span className="text-sm font-semibold text-brand">
                           {deliveryFee > 0 ? money(deliveryFee).text : "Free"}
                         </span>
                       </div>
                       <p className="mt-1 text-sm leading-6 text-muted">
                         {deliveryTerms.note ||
-                          `${vendorData?.vendor.storeName ?? "The seller"} will confirm your delivery window on WhatsApp.`}
+                          `${vendorData?.vendor.storeName ?? "The seller"} will confirm your shipping window on WhatsApp.`}
                       </p>
                       {missingForFreeDelivery > 0 ? (
                         <p className="mt-1 text-xs leading-5 text-success">
                           Add {money(missingForFreeDelivery).text} more for free
-                          delivery.
+                          shipping.
                         </p>
                       ) : null}
                     </div>
@@ -360,7 +360,7 @@ export function CheckoutPageClient() {
                       setStep(3)
                     }}
                   >
-                    Confirm delivery details
+                    Confirm shipping method
                   </Button>
                 </div>
               </div>
@@ -742,7 +742,7 @@ function OrderSummary({
         </div>
 
         <div className="flex items-center justify-between gap-3">
-          <span className="text-muted">Delivery fees</span>
+          <span className="text-muted">Shipping fee</span>
           <span className={deliveryFee > 0 ? "font-semibold text-ink" : "font-semibold text-success"}>
             {deliveryFee > 0 ? money(deliveryFee).text : "Free"}
           </span>

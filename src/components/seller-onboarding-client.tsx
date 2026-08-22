@@ -231,16 +231,16 @@ export function SellerOnboardingClient() {
                 numbers, so the two can never disagree. */}
             <div className="space-y-3">
               <div>
-                <p className="text-sm font-semibold text-ink">Delivery</p>
+                <p className="text-sm font-semibold text-ink">Shipping</p>
                 <p className="mt-1 text-xs leading-5 text-muted">
-                  Leave the fee blank or zero and delivery shows as free.
+                  Leave the fee blank or zero and shipping shows as free.
                 </p>
               </div>
               <Input
                 type="number"
                 inputMode="decimal"
                 min={0}
-                placeholder="Delivery fee (₦)"
+                placeholder="Shipping fee (₦)"
                 value={deliveryFee}
                 onChange={(event) => setDeliveryFee(event.target.value)}
               />
@@ -248,12 +248,12 @@ export function SellerOnboardingClient() {
                 type="number"
                 inputMode="decimal"
                 min={0}
-                placeholder="Free delivery on orders over (₦) — optional"
+                placeholder="Free shipping on orders over (₦) — optional"
                 value={freeDeliveryOver}
                 onChange={(event) => setFreeDeliveryOver(event.target.value)}
               />
               <Input
-                placeholder="Delivery promise, e.g. 2 to 4 working days nationwide"
+                placeholder="Shipping promise, e.g. 2 to 4 working days nationwide"
                 value={deliveryNote}
                 onChange={(event) => setDeliveryNote(event.target.value)}
               />
