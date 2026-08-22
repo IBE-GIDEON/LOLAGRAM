@@ -17,8 +17,9 @@ import { PAYMENT_METHODS } from "@/lib/payment-methods"
 import { amountToFreeDelivery } from "@/lib/delivery"
 import {
   DEFAULT_SHIPPING_METHOD,
-  SHIPPING_METHODS,
+  isMethodAvailableFor,
   resolveShippingFee,
+  shippingMethodsFor,
   type ShippingMethod
 } from "@/lib/shipping"
 import {
@@ -133,6 +134,8 @@ export function CheckoutPageClient() {
     freeOver: vendorData?.vendor.freeDeliveryOver,
     note: vendorData?.vendor.deliveryNote
   }
+  const availableMethods = shippingMethodsFor(savedAddress?.country)
+
   const shippingRates = vendorData?.vendor.shippingRates as
     | Record<ShippingMethod, number>
     | undefined
@@ -148,6 +151,14 @@ export function CheckoutPageClient() {
     carrierQuote?.method === shippingMethod ? carrierQuote.fee : flatShippingFee
   const missingForFreeShipping = amountToFreeDelivery(liveSubtotal, deliveryTerms)
   const orderTotal = Math.round((liveSubtotal + deliveryFee) * 100) / 100
+
+  // Changing country can take the chosen method off the list — local shipping
+  // does not cover Ghana. Leaving it selected would price and charge it.
+  useEffect(() => {
+    if (isMethodAvailableFor(shippingMethod, savedAddress?.country)) return
+    const fallback = shippingMethodsFor(savedAddress?.country)[0]
+    if (fallback) setShippingMethod(fallback.id)
+  }, [savedAddress?.country, shippingMethod])
 
   // Ask the server for the courier's own price once we know the destination.
   // Only for couriers: pickup and local are the seller's own arrangement.
@@ -378,7 +389,7 @@ export function CheckoutPageClient() {
             {step === 2 && savedAddress ? (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  {SHIPPING_METHODS.map((method) => {
+                  {availableMethods.map((method) => {
                     const flat = resolveShippingFee(
                       method.id,
                       liveSubtotal,
@@ -926,7 +937,7 @@ function OrderSummary({
 function CarrierMark({
   method
 }: {
-  method: (typeof SHIPPING_METHODS)[number]
+  method: ReturnType<typeof shippingMethodsFor>[number]
 }) {
   const [logoFailed, setLogoFailed] = useState(false)
 

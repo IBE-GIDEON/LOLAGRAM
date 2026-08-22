@@ -1,6 +1,10 @@
 import { type SupabaseClient } from "@supabase/supabase-js"
 
-import { normalizeShippingMethod, type ShippingMethod } from "@/lib/shipping"
+import {
+  isMethodAvailableFor,
+  normalizeShippingMethod,
+  type ShippingMethod
+} from "@/lib/shipping"
 import { quoteShipping, totalCartWeight } from "@/lib/shipping-quote"
 import { type RateAddress } from "@/lib/shipping-rates"
 import { type OrderItem } from "@/lib/types"
@@ -125,6 +129,20 @@ export async function priceCart(
   // The browser says which method; what it costs is decided here. Anything
   // unrecognised falls back to local rather than to free.
   const shippingMethod = normalizeShippingMethod(rawShippingMethod)
+
+  // Checkout hides local shipping for an address outside the countries it
+  // covers, but hiding a button is not a rule. Asking for the Nigerian flat
+  // rate on a Ghanaian address would undercharge, so refuse it here too.
+  if (
+    destination?.countryCode &&
+    !isMethodAvailableFor(shippingMethod, destination.countryCode)
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      error: "Local shipping does not cover that country. Choose a courier."
+    }
+  }
 
   // Re-quoted at the moment the order is written, rather than trusting the
   // figure the page last showed. If the carrier has moved its price since, the

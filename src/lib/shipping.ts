@@ -49,6 +49,38 @@ export const SHIPPING_METHOD_IDS = SHIPPING_METHODS.map((method) => method.id)
 
 export const DEFAULT_SHIPPING_METHOD: ShippingMethod = "local"
 
+/**
+ * Countries local shipping actually covers, as ISO alpha-2.
+ *
+ * One flat price for the whole of each. Add a country here and it appears in
+ * the list beside Nigeria the moment a buyer with that address is checking
+ * out — no other change needed.
+ */
+export const LOCAL_SHIPPING_COUNTRIES = ["NG"] as const
+
+/**
+ * Whether a method can be offered to an address in this country.
+ *
+ * Local shipping is the only one that is fussy: quoting a Nigerian flat rate
+ * against a Ghanaian address would both read as nonsense and undercharge. An
+ * unknown country is treated as allowed, since the buyer has not said yet.
+ */
+export function isMethodAvailableFor(
+  method: ShippingMethod,
+  countryCode: string | undefined
+): boolean {
+  if (method !== "local") return true
+  if (!countryCode) return true
+  return (LOCAL_SHIPPING_COUNTRIES as readonly string[]).includes(countryCode)
+}
+
+/** The methods offerable to an address in this country, in order. */
+export function shippingMethodsFor(countryCode: string | undefined) {
+  return SHIPPING_METHODS.filter((method) =>
+    isMethodAvailableFor(method.id, countryCode)
+  )
+}
+
 /** The couriers, which are the ones a seller sets a separate rate for. */
 export const COURIER_METHODS = SHIPPING_METHODS.filter((method) => method.brand)
 
