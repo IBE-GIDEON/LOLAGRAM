@@ -1,24 +1,113 @@
 "use client"
 
-import { useEffect, useId, useRef, useState } from "react"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { FiChevronDown } from "react-icons/fi"
 
 import { Input } from "@/components/ui"
+import { DEFAULT_COUNTRY_CODE } from "@/lib/countries"
+import { NIGERIAN_STATES } from "@/lib/nigeria"
 import { cn } from "@/lib/utils"
 
 export type PlaceSuggestion = {
   text: string
-  /** "Cross River, Nigeria" — the tiers above the one being picked. */
+  /** The state a city sits in, when its name gives it away. */
   secondary: string
+}
+
+/** How many rows the list shows at once. It scrolls past that. */
+const MAX_VISIBLE = 60
+
+type Entry = {
+  text: string
+  /** Lowercased and stripped of accents, computed once when the list loads. */
+  folded: string
+}
+
+type LoadedList = {
+  entries: Entry[]
+  /** Folded state names, for filling the state in when a city is picked. */
+  regionSet: Set<string>
+  regionByFolded: Map<string, string>
+}
+
+/**
+ * Country lists, kept for the life of the page.
+ *
+ * Module scope, not component state: the state field and the city field are
+ * separate components, a buyer moves between them and back, and re-fetching
+ * Nigeria's cities each time is what made this feel slow.
+ */
+const listCache = new Map<string, LoadedList>()
+const inFlight = new Map<string, Promise<LoadedList>>()
+
+function fold(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+}
+
+/**
+ * Nigerian states are already in the bundle, so seed them rather than fetch
+ * them. This is the field almost every buyer touches, and it now opens with no
+ * request at all — the same as the country box beside it.
+ */
+listCache.set(`${DEFAULT_COUNTRY_CODE}:region`, {
+  entries: NIGERIAN_STATES.map((text) => ({ text, folded: fold(text) })),
+  regionSet: new Set(NIGERIAN_STATES.map(fold)),
+  regionByFolded: new Map(NIGERIAN_STATES.map((name) => [fold(name), name]))
+})
+
+async function loadList(country: string, kind: "region" | "city") {
+  const key = `${country}:${kind}`
+
+  const cached = listCache.get(key)
+  if (cached) return cached
+
+  const existing = inFlight.get(key)
+  if (existing) return existing
+
+  const request = (async () => {
+    const [listResponse, regionResponse] = await Promise.all([
+      fetch(`/api/places?country=${country}&kind=${kind}`),
+      // A city's parent state comes from matching names, so the city list
+      // needs the state list too. It is the smaller of the two by far.
+      kind === "city"
+        ? fetch(`/api/places?country=${country}&kind=region`)
+        : Promise.resolve(null)
+    ])
+
+    const items: string[] = listResponse.ok
+      ? ((await listResponse.json()) as { items?: string[] }).items ?? []
+      : []
+
+    const regions: string[] = regionResponse?.ok
+      ? ((await regionResponse.json()) as { items?: string[] }).items ?? []
+      : []
+
+    const loaded: LoadedList = {
+      entries: items.map((text) => ({ text, folded: fold(text) })),
+      regionSet: new Set(regions.map(fold)),
+      regionByFolded: new Map(regions.map((name) => [fold(name), name]))
+    }
+
+    listCache.set(key, loaded)
+    inFlight.delete(key)
+    return loaded
+  })()
+
+  inFlight.set(key, request)
+  return request
 }
 
 /**
  * A text field that offers real places as you type.
  *
- * It stays an ordinary text input underneath. Suggestions are an accelerator,
- * never a gate: if the lookup is unconfigured, rate-limited or simply does not
- * know a village, whatever the buyer typed still stands. An address field that
- * refuses to accept an address it has not heard of is worse than no lookup.
+ * The country's whole list is fetched once and filtered here, so opening the
+ * list and narrowing it are both immediate — no request per keystroke, no
+ * debounce to wait out. It stays an ordinary text input underneath: a place
+ * the list has never heard of is still accepted, because an address field that
+ * refuses an address is worse than no list at all.
  */
 export function PlaceAutocomplete({
   value,
@@ -31,7 +120,7 @@ export function PlaceAutocomplete({
 }: {
   value: string
   onChange: (next: string) => void
-  /** Fires only on picking a suggestion, with its parent tiers attached. */
+  /** Fires only on picking a suggestion, with its parent state attached. */
   onSelect?: (suggestion: PlaceSuggestion) => void
   /** ISO 3166-1 alpha-2 — results are confined to this country. */
   country: string
@@ -39,54 +128,36 @@ export function PlaceAutocomplete({
   placeholder?: string
   autoComplete?: string
 }) {
-  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([])
+  const [list, setList] = useState<LoadedList | null>(
+    () => listCache.get(`${country}:${kind}`) ?? null
+  )
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
   const listId = useId()
-  // Set when a value came from the list, so choosing a suggestion does not
-  // immediately trigger a search for the thing just chosen.
   const justPicked = useRef(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    // Nothing to fetch for a field nobody is looking at.
-    if (!open) return
-
-    if (justPicked.current) {
-      justPicked.current = false
+    const cached = listCache.get(`${country}:${kind}`)
+    if (cached) {
+      setList(cached)
       return
     }
 
-    const query = value.trim()
-    // Opening the list is a click and should feel like one; typing gets a
-    // pause so a word costs one request rather than one per letter.
-    const delay = query ? 200 : 0
-
-    const controller = new AbortController()
-    const timer = window.setTimeout(() => {
-      fetch(
-        `/api/places?input=${encodeURIComponent(query)}&country=${encodeURIComponent(
-          country
-        )}&kind=${kind}`,
-        { signal: controller.signal }
-      )
-        .then((response) => (response.ok ? response.json() : { suggestions: [] }))
-        .then((data: { suggestions?: PlaceSuggestion[] }) => {
-          setSuggestions(data.suggestions ?? [])
-          setActiveIndex(-1)
-        })
-        .catch(() => undefined)
-    }, delay)
+    let ignore = false
+    setList(null)
+    loadList(country, kind)
+      .then((loaded) => {
+        if (!ignore) setList(loaded)
+      })
+      .catch(() => undefined)
 
     return () => {
-      window.clearTimeout(timer)
-      controller.abort()
+      ignore = true
     }
-  }, [value, country, kind, open])
+  }, [country, kind])
 
-  // Changing country invalidates whatever was on offer for the old one.
   useEffect(() => {
-    setSuggestions([])
     setOpen(false)
   }, [country])
 
@@ -98,16 +169,57 @@ export function PlaceAutocomplete({
     return () => document.removeEventListener("pointerdown", onPointerDown)
   }, [])
 
+  // Filtering happens here, on every render, against an already-folded list.
+  // Even the largest country in the world is twelve thousand short strings,
+  // which is well under a frame.
+  const suggestions = useMemo<PlaceSuggestion[]>(() => {
+    if (!list) return []
+
+    const needle = fold(value.trim())
+
+    const pickRegion = (text: string) =>
+      kind === "city" ? list.regionByFolded.get(fold(text)) ?? "" : ""
+
+    if (!needle) {
+      // Just opened: show the top of the list so there is something to choose.
+      return list.entries
+        .slice(0, MAX_VISIBLE)
+        .map((entry) => ({ text: entry.text, secondary: pickRegion(entry.text) }))
+    }
+
+    const startsWith: PlaceSuggestion[] = []
+    const contains: PlaceSuggestion[] = []
+
+    for (const entry of list.entries) {
+      if (entry.folded.startsWith(needle)) {
+        startsWith.push({ text: entry.text, secondary: pickRegion(entry.text) })
+        if (startsWith.length >= MAX_VISIBLE) break
+      } else if (
+        contains.length < MAX_VISIBLE &&
+        entry.folded.includes(needle)
+      ) {
+        contains.push({ text: entry.text, secondary: pickRegion(entry.text) })
+      }
+    }
+
+    // Prefix before substring, so "lag" leads with Lagos rather than with
+    // somewhere that merely has those letters in the middle.
+    return [...startsWith, ...contains].slice(0, MAX_VISIBLE)
+  }, [list, value, kind])
+
   const pick = (suggestion: PlaceSuggestion) => {
     justPicked.current = true
     onChange(suggestion.text)
     onSelect?.(suggestion)
-    setSuggestions([])
     setOpen(false)
     setActiveIndex(-1)
   }
 
-  const visible = open && suggestions.length > 0
+  const loading = list === null
+  // Open with a row saying so rather than with nothing. A click that produces
+  // no visible change is indistinguishable from a broken control, which is
+  // what the first click looked like while the list was still arriving.
+  const visible = open && (suggestions.length > 0 || loading)
 
   return (
     <div ref={containerRef} className="relative">
@@ -121,15 +233,20 @@ export function PlaceAutocomplete({
         aria-controls={listId}
         aria-autocomplete="list"
         onChange={(event) => {
+          justPicked.current = false
           onChange(event.target.value)
           setOpen(true)
+          setActiveIndex(-1)
         }}
         onFocus={() => setOpen(true)}
         // Focus alone does not fire again once the field already has it, so a
         // click after Escape would otherwise never reopen the list.
         onClick={() => setOpen(true)}
         onKeyDown={(event) => {
-          if (!visible) return
+          if (!visible) {
+            if (event.key === "ArrowDown") setOpen(true)
+            return
+          }
 
           if (event.key === "ArrowDown") {
             event.preventDefault()
@@ -166,6 +283,9 @@ export function PlaceAutocomplete({
           role="listbox"
           className="absolute z-30 mt-1 max-h-60 w-full overflow-auto rounded-2xl border border-border bg-surface py-1 shadow-lg"
         >
+          {loading ? (
+            <li className="px-4 py-2.5 text-sm text-muted">Loading places...</li>
+          ) : null}
           {suggestions.map((suggestion, index) => (
             <li key={`${suggestion.text}-${index}`}>
               <button
