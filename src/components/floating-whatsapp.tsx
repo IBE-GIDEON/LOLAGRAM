@@ -144,7 +144,11 @@ export function FloatingWhatsApp() {
 
           {/* Conversation */}
           <div className="bg-[#ECE5DD] px-3 py-4">
-            <div className="max-w-[85%] rounded-lg rounded-tl-none bg-white px-3 py-2 shadow-sm">
+            {/* bg-[#FFFFFF], not bg-white: globals.css forces .bg-white to the
+                dark surface in dark mode, which left this near-black greeting
+                sitting on a near-black bubble. The panel is WhatsApp's own
+                colours in both themes, so the bubble stays white. */}
+            <div className="max-w-[85%] rounded-lg rounded-tl-none bg-[#FFFFFF] px-3 py-2 shadow-sm">
               <p className="text-[11px] font-semibold text-[#075E54]">
                 {store.name}
               </p>
@@ -175,7 +179,9 @@ export function FloatingWhatsApp() {
               onChange={(event) => setMessage(event.target.value)}
               placeholder="Type a message.."
               aria-label="Your message"
-              className="min-w-0 flex-1 rounded-full bg-white px-4 py-2.5 text-[13px] text-[#111B21] outline-none placeholder:text-[#8696A0]"
+              // Same reason as the bubble above: dark mode would have hidden
+              // whatever the visitor typed.
+              className="min-w-0 flex-1 rounded-full bg-[#FFFFFF] px-4 py-2.5 text-[13px] text-[#111B21] outline-none placeholder:text-[#8696A0]"
             />
             <button
               type="submit"
