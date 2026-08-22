@@ -31,7 +31,6 @@ import {
   startCardCheckout
 } from "@/lib/marketplace"
 import { COUNTRIES, DEFAULT_COUNTRY_CODE } from "@/lib/countries"
-import { NIGERIAN_STATES } from "@/lib/nigeria"
 import { getPrimaryProductImage } from "@/lib/product-images"
 import { queueOfflineOrder } from "@/lib/offline-orders"
 import { type PaymentMethod, type VendorDetail } from "@/lib/types"
@@ -39,12 +38,7 @@ import { cn } from "@/lib/utils"
 
 type Step = 1 | 2 | 3
 
-export function CheckoutPageClient({
-  placesEnabled = false
-}: {
-  /** Whether GOOGLE_PLACES_API_KEY is set, resolved on the server. */
-  placesEnabled?: boolean
-}) {
+export function CheckoutPageClient() {
   const router = useRouter()
   const { profile, refreshProfile } = useAuth()
   const { money } = useLocale()
@@ -241,7 +235,6 @@ export function CheckoutPageClient({
                 onChange={setAddress}
                 onSave={saveAddressStep}
                 onCancel={savedAddress ? () => setStep(2) : undefined}
-                placesEnabled={placesEnabled}
               />
             ) : summary ? (
               <div className="flex items-start gap-3 rounded-2xl border border-border p-4">
@@ -522,13 +515,11 @@ function AddressForm({
   address,
   onChange,
   onSave,
-  onCancel,
-  placesEnabled
+  onCancel
 }: {
   address: CheckoutAddress
   onChange: (next: CheckoutAddress) => void
   onSave: () => void
-  placesEnabled: boolean
   onCancel?: () => void
 }) {
   const set = <K extends keyof CheckoutAddress>(key: K, value: CheckoutAddress[K]) =>
@@ -564,60 +555,33 @@ function AddressForm({
         </Field>
 
         <Field label={isNigeria ? "State" : "State or province"}>
-          {placesEnabled ? (
-            <PlaceAutocomplete
-              value={address.region}
-              onChange={(next) => set("region", next)}
-              country={address.country}
-              kind="region"
-              placeholder={isNigeria ? "Start typing a state" : "State or province"}
-            />
-          ) : isNigeria ? (
-            <select
-              className={selectClass}
-              value={address.region}
-              onChange={(event) => set("region", event.target.value)}
-            >
-              <option value="">Choose a state</option>
-              {NIGERIAN_STATES.map((state) => (
-                <option key={state} value={state}>
-                  {state}
-                </option>
-              ))}
-            </select>
-          ) : (
-            // No lookup and no built-in list for anywhere but Nigeria.
-            <Input
-              value={address.region}
-              placeholder="State or province"
-              onChange={(event) => set("region", event.target.value)}
-            />
-          )}
+          <PlaceAutocomplete
+            value={address.region}
+            onChange={(next) => set("region", next)}
+            country={address.country}
+            kind="region"
+            placeholder={isNigeria ? "Start typing a state" : "State or province"}
+          />
         </Field>
 
         <Field label="City">
-          {placesEnabled ? (
-            <PlaceAutocomplete
-              value={address.city}
-              onChange={(next) => set("city", next)}
-              country={address.country}
-              kind="city"
-              placeholder="Start typing a city"
-              // A city's suggestion carries its state, so picking one fills
-              // the field above: "Calabar" arrives knowing it is Cross River.
-              onSelect={(suggestion) => {
-                const parentState = suggestion.secondary.split(",")[0]?.trim()
-                if (!parentState) return
-                onChange({ ...address, city: suggestion.text, region: parentState })
-              }}
-            />
-          ) : (
-            <Input
-              value={address.city}
-              placeholder={isNigeria ? "Calabar Municipal" : "City"}
-              onChange={(event) => set("city", event.target.value)}
-            />
-          )}
+          <PlaceAutocomplete
+            value={address.city}
+            onChange={(next) => set("city", next)}
+            country={address.country}
+            kind="city"
+            placeholder="Start typing a city"
+            // Where a city shares its state's name — Lagos, Kano, Enugu — the
+            // suggestion carries it, so picking the city fills the field above.
+            onSelect={(suggestion) => {
+              if (!suggestion.secondary) return
+              onChange({
+                ...address,
+                city: suggestion.text,
+                region: suggestion.secondary
+              })
+            }}
+          />
         </Field>
 
         <Field label="First name">
